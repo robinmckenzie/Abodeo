@@ -1,0 +1,9 @@
+# Local credentials. Never commit these.
+.env
+.env.*
+*.pem
+*.key
+
+# Example files hold placeholder names only, never real values.
+!.env.example
+!.env.*.example
