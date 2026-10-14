@@ -1,0 +1,60 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #111111;
+    color: #f2f2f2;
+  }
+}
+
+.welcome {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.welcome h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.welcome p {
+  margin: 0.75rem 0 0;
+  font-size: clamp(1.125rem, 3vw, 1.5rem);
+}
+
+.error {
+  padding: 4rem 1rem 1rem;
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+.error pre {
+  overflow-x: auto;
+  padding: 1rem;
+}
