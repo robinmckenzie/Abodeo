@@ -39,6 +39,7 @@
 
 ## Development commands
 
+- Validate with `npm run build`, `npm run typecheck`, `npm run lint` and `npm test`. Run the app with `npm run dev`.
 - Keep the lock file in sync with the dependency manifest when dependencies change.
 ## Code conventions
 

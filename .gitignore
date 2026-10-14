@@ -7,3 +7,9 @@
 # Example files hold placeholder names only, never real values.
 !.env.example
 !.env.*.example
+
+# Dependencies, build output and generated files.
+/node_modules/
+/build/
+/.react-router/
+/coverage/

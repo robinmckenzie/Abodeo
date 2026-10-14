@@ -9,3 +9,26 @@ with the prefix `AD`, such as `AD #3`.
 ChatGPT also follows the shared `CHATGPT.md` in
 [project-starters](https://github.com/robinmckenzie/project-starters), which is
 not copied here.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/), which includes npm: version 24.15 or later in the 24 series, 22.22.2 or later in the 22 series, or 26 or later.
+
+## Setup
+
+```sh
+npm install
+```
+
+## Commands
+
+Run these from the repository root.
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts the app locally at http://localhost:5173, reloading on changes. |
+| `npm run build` | Builds the app for production into `build/`. |
+| `npm start` | Serves the production build at http://localhost:3000 (run `npm run build` first). |
+| `npm run typecheck` | Checks the TypeScript types. |
+| `npm run lint` | Checks the code with ESLint. |
+| `npm test` | Runs the tests once with Vitest. |
