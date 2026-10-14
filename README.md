@@ -12,7 +12,7 @@ not copied here.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 22.22 or later, which includes npm.
+- [Node.js](https://nodejs.org/), which includes npm: version 24.15 or later in the 24 series, 22.22.2 or later in the 22 series, or 26 or later.
 
 ## Setup
 
