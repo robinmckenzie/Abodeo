@@ -1,9 +1,10 @@
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   { ignores: ["build/", ".react-router/", "coverage/"] },
   js.configs.recommended,
   tseslint.configs.recommended,

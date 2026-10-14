@@ -28,7 +28,7 @@ Run these from the repository root.
 | --- | --- |
 | `npm run dev` | Starts the app locally at http://localhost:5173, reloading on changes. |
 | `npm run build` | Builds the app for production into `build/`. |
-| `npm start` | Serves the production build (run `npm run build` first). |
+| `npm start` | Serves the production build at http://localhost:3000 (run `npm run build` first). |
 | `npm run typecheck` | Checks the TypeScript types. |
 | `npm run lint` | Checks the code with ESLint. |
 | `npm test` | Runs the tests once with Vitest. |
