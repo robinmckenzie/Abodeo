@@ -191,8 +191,9 @@ body:has(.dashboard) {
 }
 
 /* The fade-out snapshot is still, so the release is animated on the button's
-   own snapshot: from its pressed 95% back to its size before the press, 105%
-   under a mouse or 100% on touch, while it fades with the screen. */
+   own snapshot: from its pressed 95% back to its size before the press, while
+   it fades with the screen. That is 105% when a mouse was over it, which the
+   Get Started link marks on the page's root element, and 100% otherwise. */
 ::view-transition-group(get-started) {
   animation-duration: 1s;
 }
@@ -203,10 +204,8 @@ body:has(.dashboard) {
     get-started-fade-out 1s ease-out both;
 }
 
-@media (hover: hover) {
-  ::view-transition-old(get-started) {
-    animation-name: get-started-release-hovered, get-started-fade-out;
-  }
+.get-started-hovered::view-transition-old(get-started) {
+  animation-name: get-started-release-hovered, get-started-fade-out;
 }
 
 @keyframes get-started-release {

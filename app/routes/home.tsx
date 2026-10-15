@@ -35,7 +35,12 @@ export default function Home() {
         prefetch="render"
         viewTransition
         onClick={(event) => {
-          if (!isOpeningElsewhere(event)) setIsReleased(true);
+          if (isOpeningElsewhere(event)) return;
+          document.documentElement.classList.toggle(
+            "get-started-hovered",
+            isMouseOver(event),
+          );
+          setIsReleased(true);
         }}
       >
         <img
@@ -47,6 +52,13 @@ export default function Home() {
       </Link>
     </main>
   );
+}
+
+// True for a mouse click with the pointer over the button, not for a tap or
+// the keyboard, so the release springs back to the hovered size only then.
+function isMouseOver(event: React.MouseEvent<HTMLElement>) {
+  const pointerType = (event.nativeEvent as PointerEvent).pointerType;
+  return pointerType === "mouse" && event.currentTarget.matches(":hover");
 }
 
 function isOpeningElsewhere(event: React.MouseEvent) {
