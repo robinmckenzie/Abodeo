@@ -107,8 +107,13 @@ export function ProjectForm({
       <div className="project-form-body">
         <fieldset className="assignee-list">
           <legend>Assigned to</legend>
-          {assignees.map((assignee) => (
-            <label key={assignee.id} className="assignee-option">
+          {/* Each option's place in the list times its arrival. */}
+          {assignees.map((assignee, index) => (
+            <label
+              key={assignee.id}
+              className="assignee-option"
+              style={{ "--arrival": index } as React.CSSProperties}
+            >
               <input
                 type="radio"
                 name="assignee"
