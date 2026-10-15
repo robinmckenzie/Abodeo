@@ -25,6 +25,11 @@ body {
   }
 }
 
+/* Matches the logo's own background, in dark mode as well. */
+body:has(.welcome) {
+  background: #fdfcf8;
+}
+
 .welcome {
   min-height: 100vh;
   min-height: 100dvh;
@@ -33,19 +38,21 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  text-align: center;
 }
 
 .welcome h1 {
+  width: 100%;
   margin: 0;
-  font-size: clamp(2.5rem, 10vw, 5rem);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
 }
 
-.welcome p {
-  margin: 0.75rem 0 0;
-  font-size: clamp(1.125rem, 3vw, 1.5rem);
+/* Fills the width or height available, whichever runs out first, up to the
+   logo's own size. 997 / 868 is the logo's width / height. */
+.welcome img {
+  display: block;
+  width: min(100%, 997px, calc((100vh - 3rem) * 997 / 868));
+  width: min(100%, 997px, calc((100dvh - 3rem) * 997 / 868));
+  height: auto;
+  margin: 0 auto;
 }
 
 .error {
