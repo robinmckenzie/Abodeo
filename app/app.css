@@ -45,12 +45,15 @@ body:has(.welcome) {
   margin: 0;
 }
 
-/* Fills the width or height available, whichever runs out first, up to the
-   logo's own size. 997 / 868 is the logo's width / height. */
+/* Takes 40% of the window's width or height, whichever runs out first, but no
+   smaller than 16rem and no larger than the logo's own size. Below 16rem plus
+   padding it fits the width available. 997 / 868 is the logo's
+   width / height. */
 .welcome img {
   display: block;
-  width: min(100%, 997px, calc((100vh - 3rem) * 997 / 868));
-  width: min(100%, 997px, calc((100dvh - 3rem) * 997 / 868));
+  width: clamp(16rem, min(40vw, 40vh * 997 / 868), 997px);
+  width: clamp(16rem, min(40vw, 40dvh * 997 / 868), 997px);
+  max-width: 100%;
   height: auto;
   margin: 0 auto;
 }
