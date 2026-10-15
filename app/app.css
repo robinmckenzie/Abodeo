@@ -477,7 +477,6 @@ body:has(.dashboard) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1rem;
 }
 
 /* Level with the heading, which the close button is as tall as. */
