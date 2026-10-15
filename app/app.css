@@ -51,11 +51,18 @@ body:has(.dashboard) {
 /* Takes 40% of the window's width or height, whichever runs out first, but no
    smaller than 16rem and no larger than the logo's own size. Below 16rem plus
    padding it fits the width available. 997 / 868 is the logo's
-   width / height. */
+   width / height. 0.78 is Robin's tuned size, and --logo-size scales it from
+   there, set by the T panel's size slider. */
 .welcome img {
   display: block;
-  width: clamp(16rem, min(40vw, 40vh * 997 / 868), 997px);
-  width: clamp(16rem, min(40vw, 40dvh * 997 / 868), 997px);
+  width: calc(
+    clamp(16rem, min(40vw, 40vh * 997 / 868), 997px) * 0.78 *
+      var(--logo-size, 1)
+  );
+  width: calc(
+    clamp(16rem, min(40vw, 40dvh * 997 / 868), 997px) * 0.78 *
+      var(--logo-size, 1)
+  );
   max-width: 100%;
   height: auto;
   margin: 0 auto;
@@ -200,14 +207,23 @@ body:has(.dashboard) {
 
 /* As wide as the logo, but no wider than the button image's own size. The
    view transition name gives the button its own snapshot when the screen
-   fades out, so that it can spring back on release (see below). */
+   fades out, so that it can spring back on release (see below).
+   0.61 is Robin's tuned size, and --button-size scales it from there, set by
+   the T panel's size slider. The transition is the hover's, so that leaving
+   the button shrinks it back with the same movement as hovering grew it. */
 .get-started {
   display: block;
-  width: clamp(16rem, min(40vw, 40vh * 997 / 868), 457px);
-  width: clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px);
+  width: calc(
+    clamp(16rem, min(40vw, 40vh * 997 / 868), 457px) * 0.61 *
+      var(--button-size, 1)
+  );
+  width: calc(
+    clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px) * 0.61 *
+      var(--button-size, 1)
+  );
   max-width: 100%;
   margin-top: 1.5rem;
-  transition: transform 0.2s var(--spring-press);
+  transition: transform 0.31s var(--spring-hover);
   view-transition-name: get-started;
 }
 

@@ -9,6 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import { fadeTuningScript } from "./fade-tuning-panel";
+import { sizeTuningScript } from "./size-sliders";
 import "./app.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -19,9 +20,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
-        {/* Applies values saved by the fade tuning panel before the page
-            first appears. */}
+        {/* Apply values saved by the fade tuning panel and the size sliders
+            before the page first appears. */}
         <script dangerouslySetInnerHTML={{ __html: fadeTuningScript }} />
+        <script dangerouslySetInnerHTML={{ __html: sizeTuningScript }} />
       </head>
       <body>
         {children}

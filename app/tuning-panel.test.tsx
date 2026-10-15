@@ -1,56 +1,31 @@
 import { readFileSync } from "node:fs";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildSpringEasing } from "./spring-easing";
 import { defaultValues, TuningPanel } from "./tuning-panel";
 
-function pressT() {
-  fireEvent.keyDown(window, { key: "t" });
-}
-
-function readStyle() {
-  return document.getElementById("tuning-panel-css")?.textContent ?? "";
-}
-
+// Only what visitors see is tested here: the T panel is a tool for Robin,
+// but its CSS applies to every visitor's button, even while it is hidden.
 describe("TuningPanel", () => {
   afterEach(() => {
-    // The panel remembers whether it is shown, so leave it hidden.
-    if (screen.queryByText("Current values")) pressT();
     cleanup();
-  });
-
-  it("is hidden until T is pressed, and hidden again by T", () => {
-    render(<TuningPanel />);
-    expect(screen.queryByText("Current values")).toBeNull();
-    pressT();
-    expect(screen.getByText("Current values")).toBeTruthy();
-    pressT();
-    expect(screen.queryByText("Current values")).toBeNull();
   });
 
   it("applies the agreed values to the button while hidden", () => {
     render(<TuningPanel />);
-    const css = readStyle();
+    const css = document.getElementById("tuning-panel-css")?.textContent ?? "";
     expect(css).toContain("transform: scale(1.05)");
     expect(css).toContain(buildSpringEasing(defaultValues.hoverSpring));
     expect(css).toContain("transform: scale(0.95)");
   });
 
-  it("updates the button's movement when a slider moves", () => {
-    render(<TuningPanel />);
-    pressT();
-    const [hoverSize] = screen.getAllByRole("slider", { name: /Size/ });
-    fireEvent.change(hoverSize, { target: { value: "1.1" } });
-    expect(readStyle()).toContain("transform: scale(1.1)");
-    fireEvent.change(hoverSize, { target: { value: "1.05" } });
-  });
-
-  it("keeps the tuned values after the welcome screen is removed", () => {
+  it("keeps the button's CSS while the welcome screen fades out", () => {
     const { unmount } = render(<TuningPanel />);
     unmount();
-    expect(readStyle()).toContain("tune-release");
+    const css = document.getElementById("tuning-panel-css")?.textContent ?? "";
+    expect(css).toContain("tune-release");
   });
 
   it("starts from the same movements as app.css", () => {
@@ -70,9 +45,12 @@ describe("TuningPanel", () => {
     }
   });
 
-  it("ignores T pressed with Ctrl, so browser shortcuts still work", () => {
-    render(<TuningPanel />);
-    fireEvent.keyDown(window, { key: "t", ctrlKey: true });
-    expect(screen.queryByText("Current values")).toBeNull();
+  it("shrinks the button back with the hover's movement in app.css", () => {
+    // Tests run from the repository root.
+    const css = readFileSync("app/app.css", "utf8");
+    const rule = css.match(/\n\.get-started \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain(
+      `transition: transform ${defaultValues.hoverDuration}s var(--spring-hover)`,
+    );
   });
 });
