@@ -74,7 +74,44 @@ function buildCss(v: Values) {
 }
 @keyframes tune-release-hovered {
   to { transform: scale(${v.hoverScale / v.pressScale}); }
+}
+.tuning-panel {
+  width: 100%;
+  max-width: 1100px;
+  margin-top: 32px;
+  display: grid;
+  gap: 16px;
+  font-size: 14px;
+}
+.tuning-panel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* On a phone in landscape the panel goes below the logo and button, not
+   beside them. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .welcome:has(> .tuning-panel) {
+    flex-wrap: wrap;
+    align-content: center;
+  }
+  .tuning-panel {
+    flex-basis: 100%;
+  }
 }`;
+}
+
+// Puts the CSS in a style element in the page's head rather than in the
+// panel, so that it still applies while the welcome screen fades out and the
+// panel is removed with it.
+function applyCss(css: string) {
+  let style = document.getElementById("tuning-panel-css");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "tuning-panel-css";
+    document.head.append(style);
+  }
+  style.textContent = css;
 }
 
 // Samples a CSS cubic-bezier as (time fraction, progress) points.
@@ -135,8 +172,7 @@ function Graph({
         {formatPercent(extreme)}
       </figcaption>
       <svg
-        width={width}
-        height={height}
+        viewBox={`0 0 ${width} ${height}`}
         style={{ background: "#fff", border: "1px solid #ddd" }}
       >
         {ticks.map((s) => (
@@ -206,7 +242,7 @@ function Slider({
     <label
       style={{
         display: "grid",
-        gridTemplateColumns: "9rem 1fr 3.5rem",
+        gridTemplateColumns: "7.5rem minmax(0, 1fr) 3rem",
         gap: 8,
         alignItems: "center",
       }}
@@ -266,17 +302,24 @@ export function TuningPanel() {
   const [v, setV] = useState(saved);
   const [visible, setVisible] = useState(savedVisible);
 
-  // T shows and hides the panel. The tuned values apply either way.
+  // T shows and hides the panel. The tuned values apply either way. A held
+  // key, browser shortcuts and typing into a text field are ignored.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "t" && e.key !== "T") return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTextField(e.target)) return;
       savedVisible = !savedVisible;
       setVisible(savedVisible);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    applyCss(buildCss(v));
+  }, [v]);
+
   const update = (patch: Partial<Values>) => {
     saved = { ...v, ...patch };
     setV(saved);
@@ -292,129 +335,126 @@ export function TuningPanel() {
   };
 
   return (
-    <>
-      <style>{buildCss(v)}</style>
-      {visible && (
+    visible && (
+      <div className="tuning-panel">
         <div
           style={{
-            width: "100%",
-            maxWidth: 1100,
-            marginTop: 32,
             display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
             gap: 16,
-            fontSize: 14,
           }}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: 16,
-            }}
-          >
-            <div style={section}>
-              <strong>1. Hover</strong>
-              <Slider
-                label="Size"
-                value={v.hoverScale}
-                min={1}
-                max={1.2}
-                step={0.005}
-                onChange={(hoverScale) => update({ hoverScale })}
-              />
-              <Slider
-                label="Duration (s)"
-                value={v.hoverDuration}
-                min={0.05}
-                max={1}
-                step={0.01}
-                onChange={(hoverDuration) => update({ hoverDuration })}
-              />
-              <CurveSliders
-                curve={v.hoverCurve}
-                onChange={(hoverCurve) => update({ hoverCurve })}
-              />
-              <Graph
-                title="Hover"
-                from={1}
-                to={v.hoverScale}
-                duration={v.hoverDuration}
-                curve={v.hoverCurve}
-              />
-            </div>
-            <div style={section}>
-              <strong>2. Mouse down</strong>
-              <Slider
-                label="Size"
-                value={v.pressScale}
-                min={0.8}
-                max={1}
-                step={0.005}
-                onChange={(pressScale) => update({ pressScale })}
-              />
-              <Slider
-                label="Duration (s)"
-                value={v.pressDuration}
-                min={0.05}
-                max={1}
-                step={0.01}
-                onChange={(pressDuration) => update({ pressDuration })}
-              />
-              <CurveSliders
-                curve={v.pressCurve}
-                onChange={(pressCurve) => update({ pressCurve })}
-              />
-              <Graph
-                title="Mouse down"
-                from={v.hoverScale}
-                to={v.pressScale}
-                duration={v.pressDuration}
-                curve={v.pressCurve}
-              />
-            </div>
-            <div style={section}>
-              <strong>3. Mouse up</strong>
-              <Slider
-                label="Duration (s)"
-                value={v.releaseDuration}
-                min={0.05}
-                max={1}
-                step={0.01}
-                onChange={(releaseDuration) => update({ releaseDuration })}
-              />
-              <CurveSliders
-                curve={v.releaseCurve}
-                onChange={(releaseCurve) => update({ releaseCurve })}
-              />
-              <Slider
-                label="Screen fade (s)"
-                value={v.fadeDuration}
-                min={0.2}
-                max={3}
-                step={0.1}
-                onChange={(fadeDuration) => update({ fadeDuration })}
-              />
-              <Graph
-                title="Mouse up"
-                from={v.pressScale}
-                to={v.hoverScale}
-                duration={v.releaseDuration}
-                curve={v.releaseCurve}
-                fadeDuration={v.fadeDuration}
-              />
-            </div>
+          <div style={section}>
+            <strong>1. Hover</strong>
+            <Slider
+              label="Size"
+              value={v.hoverScale}
+              min={1}
+              max={1.2}
+              step={0.005}
+              onChange={(hoverScale) => update({ hoverScale })}
+            />
+            <Slider
+              label="Duration (s)"
+              value={v.hoverDuration}
+              min={0.05}
+              max={1}
+              step={0.01}
+              onChange={(hoverDuration) => update({ hoverDuration })}
+            />
+            <CurveSliders
+              curve={v.hoverCurve}
+              onChange={(hoverCurve) => update({ hoverCurve })}
+            />
+            <Graph
+              title="Hover"
+              from={1}
+              to={v.hoverScale}
+              duration={v.hoverDuration}
+              curve={v.hoverCurve}
+            />
           </div>
           <div style={section}>
-            <strong>Current values</strong>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
-              {`Hover: size ${v.hoverScale}, ${v.hoverDuration}s, ${formatBezier(v.hoverCurve)}
+            <strong>2. Mouse down</strong>
+            <Slider
+              label="Size"
+              value={v.pressScale}
+              min={0.8}
+              max={1}
+              step={0.005}
+              onChange={(pressScale) => update({ pressScale })}
+            />
+            <Slider
+              label="Duration (s)"
+              value={v.pressDuration}
+              min={0.05}
+              max={1}
+              step={0.01}
+              onChange={(pressDuration) => update({ pressDuration })}
+            />
+            <CurveSliders
+              curve={v.pressCurve}
+              onChange={(pressCurve) => update({ pressCurve })}
+            />
+            <Graph
+              title="Mouse down"
+              from={v.hoverScale}
+              to={v.pressScale}
+              duration={v.pressDuration}
+              curve={v.pressCurve}
+            />
+          </div>
+          <div style={section}>
+            <strong>3. Mouse up</strong>
+            <Slider
+              label="Duration (s)"
+              value={v.releaseDuration}
+              min={0.05}
+              max={1}
+              step={0.01}
+              onChange={(releaseDuration) => update({ releaseDuration })}
+            />
+            <CurveSliders
+              curve={v.releaseCurve}
+              onChange={(releaseCurve) => update({ releaseCurve })}
+            />
+            <Slider
+              label="Screen fade (s)"
+              value={v.fadeDuration}
+              min={0.2}
+              max={3}
+              step={0.1}
+              onChange={(fadeDuration) => update({ fadeDuration })}
+            />
+            <Graph
+              title="Mouse up"
+              from={v.pressScale}
+              to={v.hoverScale}
+              duration={v.releaseDuration}
+              curve={v.releaseCurve}
+              fadeDuration={v.fadeDuration}
+            />
+          </div>
+        </div>
+        <div style={section}>
+          <strong>Current values</strong>
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
+            {`Hover: size ${v.hoverScale}, ${v.hoverDuration}s, ${formatBezier(v.hoverCurve)}
 Mouse down: size ${v.pressScale}, ${v.pressDuration}s, ${formatBezier(v.pressCurve)}
 Mouse up: ${v.releaseDuration}s, ${formatBezier(v.releaseCurve)}
 Screen fade: ${v.fadeDuration}s`}
-            </pre>
-          </div>
+          </pre>
         </div>
-      )}
-    </>
+      </div>
+    )
+  );
+}
+
+function isTextField(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.matches("input:not([type=range]), textarea, select"))
   );
 }

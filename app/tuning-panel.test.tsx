@@ -7,8 +7,8 @@ function pressT() {
   fireEvent.keyDown(window, { key: "t" });
 }
 
-function readStyle(container: HTMLElement) {
-  return container.querySelector("style")?.textContent ?? "";
+function readStyle() {
+  return document.getElementById("tuning-panel-css")?.textContent ?? "";
 }
 
 describe("TuningPanel", () => {
@@ -28,20 +28,26 @@ describe("TuningPanel", () => {
   });
 
   it("applies the agreed values to the button while hidden", () => {
-    const { container } = render(<TuningPanel />);
-    const css = readStyle(container);
+    render(<TuningPanel />);
+    const css = readStyle();
     expect(css).toContain("transform: scale(1.05)");
     expect(css).toContain("cubic-bezier(0.3, 3.35, 0.6, 1)");
     expect(css).toContain("transform: scale(0.95)");
   });
 
   it("updates the button's movement when a slider moves", () => {
-    const { container } = render(<TuningPanel />);
+    render(<TuningPanel />);
     pressT();
     const [hoverSize] = screen.getAllByRole("slider", { name: /Size/ });
     fireEvent.change(hoverSize, { target: { value: "1.1" } });
-    expect(readStyle(container)).toContain("transform: scale(1.1)");
+    expect(readStyle()).toContain("transform: scale(1.1)");
     fireEvent.change(hoverSize, { target: { value: "1.05" } });
+  });
+
+  it("keeps the tuned values after the welcome screen is removed", () => {
+    const { unmount } = render(<TuningPanel />);
+    unmount();
+    expect(readStyle()).toContain("tune-release");
   });
 
   it("ignores T pressed with Ctrl, so browser shortcuts still work", () => {
