@@ -54,11 +54,12 @@ export default function Home() {
   );
 }
 
-// True for a mouse click with the pointer over the button, not for a tap or
-// the keyboard, so the release springs back to the hovered size only then.
+// True when the button is showing its hovered size: a mouse is over it,
+// whether it was clicked or used from the keyboard. A tap is excluded, because
+// a touch screen can leave the button marked as hovered after the tap.
 function isMouseOver(event: React.MouseEvent<HTMLElement>) {
   const pointerType = (event.nativeEvent as PointerEvent).pointerType;
-  return pointerType === "mouse" && event.currentTarget.matches(":hover");
+  return pointerType !== "touch" && event.currentTarget.matches(":hover");
 }
 
 function isOpeningElsewhere(event: React.MouseEvent) {
