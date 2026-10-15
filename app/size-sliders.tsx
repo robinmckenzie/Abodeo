@@ -24,7 +24,7 @@ function buildCss(sizes: Record<keyof Sizes, number | string>) {
 
 // Saved sizes that are not numbers in the slider's range are replaced with
 // the defaults.
-export function parseSizes(json: string | null): Sizes {
+function parseSizes(json: string | null): Sizes {
   const sizes = { ...defaultSizes };
   try {
     const parsed = JSON.parse(json ?? "null");

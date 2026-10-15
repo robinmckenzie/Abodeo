@@ -60,7 +60,7 @@ const isInRange = (value: unknown, [min, max]: readonly [number, number]) =>
 
 // Saved values that are not numbers in their slider's range are replaced
 // with the defaults.
-export function parseValues(json: string | null): Values {
+function parseValues(json: string | null): Values {
   const values = structuredClone(defaultValues);
   try {
     const parsed = JSON.parse(json ?? "null");
