@@ -3,7 +3,7 @@
 // button from their normal sizes. It stays put as they change size. The
 // sizes are kept in local storage, and sizeTuningScript applies them before
 // the page first appears, so that nothing visibly changes size afterwards.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Sizes = { logo: number; button: number };
 
@@ -92,21 +92,67 @@ function readSizes() {
 
 const formatPercent = (size: number) => `${Math.round(size * 100)}%`;
 
+const targets = { logo: ".welcome h1 img", button: ".get-started" };
+
+// The size an element is shown at, which is less than the size set when it
+// would be wider than the space available, as its max-width stops it there.
+// It compares the element's width with its width without that limit.
+function measureShownSize(selector: string, size: number) {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) return size;
+  const shownWidth = element.offsetWidth;
+  const maxWidth = element.style.maxWidth;
+  element.style.maxWidth = "none";
+  const fullWidth = element.offsetWidth;
+  element.style.maxWidth = maxWidth;
+  return fullWidth ? (size * shownWidth) / fullWidth : size;
+}
+
+// Measures again whenever the logo or button changes width, which happens
+// when a size or the window changes, or when the page's layout does.
+function useShownSizes() {
+  const [shown, setShown] = useState<Sizes | null>(null);
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const sizes = readSizes();
+      setShown({
+        logo: measureShownSize(targets.logo, sizes.logo),
+        button: measureShownSize(targets.button, sizes.button),
+      });
+    });
+    for (const selector of Object.values(targets)) {
+      const element = document.querySelector(selector);
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, []);
+  return shown;
+}
+
 function SizeSlider({
   label,
   name,
   value,
+  shown,
   onChange,
 }: {
   label: string;
   name: string;
   value: number;
+  shown: number | undefined;
   onChange: (value: number) => void;
 }) {
+  const isCapped =
+    shown !== undefined && Math.round(shown * 100) < Math.round(value * 100);
   return (
     <label className="size-slider">
       <span>{label}</span>
       <span>{formatPercent(value)}</span>
+      {/* Takes up its line either way, so that the sliders do not jump. */}
+      <span className="size-slider-shown">
+        {isCapped ? `(${formatPercent(shown)} here)` : " "}
+      </span>
       <input
         type="range"
         aria-label={name}
@@ -122,6 +168,7 @@ function SizeSlider({
 
 export function SizeSliders() {
   const [sizes, setSizes] = useState(readSizes);
+  const shown = useShownSizes();
 
   const update = (next: Sizes) => {
     current = next;
@@ -137,12 +184,14 @@ export function SizeSliders() {
           label="Logo"
           name="Logo size"
           value={sizes.logo}
+          shown={shown?.logo}
           onChange={(logo) => update({ ...sizes, logo })}
         />
         <SizeSlider
           label="Button"
           name="Button size"
           value={sizes.button}
+          shown={shown?.button}
           onChange={(button) => update({ ...sizes, button })}
         />
       </div>

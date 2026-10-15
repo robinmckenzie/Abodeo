@@ -184,7 +184,7 @@ function buildCss(v: Values) {
    scrolls past it. */
 @media (min-width: 700px) and (max-width: 1400px) {
   .welcome:has(.size-sliders) > :is(.tuning-panel, .fade-tuning-panel) {
-    padding-right: 148px;
+    padding-right: 184px;
   }
 }
 /* The size sliders' panel stays at the right-hand edge of the window. */
@@ -213,6 +213,11 @@ function buildCss(v: Values) {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  width: 64px;
+}
+.size-slider-shown {
+  color: #666;
+  font-size: 11px;
 }
 .size-slider input {
   writing-mode: vertical-lr;
