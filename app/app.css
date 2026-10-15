@@ -209,7 +209,8 @@ body:has(.dashboard) {
    view transition name gives the button its own snapshot when the screen
    fades out, so that it can spring back on release (see below).
    0.61 is Robin's tuned size, and --button-size scales it from there, set by
-   the T panel's size slider. */
+   the T panel's size slider. The transition is the hover's, so that leaving
+   the button shrinks it back with the same movement as hovering grew it. */
 .get-started {
   display: block;
   width: calc(
@@ -222,7 +223,7 @@ body:has(.dashboard) {
   );
   max-width: 100%;
   margin-top: 1.5rem;
-  transition: transform 0.2s var(--spring-press);
+  transition: transform 0.31s var(--spring-hover);
   view-transition-name: get-started;
 }
 

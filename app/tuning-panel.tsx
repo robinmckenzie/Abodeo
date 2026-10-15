@@ -114,6 +114,11 @@ function readValues() {
 function buildCss(v: Values) {
   return `
 @media (prefers-reduced-motion: no-preference) {
+  /* Leaving the button: the same movement as the hover. */
+  .get-started {
+    transition-duration: ${v.hoverDuration}s;
+    transition-timing-function: ${buildSpringEasing(v.hoverSpring)};
+  }
   @media (hover: hover) {
     .get-started:hover {
       transform: scale(${v.hoverScale});

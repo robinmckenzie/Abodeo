@@ -77,6 +77,27 @@ describe("TuningPanel", () => {
     }
   });
 
+  it("shrinks the button back with the hover's tuned movement", () => {
+    render(<TuningPanel />);
+    pressT();
+    const [hoverDuration] = screen.getAllByRole("slider", {
+      name: /Duration/,
+    });
+    fireEvent.change(hoverDuration, { target: { value: "0.5" } });
+    const unhover = readStyle().match(/\.get-started \{([^}]*)\}/)?.[1] ?? "";
+    expect(unhover).toContain("transition-duration: 0.5s");
+    expect(unhover).toContain(buildSpringEasing(defaultValues.hoverSpring));
+  });
+
+  it("shrinks the button back with the hover's movement in app.css", () => {
+    // Tests run from the repository root.
+    const css = readFileSync("app/app.css", "utf8");
+    const rule = css.match(/\n\.get-started \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain(
+      `transition: transform ${defaultValues.hoverDuration}s var(--spring-hover)`,
+    );
+  });
+
   it("ignores T pressed with Ctrl, so browser shortcuts still work", () => {
     render(<TuningPanel />);
     fireEvent.keyDown(window, { key: "t", ctrlKey: true });
