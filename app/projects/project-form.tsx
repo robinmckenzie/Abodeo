@@ -107,12 +107,11 @@ export function ProjectForm({
       <div className="project-form-body">
         <fieldset className="assignee-list">
           <legend>Assigned to</legend>
-          {/* Each option's place in the list times its arrival. */}
           {assignees.map((assignee, index) => (
             <label
               key={assignee.id}
-              className="assignee-option"
-              style={{ "--arrival": index } as React.CSSProperties}
+              className="assignee-option arrives"
+              style={arriveAt(index)}
             >
               <input
                 type="radio"
@@ -138,6 +137,8 @@ export function ProjectForm({
           <label htmlFor={`${id}-title`}>Title</label>
           <input
             id={`${id}-title`}
+            className="arrives"
+            style={arriveAt(1)}
             name="title"
             value={values.title}
             autoComplete="off"
@@ -148,9 +149,17 @@ export function ProjectForm({
               A project needs a title, so its last title is kept.
             </p>
           )}
-          <label htmlFor={`${id}-notes`}>Notes</label>
+          <label
+            htmlFor={`${id}-notes`}
+            className="arrives"
+            style={arriveAt(2)}
+          >
+            Notes
+          </label>
           <textarea
             id={`${id}-notes`}
+            className="arrives"
+            style={arriveAt(3)}
             name="notes"
             rows={8}
             value={values.notes}
@@ -169,6 +178,14 @@ export function ProjectForm({
       </div>
     </form>
   );
+}
+
+// As the form appears, parts of it arrive one after another, timed by their
+// place in the sequence: the assignees down the left, and alongside them
+// the title field, the notes label and the notes box, after the title's
+// label, which shows at once with the first assignee.
+function arriveAt(place: number) {
+  return { "--arrival": place } as React.CSSProperties;
 }
 
 // A thin circle, with a three-line arrow pointing right when selected. The

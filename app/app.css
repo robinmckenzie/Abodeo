@@ -617,13 +617,13 @@ body:has(.dashboard) {
   cursor: pointer;
 }
 
-/* As the form appears, the assignees arrive one by one: each fades in over
-   0.4 seconds, 0.07 seconds after the one above. --arrival is the option's
-   place in the list. The dashboard's T panel can tune both times, through
-   --assignee-fade and --assignee-gap. */
+/* As the form appears, its parts arrive one by one (see arriveAt in
+   project-form.tsx): each fades in over 1.15 seconds, 0.07 seconds after
+   the one before. --arrival is its place in the sequence. The dashboard's T
+   panel can tune both times, through --assignee-fade and --assignee-gap. */
 @media (prefers-reduced-motion: no-preference) {
-  .assignee-option {
-    animation: assignee-arrive var(--assignee-fade, 0.4s) ease-out both;
+  .project-form .arrives {
+    animation: form-arrive var(--assignee-fade, 1.15s) ease-out both;
     animation-delay: calc(var(--arrival, 0) * var(--assignee-gap, 0.07s));
   }
 }
@@ -664,7 +664,7 @@ body:has(.dashboard) {
   justify-self: start;
 }
 
-@keyframes assignee-arrive {
+@keyframes form-arrive {
   from {
     opacity: 0;
   }

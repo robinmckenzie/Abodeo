@@ -1,7 +1,8 @@
-// A panel for tuning how the assignees arrive as the project form appears,
-// shown and hidden with T on the dashboard, and fixed to the left of the
-// window. Tuned values are kept in local storage and set as CSS properties
-// on the page's root element, which app.css uses in place of its defaults.
+// A panel for tuning how the project form's assignees, title field and
+// notes arrive as the form appears, shown and hidden with T on the
+// dashboard, and fixed to the left of the window. Tuned values are kept in
+// local storage and set as CSS properties on the page's root element, which
+// app.css uses in place of its defaults.
 import { useEffect, useState } from "react";
 
 import { isTextField } from "../keyboard";
@@ -10,7 +11,7 @@ import { Slider } from "../tuning-panel";
 type Values = { fade: number; gap: number };
 
 // As in app.css.
-const defaultValues: Values = { fade: 0.4, gap: 0.07 };
+const defaultValues: Values = { fade: 1.15, gap: 0.07 };
 
 const ranges: Record<keyof Values, [number, number]> = {
   fade: [0, 1.5],
@@ -100,7 +101,7 @@ export function AssigneeTuningPanel() {
   return (
     <div className="assignee-tuning-panel">
       <fieldset>
-        <legend>Assignees arriving (T)</legend>
+        <legend>Form arriving (T)</legend>
         <Slider
           label="Fade (s)"
           value={values.fade}
