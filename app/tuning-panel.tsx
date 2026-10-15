@@ -23,13 +23,13 @@ type Values = {
 
 export const defaultValues: Values = {
   hoverScale: 1.05,
-  hoverDuration: 0.2,
-  hoverSpring: { first: 0.8, dip: 0.3, second: 0.15, peakAt: 0.3 },
+  hoverDuration: 0.31,
+  hoverSpring: { first: 0.8, dip: 0.15, second: 0.1, peakAt: 0.25 },
   pressScale: 0.95,
-  pressDuration: 0.2,
-  pressSpring: { first: 0.45, dip: 0.2, second: 0.1, peakAt: 0.3 },
+  pressDuration: 0.31,
+  pressSpring: { first: 0.45, dip: 0.15, second: 0.1, peakAt: 0.3 },
   releaseDuration: 0.3,
-  releaseSpring: { first: 0.45, dip: 0.2, second: 0.1, peakAt: 0.3 },
+  releaseSpring: { first: 0.45, dip: 0.15, second: 0.05, peakAt: 0.3 },
   fadeDuration: 1,
 };
 
@@ -308,7 +308,7 @@ function SpringSliders({
         label="Dip"
         value={spring.dip}
         min={0}
-        max={1}
+        max={0.5}
         step={0.05}
         onChange={(dip) => onChange({ ...spring, dip })}
       />
@@ -316,7 +316,7 @@ function SpringSliders({
         label="Second bounce"
         value={spring.second}
         min={0}
-        max={1}
+        max={0.5}
         step={0.05}
         onChange={(second) => onChange({ ...spring, second })}
       />

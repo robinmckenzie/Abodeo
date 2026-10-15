@@ -59,14 +59,15 @@ describe("TuningPanel", () => {
     const readVariable = (name: string) =>
       css.match(new RegExp(`--${name}:\\s*(linear\\([^)]*\\))`))?.[1];
     const normalise = (easing = "") => easing.replace(/\s+/g, "");
-    expect(normalise(readVariable("spring-hover"))).toBe(
-      normalise(buildSpringEasing(defaultValues.hoverSpring)),
-    );
-    // app.css uses one curve for both the press and the release.
-    expect(normalise(readVariable("spring"))).toBe(
-      normalise(buildSpringEasing(defaultValues.pressSpring)),
-    );
-    expect(defaultValues.releaseSpring).toEqual(defaultValues.pressSpring);
+    for (const [name, spring] of [
+      ["spring-hover", defaultValues.hoverSpring],
+      ["spring-press", defaultValues.pressSpring],
+      ["spring-release", defaultValues.releaseSpring],
+    ] as const) {
+      expect(normalise(readVariable(name))).toBe(
+        normalise(buildSpringEasing(spring)),
+      );
+    }
   });
 
   it("ignores T pressed with Ctrl, so browser shortcuts still work", () => {
