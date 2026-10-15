@@ -84,9 +84,9 @@ it starts.
 Robin checks each production deployment. Agents do not run checks against the
 deployed site.
 
-1. In the Vercel project's Deployments list, the newest deployment marked
-   Production and Current shows branch `main` and the same commit ID and
-   message as the latest commit on `main` in GitHub.
+1. In the Vercel project's Deployments list, the newest Production deployment
+   is Ready and shows branch `main` and the same commit ID and message as the
+   latest commit on `main` in GitHub.
 2. Open the production address in a private window that is not signed in to
    anything. The welcome screen appears without a sign-in prompt.
 3. View the page source. The welcome text is in the HTML sent by the server.
