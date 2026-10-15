@@ -37,7 +37,8 @@ Run these from the repository root.
 
 Abodeo is hosted on [Vercel](https://vercel.com/) at PRODUCTION_ADDRESS. Anyone
 with that address can open it without a Vercel account. The other addresses
-Vercel generates for each deployment ask for a Vercel login.
+Vercel generates for each deployment ask for a Vercel login, because the project
+uses Vercel's Standard Protection.
 
 ### How it is set up
 
@@ -49,6 +50,21 @@ Vercel generates for each deployment ask for a Vercel login.
 - There are no environment variables.
 - `main` is the production branch. `vercel.json` turns off deployment for every
   other branch, so pushing a branch or opening a pull request deploys nothing.
+
+### Setting up the Vercel project
+
+This was done once, and is only needed again if the project is recreated.
+Importing deploys straight away, so Robin approves the first deployment before
+it starts.
+
+1. Make sure `main` contains `vercel.json`, so that only `main` deploys from the
+   start.
+2. In Vercel, choose Add New, then Project, and import `robinmckenzie/Abodeo`
+   from GitHub, giving Vercel's GitHub app access to the repository if asked.
+3. Keep the detected framework, React Router, and the default build settings.
+   Add no environment variables. Selecting Deploy starts the first deployment.
+4. In the project's settings, confirm that the production branch is `main`, the
+   Node.js version is 24.x and Deployment Protection is Standard Protection.
 
 ### How a change reaches production
 
