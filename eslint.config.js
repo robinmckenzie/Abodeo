@@ -5,7 +5,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  { ignores: ["build/", ".react-router/", "coverage/"] },
+  { ignores: ["build/", ".react-router/", "coverage/", ".vercel/"] },
   js.configs.recommended,
   tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,

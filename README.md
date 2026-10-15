@@ -32,3 +32,52 @@ Run these from the repository root.
 | `npm run typecheck` | Checks the TypeScript types. |
 | `npm run lint` | Checks the code with ESLint. |
 | `npm test` | Runs the tests once with Vitest. |
+
+## Deployment
+
+Abodeo is hosted on [Vercel](https://vercel.com/) at PRODUCTION_ADDRESS. Anyone
+with that address can open it without a Vercel account. The other addresses
+Vercel generates for each deployment ask for a Vercel login.
+
+### How it is set up
+
+- The Vercel project `abodeo`, on Robin's Hobby plan, is connected to this
+  repository. Vercel detects React Router, builds with `npm run build` and
+  serves the server rendering as a Vercel Function on Node.js 24.x.
+- No Vercel package is installed, so the build warns that Vercel's React Router
+  preset was not detected. That is expected.
+- There are no environment variables.
+- `main` is the production branch. `vercel.json` turns off deployment for every
+  other branch, so pushing a branch or opening a pull request deploys nothing.
+
+### How a change reaches production
+
+- Merging or pushing into `main` deploys that commit to production
+  automatically. Approving the merge or push therefore approves the deployment,
+  as `AGENTS.md` says.
+- Any other deployment, such as using Redeploy in Vercel after a failed build,
+  needs Robin's approval first.
+- A page opened before a deployment keeps running the old code until it is
+  reloaded, so check a new deployment in a fresh window.
+
+### Checking a deployment
+
+Robin checks each production deployment. Agents do not run checks against the
+deployed site.
+
+1. In Vercel, confirm that the production deployment is the intended commit on
+   `main`.
+2. Open the production address in a private window that is not signed in to
+   anything. The welcome screen appears without a sign-in prompt.
+3. View the page source. The welcome text is in the HTML sent by the server.
+4. In the browser's developer tools, the Console shows no errors and the
+   Network tab shows the styles and scripts loaded without failures.
+5. Open an address that does not exist, such as `/no-such-page`. The 404 page
+   appears.
+
+### Trying Vercel's build locally
+
+To check Vercel's build without deploying, create `.vercel/project.json`
+containing `{"projectId":"_","orgId":"_","settings":{"framework":"react-router"}}`
+and run `npx vercel build`. The output goes to `.vercel/output`, which Git
+ignores.

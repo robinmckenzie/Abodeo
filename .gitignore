@@ -13,3 +13,6 @@
 /build/
 /.react-router/
 /coverage/
+
+# Vercel's link to the project and its local build output.
+/.vercel/
