@@ -86,13 +86,17 @@ export function ExpandedProjectBar({
     const bar = barRef.current;
     if (!bar || !canAnimate(bar)) return;
     const height = bar.offsetHeight;
-    bar.animate(
+    const expanding = bar.animate(
       [
         { height: `${barHeight}px`, overflow: "hidden" },
         { height: `${height}px`, overflow: "hidden" },
       ],
       { duration: resizeDuration, easing: "ease-out" },
     );
+    // Cancelled if the effect is undone, as React does once in development,
+    // so that running again measures the full height rather than the
+    // animation's starting one.
+    return () => expanding.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
