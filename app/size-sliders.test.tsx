@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseSizes, sizeTuningScript } from "./size-sliders";
 import { TuningPanel } from "./tuning-panel";
@@ -63,6 +63,27 @@ describe("SizeSliders", () => {
     expect(readStyle()).toContain("--logo-size: 1;");
     expect(localStorage.getItem("abodeo-button-tuning")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
+  });
+
+  it("shows the sizes in use after T hides and shows the sliders, without local storage", () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("Storage is blocked");
+      });
+    render(<TuningPanel />);
+    pressT();
+    fireEvent.change(screen.getByRole("slider", { name: "Logo size" }), {
+      target: { value: "1.2" },
+    });
+    pressT();
+    pressT();
+    expect(
+      (screen.getByRole("slider", { name: "Logo size" }) as HTMLInputElement)
+        .value,
+    ).toBe("1.2");
+    expect(readStyle()).toContain("--logo-size: 1.2");
+    setItem.mockRestore();
   });
 
   it("saves nothing when the sliders are only shown", () => {

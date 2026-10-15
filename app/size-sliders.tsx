@@ -74,53 +74,81 @@ function saveSizes(sizes: Sizes) {
   }
 }
 
-function loadSizes() {
-  try {
-    return parseSizes(localStorage.getItem(storageKey));
-  } catch {
-    return defaultSizes;
+// Kept outside the component so that the sliders show the sizes in use
+// when T hides and shows them again, even without local storage.
+let current: Sizes | null = null;
+
+function readSizes() {
+  if (!current) {
+    try {
+      current = parseSizes(localStorage.getItem(storageKey));
+    } catch {
+      current = defaultSizes;
+    }
   }
+  return current;
 }
 
 const formatPercent = (size: number) => `${Math.round(size * 100)}%`;
 
+// The element's layout box in page coordinates, leaving out transforms, so
+// that the button's springs do not move its slider.
+function measureLayoutBox(element: HTMLElement) {
+  let left = 0;
+  let top = 0;
+  for (
+    let e: HTMLElement | null = element;
+    e;
+    e = e.offsetParent as HTMLElement | null
+  ) {
+    left += e.offsetLeft;
+    top += e.offsetTop;
+  }
+  return {
+    left,
+    top,
+    width: element.offsetWidth,
+    height: element.offsetHeight,
+  };
+}
+
 // Keeps a slider beside the element it sizes, in page coordinates, and as
-// tall as that element, moving it whenever the page's layout changes. It
-// stays on screen, over the element if there is no room beside it.
+// tall as that element. It checks every frame, because the element can move
+// without changing size, such as when the F panel opens or the other slider
+// moves. It stays on screen, over the element if there is no room beside it.
 function usePositionBeside(
   selector: string,
   ref: React.RefObject<HTMLDivElement | null>,
 ) {
   useLayoutEffect(() => {
-    const target = document.querySelector(selector);
+    const target = document.querySelector<HTMLElement>(selector);
     const slider = ref.current;
     if (!target || !slider) return;
+    let last = "";
+    let frame = 0;
     // The percentage and slider span the element's height, and anything
     // after them, such as the reset button, hangs below it.
     const position = () => {
-      const rect = target.getBoundingClientRect();
-      const input = slider.querySelector("input");
-      const percent = slider.querySelector("span");
-      if (input && percent) {
-        const height = rect.height - percent.offsetHeight - 4;
-        input.style.height = `${Math.max(height, 48)}px`;
+      const box = measureLayoutBox(target);
+      const viewportWidth = document.documentElement.clientWidth;
+      const key = `${box.left},${box.top},${box.width},${box.height},${viewportWidth},${window.scrollX}`;
+      if (key !== last) {
+        last = key;
+        const input = slider.querySelector("input");
+        const percent = slider.querySelector("span");
+        if (input && percent) {
+          const height = box.height - percent.offsetHeight - 4;
+          input.style.height = `${Math.max(height, 48)}px`;
+        }
+        const maxLeft = window.scrollX + viewportWidth - slider.offsetWidth - 4;
+        const left = Math.min(box.left + box.width + 12, maxLeft);
+        slider.style.left = `${left}px`;
+        slider.style.top = `${box.top}px`;
       }
-      const maxLeft =
-        document.documentElement.clientWidth - slider.offsetWidth - 4;
-      const left = Math.min(rect.right + 12, maxLeft);
-      slider.style.left = `${left + window.scrollX}px`;
-      slider.style.top = `${rect.top + window.scrollY}px`;
+      frame = requestAnimationFrame(position);
     };
     position();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(position);
-    observer.observe(target);
-    observer.observe(document.body);
-    window.addEventListener("resize", position);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", position);
-    };
+    return () => cancelAnimationFrame(frame);
   }, [selector, ref]);
 }
 
@@ -157,9 +185,10 @@ function SizeSlider({
 }
 
 export function SizeSliders() {
-  const [sizes, setSizes] = useState(loadSizes);
+  const [sizes, setSizes] = useState(readSizes);
 
   const update = (next: Sizes) => {
+    current = next;
     applySizes(next);
     saveSizes(next);
     setSizes(next);
