@@ -6,15 +6,16 @@ import Home from "./home";
 describe("Home", () => {
   afterEach(cleanup);
 
-  it("shows the name Abodeo as the main heading", () => {
+  it("shows the logo as the main heading", () => {
     render(<Home />);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "Abodeo",
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.querySelector("img")).toBe(
+      screen.getByRole("img", { name: "Abodeo - Your home, sorted." }),
     );
   });
 
-  it("shows the welcoming text", () => {
+  it("no longer shows the previous text", () => {
     render(<Home />);
-    expect(screen.getByText("Your home, sorted.")).toBeTruthy();
+    expect(screen.queryByText("Your home, sorted.")).toBeNull();
   });
 });
