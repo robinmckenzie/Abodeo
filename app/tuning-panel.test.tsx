@@ -21,6 +21,13 @@ describe("TuningPanel", () => {
     expect(css).toContain("transform: scale(0.95)");
   });
 
+  it("keeps the button's CSS while the welcome screen fades out", () => {
+    const { unmount } = render(<TuningPanel />);
+    unmount();
+    const css = document.getElementById("tuning-panel-css")?.textContent ?? "";
+    expect(css).toContain("tune-release");
+  });
+
   it("starts from the same movements as app.css", () => {
     // Tests run from the repository root.
     const css = readFileSync("app/app.css", "utf8");
