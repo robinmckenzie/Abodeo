@@ -330,6 +330,7 @@ describe("Dashboard", () => {
       () =>
         ({
           finished: new Promise<void>((resolve) => finishes.push(resolve)),
+          cancel: () => {},
         }) as unknown as Animation,
     );
     try {
