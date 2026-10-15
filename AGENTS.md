@@ -64,7 +64,7 @@
 
 - For code changes, run the project's build, lint and test commands. Report failures and any checks that could not run.
 - Add or update regression tests for changed logic where useful.
-- For changes to a user interface, verify the affected behaviour in the running application on phone, tablet (portrait and landscape) and desktop screen sizes.
+- For changes to a user interface, verify the affected behaviour in the running application at desktop screen sizes. Phone and tablet are out of scope until Robin brings them back.
 - Implementing a ticket includes a Codex review. After committing, run Codex yourself, non-interactively and read-only, on the commit and the ticket's text. Fix findings that fall within the ticket and run the review again. Report the outcome, and any other findings, in the handover. If Codex cannot be run, say so and give Robin the prompt instead.
 - When handing over, summarise the resulting behaviour and any remaining limitations, and state what was verified, what was not, and why. Do not report something as verified if it could not be checked reliably.
 
