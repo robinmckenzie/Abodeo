@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildSpringEasing } from "./spring-easing";
-import { defaultValues, TuningPanel } from "./tuning-panel";
+import { defaultValues, parseValues, TuningPanel } from "./tuning-panel";
 
 function pressT() {
   fireEvent.keyDown(window, { key: "t" });
@@ -16,9 +16,16 @@ function readStyle() {
 
 describe("TuningPanel", () => {
   afterEach(() => {
-    // The panel remembers whether it is shown, so leave it hidden.
-    if (screen.queryByText("Current values")) pressT();
+    // The panel remembers its values and whether it is shown, so leave it
+    // hidden with the defaults.
+    if (screen.queryByText("Current values")) {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Reset to defaults" }),
+      );
+      pressT();
+    }
     cleanup();
+    localStorage.clear();
   });
 
   it("is hidden until T is pressed, and hidden again by T", () => {
@@ -74,5 +81,39 @@ describe("TuningPanel", () => {
     render(<TuningPanel />);
     fireEvent.keyDown(window, { key: "t", ctrlKey: true });
     expect(screen.queryByText("Current values")).toBeNull();
+  });
+
+  it("keeps tuned values in local storage, until Reset to defaults", () => {
+    render(<TuningPanel />);
+    pressT();
+    const [hoverSize] = screen.getAllByRole("slider", { name: /Size/ });
+    fireEvent.change(hoverSize, { target: { value: "1.1" } });
+    const stored = parseValues(localStorage.getItem("abodeo-button-tuning"));
+    expect(stored.hoverScale).toBe(1.1);
+    fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
+    expect(localStorage.getItem("abodeo-button-tuning")).toBeNull();
+    expect(readStyle()).toContain("transform: scale(1.05)");
+  });
+
+  it("uses the default for each saved value that is missing or out of range", () => {
+    const values = parseValues(
+      JSON.stringify({
+        hoverScale: 1.1,
+        pressScale: 5,
+        hoverSpring: { first: 1, dip: "0.2" },
+      }),
+    );
+    expect(values.hoverScale).toBe(1.1);
+    expect(values.pressScale).toBe(defaultValues.pressScale);
+    expect(values.hoverSpring).toEqual({
+      ...defaultValues.hoverSpring,
+      first: 1,
+    });
+    expect(values.releaseDuration).toBe(defaultValues.releaseDuration);
+  });
+
+  it("uses the defaults when the saved data cannot be read", () => {
+    expect(parseValues("not json")).toEqual(defaultValues);
+    expect(parseValues(null)).toEqual(defaultValues);
   });
 });

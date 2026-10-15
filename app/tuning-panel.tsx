@@ -1,8 +1,11 @@
 // A panel for tuning the Get Started button's movement, shown and hidden with
 // T on the welcome screen. It overrides the values in app.css with a style
-// element in the page's head, and its starting values match them.
+// element in the page's head, and its starting values match them. Tuned
+// values are kept in local storage. The panel also shows the logo's and
+// button's size sliders.
 import { useEffect, useState } from "react";
 
+import { SizeSliders } from "./size-sliders";
 import {
   buildSpringEasing,
   calculateSpringProgress,
@@ -33,10 +36,80 @@ export const defaultValues: Values = {
   fadeDuration: 1,
 };
 
+// The range of each slider below, for checking saved values.
+const ranges = {
+  hoverScale: [1, 1.2],
+  hoverDuration: [0.05, 1.5],
+  pressScale: [0.8, 1],
+  pressDuration: [0.05, 1.5],
+  releaseDuration: [0.05, 1.5],
+  fadeDuration: [0.2, 3],
+} as const;
+const springRanges = {
+  first: [0, 2],
+  dip: [0, 0.5],
+  second: [0, 0.5],
+  peakAt: [0.1, 0.7],
+} as const;
+const springKeys = ["hoverSpring", "pressSpring", "releaseSpring"] as const;
+
+const storageKey = "abodeo-button-tuning";
+
+const isInRange = (value: unknown, [min, max]: readonly [number, number]) =>
+  typeof value === "number" && value >= min && value <= max;
+
+// Saved values that are not numbers in their slider's range are replaced
+// with the defaults.
+export function parseValues(json: string | null): Values {
+  const values = structuredClone(defaultValues);
+  try {
+    const parsed = JSON.parse(json ?? "null");
+    for (const key of Object.keys(ranges) as (keyof typeof ranges)[]) {
+      if (isInRange(parsed?.[key], ranges[key])) values[key] = parsed[key];
+    }
+    for (const springKey of springKeys) {
+      for (const key of Object.keys(springRanges) as (keyof Spring)[]) {
+        const value = parsed?.[springKey]?.[key];
+        if (isInRange(value, springRanges[key])) values[springKey][key] = value;
+      }
+    }
+  } catch {
+    // Unreadable saved data counts as nothing saved.
+  }
+  return values;
+}
+
+// Saves nothing while every value is at its default.
+function saveValues(values: Values) {
+  try {
+    if (JSON.stringify(values) === JSON.stringify(defaultValues)) {
+      localStorage.removeItem(storageKey);
+    } else {
+      localStorage.setItem(storageKey, JSON.stringify(values));
+    }
+  } catch {
+    // Without local storage the values still apply until the page reloads.
+  }
+}
+
 // Kept outside the component so that values survive going to the dashboard
-// and back. A page reload resets them.
-let saved = defaultValues;
+// and back, and read from local storage the first time they are needed in
+// the browser. The panel is only rendered once T is pressed, so this does
+// not change what the server renders.
+let saved: Values | null = null;
 let savedVisible = false;
+
+function readValues() {
+  if (typeof window === "undefined") return defaultValues;
+  if (!saved) {
+    try {
+      saved = parseValues(localStorage.getItem(storageKey));
+    } catch {
+      saved = defaultValues;
+    }
+  }
+  return saved;
+}
 
 function buildCss(v: Values) {
   return `
@@ -80,7 +153,9 @@ function buildCss(v: Values) {
 .tuning-panel {
   width: 100%;
   max-width: 1100px;
-  margin-top: 32px;
+  /* Leaves room for the size sliders' reset button, which hangs below
+     the Get Started button. */
+  margin-top: 64px;
   display: grid;
   gap: 16px;
   font-size: 14px;
@@ -104,16 +179,37 @@ function buildCss(v: Values) {
   width: 100%;
   height: auto;
 }
+.size-slider {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 52px;
+  font-size: 12px;
+  text-align: center;
+}
+.size-slider input {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
+  margin: 0;
+}
+.size-slider button {
+  padding: 2px;
+  font-size: 11px;
+}
 /* On a phone in landscape the panel goes below the logo and button, which
-   stay side by side and shrink to fit. */
+   stay side by side and shrink to fit, with room between them for the
+   logo's size slider. :root keeps the room when the F panel is open too. */
 @media (orientation: landscape) and (max-height: 500px) {
-  .welcome:has(> .tuning-panel) {
+  :root .welcome:has(> .tuning-panel) {
     display: grid;
     grid-template-columns: auto auto;
     justify-content: center;
     align-content: center;
     align-items: center;
-    column-gap: 2rem;
+    column-gap: 6rem;
   }
   .tuning-panel {
     grid-column: 1 / -1;
@@ -337,7 +433,7 @@ function formatSpring(spring: Spring) {
 }
 
 export function TuningPanel() {
-  const [v, setV] = useState(saved);
+  const [v, setV] = useState(readValues);
   const [visible, setVisible] = useState(savedVisible);
 
   // T shows and hides the panel. The tuned values apply either way. A held
@@ -360,6 +456,7 @@ export function TuningPanel() {
 
   const update = (patch: Partial<Values>) => {
     saved = { ...v, ...patch };
+    saveValues(saved);
     setV(saved);
   };
 
@@ -480,7 +577,15 @@ Mouse down: size ${v.pressScale}, ${v.pressDuration}s, ${formatSpring(v.pressSpr
 Mouse up: ${v.releaseDuration}s, ${formatSpring(v.releaseSpring)}
 Screen fade: ${v.fadeDuration}s`}
         </pre>
+        <button
+          type="button"
+          style={{ justifySelf: "start" }}
+          onClick={() => update(defaultValues)}
+        >
+          Reset to defaults
+        </button>
       </fieldset>
+      <SizeSliders />
     </div>
   );
 }
