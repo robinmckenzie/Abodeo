@@ -7,12 +7,15 @@ import { useEffect, useState } from "react";
 
 type Sizes = { logo: number; button: number };
 
-// Robin's tuned sizes, which match the fallbacks in app.css.
-export const defaultSizes: Sizes = { logo: 0.78, button: 0.61 };
+// 100% is the default size, which app.css sets, so these match its
+// fallbacks.
+export const defaultSizes: Sizes = { logo: 1, button: 1 };
 const minSize = 0.5;
 const maxSize = 1.5;
 
-const storageKey = "abodeo-size-tuning";
+// Sizes were once saved as "abodeo-size-tuning", measured from the sizes
+// before Robin's tuned ones, so they are not read.
+const storageKey = "abodeo-welcome-sizes";
 const styleId = "size-tuning-css";
 
 function buildCss(sizes: Record<keyof Sizes, number | string>) {

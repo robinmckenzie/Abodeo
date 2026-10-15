@@ -46,7 +46,7 @@ describe("SizeSliders", () => {
     });
     expect(readStyle()).toContain("--logo-size: 1.2");
     expect(readStyle()).toContain("--button-size: 0.8");
-    expect(parseSizes(localStorage.getItem("abodeo-size-tuning"))).toEqual({
+    expect(parseSizes(localStorage.getItem("abodeo-welcome-sizes"))).toEqual({
       logo: 1.2,
       button: 0.8,
     });
@@ -61,7 +61,7 @@ describe("SizeSliders", () => {
       target: { value: "1.2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
-    expect(localStorage.getItem("abodeo-size-tuning")).toBeNull();
+    expect(localStorage.getItem("abodeo-welcome-sizes")).toBeNull();
     expect(readStyle()).toContain(`--logo-size: ${defaultSizes.logo};`);
     expect(localStorage.getItem("abodeo-button-tuning")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
@@ -104,7 +104,7 @@ describe("SizeSliders", () => {
 
   it("applies saved sizes from the page's head, checking them first", () => {
     localStorage.setItem(
-      "abodeo-size-tuning",
+      "abodeo-welcome-sizes",
       JSON.stringify({ logo: 0.7, button: 99 }),
     );
     new Function(sizeTuningScript)();
