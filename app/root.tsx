@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { fadeTuningScript } from "./fade-tuning-panel";
 import "./app.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {/* Applies values saved by the fade tuning panel before the page
+            first appears. */}
+        <script dangerouslySetInnerHTML={{ __html: fadeTuningScript }} />
       </head>
       <body>
         {children}

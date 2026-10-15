@@ -357,7 +357,28 @@ body:has(.dashboard) {
   }
 }
 
+/* The welcome screen fades in as it appears: the logo over its first 1.6
+   seconds and the button from 0.9 to 2.3 seconds, on Robin's tuned S-curve. */
+.welcome h1 {
+  animation: welcome-fade-in 1.6s cubic-bezier(0.63, 0, 0.42, 0.94) both;
+}
+
+.get-started {
+  animation: welcome-fade-in 1.4s cubic-bezier(0.63, 0, 0.42, 0.94) 0.9s both;
+}
+
+@keyframes welcome-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .welcome h1,
+  .get-started {
+    animation: none;
+  }
+
   .get-started,
   .get-started:hover,
   .get-started:active,
