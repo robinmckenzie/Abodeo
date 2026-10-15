@@ -35,10 +35,10 @@ Run these from the repository root.
 
 ## Deployment
 
-Abodeo is hosted on [Vercel](https://vercel.com/) at PRODUCTION_ADDRESS. Anyone
-with that address can open it without a Vercel account. The other addresses
-Vercel generates for each deployment ask for a Vercel login, because the project
-uses Vercel's Standard Protection.
+Abodeo is hosted on [Vercel](https://vercel.com/) at
+https://abodeo-kappa.vercel.app/. Anyone with that address can open it without
+a Vercel account. The other addresses Vercel generates for each deployment ask
+for a Vercel login, because the project uses Vercel's Standard Protection.
 
 ### How it is set up
 
@@ -61,8 +61,11 @@ it starts.
    start.
 2. In Vercel, choose Add New, then Project, and import `robinmckenzie/Abodeo`
    from GitHub, giving Vercel's GitHub app access to the repository if asked.
-3. Keep the detected framework, React Router, and the default build settings.
-   Add no environment variables. Selecting Deploy starts the first deployment.
+3. Choose Robin's Hobby team and the project name `abodeo`. Keep the detected
+   Application Preset, React Router, and leave the build and output overrides
+   switched off. Add no environment variables. Selecting Deploy starts the
+   first deployment. Vercel added the suffix `-kappa` to the address because
+   `abodeo.vercel.app` was taken.
 4. In the project's settings, confirm that the production branch is `main`, the
    Node.js version is 24.x and Deployment Protection is Standard Protection.
 
