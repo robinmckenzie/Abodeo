@@ -65,16 +65,24 @@ describe("ProjectForm", () => {
   });
 
   it("says changes are saved automatically in an opened project only", () => {
-    const note = () => screen.queryByText("Changes saved automatically.");
     renderForm(false);
-    expect(note()).toBeTruthy();
+    expect(findAutosaveNote()).toBeTruthy();
     cleanup();
     renderForm(true);
-    expect(note()).toBeNull();
+    expect(findAutosaveNote()).toBeNull();
   });
 
   it("does not say changes are saved while a save has failed", () => {
     renderForm(false, { text: "Not saved: full.", isError: true });
-    expect(screen.queryByText("Changes saved automatically.")).toBeNull();
+    expect(findAutosaveNote()).toBeNull();
   });
 });
+
+// The note is split over two lines, so it is matched as a whole sentence.
+function findAutosaveNote() {
+  return screen.queryByText(
+    (_, element) =>
+      element?.tagName === "P" &&
+      element.textContent === "Changes saved automatically.",
+  );
+}

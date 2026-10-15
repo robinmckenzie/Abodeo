@@ -80,7 +80,7 @@ export function ProjectForm({
               and not while a save has failed, which the form reports. */}
           {!isNew && !message?.isError && (
             <p className="project-form-autosave">
-              Changes saved automatically.
+              Changes saved <span>automatically.</span>
             </p>
           )}
         </div>

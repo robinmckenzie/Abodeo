@@ -492,10 +492,19 @@ body:has(.dashboard) {
   align-items: flex-end;
 }
 
+/* On two lines, after "saved", aligned with the fields' right-hand edge. The
+   space before the second line keeps the sentence whole for screen
+   readers. */
 .project-form-autosave {
   margin: 0.125rem 0 0;
   color: #6b665c;
   font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.project-form-autosave span {
+  display: block;
 }
 
 .project-form h2 {
@@ -504,11 +513,16 @@ body:has(.dashboard) {
   font-weight: 600;
 }
 
+/* The X's icon is 0.875rem wide, centred in a 2rem button, and its lines
+   stop 2.25 of the icon's 16 units short of the edge, counting their round
+   ends. The button reaches past the edge by both, so the X's right-hand side
+   is level with the fields' borders. */
 .project-form-close {
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
+  margin-right: calc((0.875rem - 2rem) / 2 - 0.875rem * 2.25 / 16);
   padding: 0;
   border: 0;
   border-radius: 50%;
