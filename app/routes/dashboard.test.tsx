@@ -308,6 +308,21 @@ describe("Dashboard", () => {
     expect(savedProjects()[0].notes).toBe("Squashed");
   });
 
+  it("closes a project in place with Esc, from a field or from the arrow", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    fireEvent.click(bars()[0]);
+    await act(async () => pressKey("Escape", notesField()));
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+
+    fireEvent.click(bars()[0]);
+    const arrow = screen.getByRole("button", { name: "Close" });
+    await act(async () => pressKey("Escape", arrow));
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(document.activeElement).toBe(bars()[0]);
+  });
+
   it("keeps the X and autosave note in the floating window", async () => {
     renderDashboard();
     await addProject("Kitchen");

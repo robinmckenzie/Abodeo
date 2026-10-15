@@ -4,7 +4,11 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
-import { ExpandedProjectBar, ProjectBar } from "../projects/project-bar";
+import {
+  ExpandedProjectBar,
+  ProjectBar,
+  type ExpandedProjectBarHandle,
+} from "../projects/project-bar";
 import { ProjectForm, type FormMessage } from "../projects/project-form";
 import { ProjectWindow } from "../projects/project-window";
 import {
@@ -29,11 +33,13 @@ export const meta: Route.MetaFunction = () => [
   { name: "description", content: "Your home, sorted." },
 ];
 
-// The project being added (id null) or opened, with the values in its form.
+// The project being added (id null) or opened, with the values in its form
+// and its collapsed bar's height, which an expanded bar grows from.
 type OpenProject = {
   id: string | null;
   values: ProjectFields;
   message: FormMessage;
+  barHeight: number;
 };
 
 export default function Dashboard() {
@@ -49,6 +55,7 @@ export default function Dashboard() {
   // returns to it, and where focus goes when the form closes.
   const focusFieldRef = useRef("title");
   const focusAfterCloseRef = useRef<string | null>(null);
+  const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
 
   useSwitchPresentationKey();
 
@@ -95,10 +102,15 @@ export default function Dashboard() {
   const openNewProject = () => {
     closeProject();
     focusFieldRef.current = "title";
-    setOpen({ id: null, values: newProjectFields, message: null });
+    setOpen({
+      id: null,
+      values: newProjectFields,
+      message: null,
+      barHeight: 0,
+    });
   };
 
-  const openProject = (project: Project) => {
+  const openProject = (project: Project, barHeight: number) => {
     closeProject();
     const { id } = project;
     saverRef.current = createAutosaver({
@@ -123,7 +135,12 @@ export default function Dashboard() {
     setUnsavedIds((ids) => toggleId(ids, id, false));
     focusFieldRef.current = "title";
     const { title, notes, assignee } = project;
-    setOpen({ id, values: { title, notes, assignee }, message: null });
+    setOpen({
+      id,
+      values: { title, notes, assignee },
+      message: null,
+      barHeight,
+    });
   };
 
   // Pressing Get Started opens the Add project form as the crossfade to the
@@ -138,7 +155,12 @@ export default function Dashboard() {
   const [handledRequest, setHandledRequest] = useState<string | null>(null);
   if (isAddProjectDue && handledRequest !== location.key) {
     setHandledRequest(location.key);
-    setOpen({ id: null, values: newProjectFields, message: null });
+    setOpen({
+      id: null,
+      values: newProjectFields,
+      message: null,
+      barHeight: 0,
+    });
   }
   useEffect(() => {
     if (isAddProjectDue) {
@@ -178,7 +200,7 @@ export default function Dashboard() {
   const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
   const isInPlace = presentation === "in-place";
 
-  // In place, the expanding bar closes the form with its own arrow.
+  // In place, the expanded bar closes the form its own way, squashing.
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -189,7 +211,11 @@ export default function Dashboard() {
       onFieldFocus={(name) => (focusFieldRef.current = name)}
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
-      onClose={closeProject}
+      onClose={() =>
+        expandedBarRef.current
+          ? expandedBarRef.current.squash()
+          : closeProject()
+      }
       hasCloseButton={!isInPlace}
     />
   );
@@ -232,7 +258,12 @@ export default function Dashboard() {
         <ul className="project-list" aria-label="Projects">
           {list.map((project) =>
             isInPlace && open?.id === project.id ? (
-              <ExpandedProjectBar key={project.id} onCollapse={closeProject}>
+              <ExpandedProjectBar
+                key={project.id}
+                ref={expandedBarRef}
+                barHeight={open.barHeight}
+                onCollapse={closeProject}
+              >
                 {form}
               </ExpandedProjectBar>
             ) : (
@@ -240,12 +271,17 @@ export default function Dashboard() {
                 key={project.id}
                 project={project}
                 hasUnsavedChanges={unsavedIds.has(project.id)}
-                onOpen={() => openProject(project)}
+                onOpen={(barHeight) => openProject(project, barHeight)}
               />
             ),
           )}
           {isInPlace && open?.id === null && (
-            <ExpandedProjectBar key="new" onCollapse={closeProject}>
+            <ExpandedProjectBar
+              key="new"
+              ref={expandedBarRef}
+              barHeight={0}
+              onCollapse={closeProject}
+            >
               {form}
             </ExpandedProjectBar>
           )}

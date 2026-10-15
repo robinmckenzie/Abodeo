@@ -1,6 +1,11 @@
 // A project's horizontal bar on the dashboard. In the in-place presentation,
 // an opened project's bar expands to show the form instead.
+import { useImperativeHandle, useLayoutEffect, useRef } from "react";
+
 import { findAssigneeName, type Project } from "./projects";
+
+// How long the expanded bar takes to expand or squash back up.
+const resizeDuration = 300;
 
 export function ProjectBar({
   project,
@@ -9,7 +14,8 @@ export function ProjectBar({
 }: {
   project: Project;
   hasUnsavedChanges: boolean;
-  onOpen: () => void;
+  // Given the bar's height, so that an expanded bar can grow from it.
+  onOpen: (barHeight: number) => void;
 }) {
   const assigneeName = findAssigneeName(project.assignee);
   // Screen readers hear the title first, and not the notes preview, whose
@@ -28,7 +34,7 @@ export function ProjectBar({
         type="button"
         data-project-id={project.id}
         aria-label={label}
-        onClick={onOpen}
+        onClick={(event) => onOpen(event.currentTarget.offsetHeight)}
       >
         <span className="project-bar-assignee">{assigneeName}</span>
         <span className="project-bar-text">
@@ -45,29 +51,93 @@ export function ProjectBar({
   );
 }
 
-// Closed with an upward arrow at the bottom centre, which squashes the bar
-// back up, rather than the form's close button. The arrow is the assignee
-// icon's, turned to point up, without its circle.
+// Expands from the collapsed bar's height to show the form, and is closed
+// by squashing back to that height, with an upward arrow at the bottom
+// centre or Esc, rather than the form's close button. The arrow is the
+// assignee icon's, turned to point up, without its circle. The squash is
+// also offered through ref, for the form's own closing, such as by Esc.
+// With reduce motion, neither is animated.
+export type ExpandedProjectBarHandle = { squash: () => void };
+
 export function ExpandedProjectBar({
+  ref,
+  barHeight,
   onCollapse,
   children,
 }: {
+  ref?: React.Ref<ExpandedProjectBarHandle>;
+  // The collapsed bar's height, or 0 for a new project, which has none.
+  barHeight: number;
   onCollapse: () => void;
   children: React.ReactNode;
 }) {
+  const barRef = useRef<HTMLLIElement>(null);
+  const isSquashingRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar || !canAnimate(bar)) return;
+    const height = bar.offsetHeight;
+    bar.animate(
+      [
+        { height: `${barHeight}px`, overflow: "hidden" },
+        { height: `${height}px`, overflow: "hidden" },
+      ],
+      { duration: resizeDuration, easing: "ease-out" },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const squash = () => {
+    const bar = barRef.current;
+    if (isSquashingRef.current) return;
+    if (!bar || !canAnimate(bar)) {
+      onCollapse();
+      return;
+    }
+    isSquashingRef.current = true;
+    bar
+      .animate(
+        [
+          { height: `${bar.offsetHeight}px`, overflow: "hidden" },
+          { height: `${barHeight}px`, overflow: "hidden" },
+        ],
+        { duration: resizeDuration, easing: "ease-in", fill: "forwards" },
+      )
+      .finished.then(onCollapse, onCollapse);
+  };
+
+  useImperativeHandle(ref, () => ({ squash }));
+
   return (
-    <li className="project-bar is-expanded">
+    <li
+      ref={barRef}
+      className="project-bar is-expanded"
+      // Esc from the arrow; the form handles Esc inside it.
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || event.defaultPrevented) return;
+        event.preventDefault();
+        squash();
+      }}
+    >
       {children}
       <button
         type="button"
         className="project-bar-collapse"
         aria-label="Close"
-        onClick={onCollapse}
+        onClick={squash}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="M10 14.5v-9M6.5 9l3.5-3.5M13.5 9l-3.5-3.5" />
         </svg>
       </button>
     </li>
+  );
+}
+
+function canAnimate(element: HTMLElement) {
+  return (
+    typeof element.animate === "function" &&
+    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   );
 }
