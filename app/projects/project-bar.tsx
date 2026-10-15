@@ -4,8 +4,14 @@ import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { findAssigneeName, type Project } from "./projects";
 
-// How long the expanded bar takes to expand or squash back up.
-const resizeDuration = 300;
+// Expanding starts at about the speed of a plain 0.3-second ease-out, then
+// slows gradually to a gentle stop, on a stronger ease-out curve. Squashing
+// back up speeds up as it goes.
+const expandTiming = {
+  duration: 500,
+  easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+};
+const squashTiming = { duration: 300, easing: "ease-in" };
 
 export function ProjectBar({
   project,
@@ -94,7 +100,7 @@ export function ExpandedProjectBar({
         { height: `${barHeight}px`, overflow: "clip" },
         { height: `${height}px`, overflow: "clip" },
       ],
-      { duration: resizeDuration, easing: "ease-out" },
+      expandTiming,
     );
     // Cancelled if the effect is undone, as React does once in development,
     // so that running again measures the full height rather than the
@@ -117,7 +123,7 @@ export function ExpandedProjectBar({
           { height: `${bar.offsetHeight}px`, overflow: "clip" },
           { height: `${barHeight}px`, overflow: "clip" },
         ],
-        { duration: resizeDuration, easing: "ease-in", fill: "forwards" },
+        { ...squashTiming, fill: "forwards" },
       )
       // Closes only if this bar is still open: another project opened
       // during the squash has already closed it, and must stay open.
