@@ -42,13 +42,15 @@ const ranges: Record<keyof Values, [number, number]> = {
 const storageKey = "abodeo-fade-tuning";
 const styleId = "fade-tuning-css";
 
-function formatCurve(v: Values) {
+type CssValues = Record<keyof Values | "buttonDuration", number | string>;
+
+function formatCurve(v: Pick<CssValues, "x1" | "y1" | "x2" | "y2">) {
   return `cubic-bezier(${v.x1}, ${v.y1}, ${v.x2}, ${v.y2})`;
 }
 
 // :root makes the tuned fades win over app.css wherever its styles end up in
 // the head, as the dev server adds them after fadeTuningScript's.
-function buildCss(v: Values) {
+function buildFadeCss(v: CssValues) {
   return `
 @media (prefers-reduced-motion: no-preference) {
   :root .welcome h1 {
@@ -57,10 +59,13 @@ function buildCss(v: Values) {
   }
   :root .get-started {
     animation-delay: ${v.buttonStart}s;
-    animation-duration: ${round(v.buttonEnd - v.buttonStart)}s;
+    animation-duration: ${v.buttonDuration}s;
     animation-timing-function: ${formatCurve(v)};
   }
+}`;
 }
+
+const panelCss = `
 .fade-tuning-panel {
   width: 100%;
   max-width: 1100px;
@@ -96,6 +101,10 @@ function buildCss(v: Values) {
     grid-column: 1 / -1;
   }
 }`;
+
+function buildCss(v: Values) {
+  const buttonDuration = round(v.buttonEnd - v.buttonStart);
+  return buildFadeCss({ ...v, buttonDuration }) + panelCss;
 }
 
 // Puts the CSS in a style element in the page's head, the same one that
@@ -143,36 +152,33 @@ function save({ visible, values }: Saved) {
     if (!visible && isDefault) {
       localStorage.removeItem(storageKey);
     } else {
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({
-          visible,
-          values,
-          css: buildCss(values),
-          cssVersion,
-        }),
-      );
+      localStorage.setItem(storageKey, JSON.stringify({ visible, values }));
     }
   } catch {
     // Without local storage the values still apply until the page reloads.
   }
 }
 
-// Changes whenever buildCss does, so that CSS saved by an earlier version of
-// this panel is not applied before the page first appears.
-const cssVersion = [...buildCss(defaultValues)].reduce(
-  (hash, c) => (hash * 31 + c.charCodeAt(0)) | 0,
-  0,
+// buildFadeCss with a placeholder such as @logoEnd@ in place of each value,
+// for fadeTuningScript to fill in.
+const fadeCssTemplate = buildFadeCss(
+  Object.fromEntries(
+    [...Object.keys(ranges), "buttonDuration"].map((key) => [key, `@${key}@`]),
+  ) as CssValues,
 );
 
 // Runs in the page's head, before the page first appears, so that the fades
-// start with the tuned values rather than jumping to them later. It applies
-// the saved CSS only if this version of the panel built it from values in
-// range. Otherwise the defaults apply until the panel loads.
+// start with the tuned values rather than jumping to them later. It checks
+// the saved values as loadSaved does and builds the CSS from them.
 export const fadeTuningScript = `try{
-var s=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)})),v=s&&s.values,r=${JSON.stringify(ranges)},ok=!!v&&s.cssVersion===${cssVersion}&&typeof s.css==="string";
-for(var k in r)ok=ok&&typeof v[k]==="number"&&v[k]>=r[k][0]&&v[k]<=r[k][1];
-if(ok&&v.buttonEnd>v.buttonStart){var e=document.createElement("style");e.id=${JSON.stringify(styleId)};e.textContent=s.css;document.head.appendChild(e)}
+var s=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)})),d=${JSON.stringify(defaultValues)},v=${JSON.stringify(defaultValues)},r=${JSON.stringify(ranges)},k,x;
+if(s&&s.values){
+for(k in r){x=s.values[k];if(typeof x==="number"&&x>=r[k][0]&&x<=r[k][1])v[k]=x}
+if(v.buttonEnd<=v.buttonStart){v.buttonStart=d.buttonStart;v.buttonEnd=d.buttonEnd}
+v.buttonDuration=Math.round((v.buttonEnd-v.buttonStart)*100)/100;
+var e=document.createElement("style");e.id=${JSON.stringify(styleId)};
+e.textContent=${JSON.stringify(fadeCssTemplate)}.replace(/@(\\w+)@/g,function(m,k){return v[k]})+${JSON.stringify(panelCss)};
+document.head.appendChild(e)}
 }catch(e){}`;
 
 function round(n: number) {
