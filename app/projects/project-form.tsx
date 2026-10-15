@@ -22,7 +22,8 @@ export function ProjectForm({
   values: ProjectFields;
   isNew: boolean;
   message: FormMessage;
-  // The field to focus when the form appears: title, notes or assignee.
+  // The field to focus when the form appears: title, notes or assignee, or
+  // "start" for a point just before the title, from which Tab goes into it.
   getFocusField: () => string;
   onChange: (changes: Partial<ProjectFields>) => void;
   onFieldFocus: (name: string) => void;
@@ -38,9 +39,12 @@ export function ProjectForm({
 
   // Focuses the field on appearing only, not when it changes.
   useEffect(() => {
+    const field = getFocusField();
     formRef.current
       ?.querySelector<HTMLElement>(
-        `[name="${getFocusField()}"]:is(:checked, :not([type=radio]))`,
+        field === "start"
+          ? ".project-form-fields"
+          : `[name="${field}"]:is(:checked, :not([type=radio]))`,
       )
       ?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,7 +121,15 @@ export function ProjectForm({
             </label>
           ))}
         </fieldset>
-        <div className="project-form-fields">
+        {/* Focusable only from code, as the starting point for an opened
+            project: Tab goes from it into the title, and screen readers
+            announce the project. */}
+        <div
+          className="project-form-fields"
+          tabIndex={-1}
+          role="group"
+          aria-labelledby={`${id}-heading`}
+        >
           <label htmlFor={`${id}-title`}>Title</label>
           <input
             id={`${id}-title`}

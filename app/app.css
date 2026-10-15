@@ -655,6 +655,12 @@ body:has(.dashboard) {
   min-width: 0;
 }
 
+/* Focused only as an opened project's starting point, which is not a
+   control, so it shows no outline. */
+.project-form-fields:focus {
+  outline: none;
+}
+
 .project-form-fields input,
 .project-form-fields textarea {
   width: 100%;

@@ -181,6 +181,18 @@ describe("Dashboard", () => {
     expect(bars()[0].textContent).toBe("ClementBathroomOne\nTwo");
   });
 
+  it("opens a project with focus just before the title, not in it", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    const start = document.activeElement as HTMLElement;
+    expect(start).not.toBe(titleField());
+    expect(start.getAttribute("role")).toBe("group");
+    expect(start.getAttribute("tabindex")).toBe("-1");
+    // Tab goes from it to the first control inside it, the title.
+    expect(start.querySelector("input, textarea, button")).toBe(titleField());
+  });
+
   it("keeps the last valid title when the title is cleared", async () => {
     renderDashboard();
     await addProject("Kitchen");

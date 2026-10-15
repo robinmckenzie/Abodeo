@@ -133,7 +133,9 @@ export default function Dashboard() {
       },
     });
     setUnsavedIds((ids) => toggleId(ids, id, false));
-    focusFieldRef.current = "title";
+    // Just before the title, so opening a project does not put the cursor in
+    // it, while Tab does.
+    focusFieldRef.current = "start";
     const { title, notes, assignee } = project;
     setOpen({
       id,
