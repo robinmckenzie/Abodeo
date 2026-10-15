@@ -479,9 +479,10 @@ body:has(.dashboard) {
   justify-content: space-between;
 }
 
-/* An opened project's autosave note spaces its heading from the fields;
-   the Add project form, which has no note, needs a gap instead. */
-.project-form-header.is-new {
+/* An opened project's autosave note spaces its heading from the fields.
+   Without the note, as in the Add project form or after a failed save, the
+   heading needs a gap instead. */
+.project-form-header:not(.has-autosave-note) {
   margin-bottom: 1rem;
 }
 

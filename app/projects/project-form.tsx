@@ -42,6 +42,10 @@ export function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Only for an opened project, as a new one is saved by Create, and not
+  // while a save has failed, which the form reports.
+  const showsAutosaveNote = !isNew && !message?.isError;
+
   return (
     <form
       ref={formRef}
@@ -64,7 +68,11 @@ export function ProjectForm({
       onBlur={onFieldBlur}
     >
       <div
-        className={isNew ? "project-form-header is-new" : "project-form-header"}
+        className={
+          showsAutosaveNote
+            ? "project-form-header has-autosave-note"
+            : "project-form-header"
+        }
       >
         <h2 id={`${id}-heading`}>{isNew ? "Add project" : "Project"}</h2>
         <div className="project-form-close-area">
@@ -78,9 +86,7 @@ export function ProjectForm({
               <path d="M3 3l10 10M13 3L3 13" />
             </svg>
           </button>
-          {/* Only for an opened project, as a new one is saved by Create,
-              and not while a save has failed, which the form reports. */}
-          {!isNew && !message?.isError && (
+          {showsAutosaveNote && (
             <p className="project-form-autosave">
               Changes saved <span>automatically.</span>
             </p>
