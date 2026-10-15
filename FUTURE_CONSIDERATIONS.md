@@ -10,6 +10,12 @@ requirements, commitments, or scheduled work.
   (2026-09-29) supports only React Router 7, so AD #4 deployed without it.
   Reconsider if a release supports React Router 8 and a feature needs it.
 
+## Screen sizes
+
+- Phone and tablet: descoped by Robin on 2026-10-15 to save testing time, so
+  work is designed and checked for desktop only. The phone and tablet layouts
+  from AD #18 remain but are no longer tested. Revisit before relying on them.
+
 ## Saving projects
 
 - Autosave with a database: AD #16 saves project edits automatically to local
