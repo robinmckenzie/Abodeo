@@ -25,9 +25,12 @@ body {
   }
 }
 
-/* Matches the logo's own background, in dark mode as well. */
-body:has(.welcome) {
+/* Matches the logo's own background, in dark mode as well, so that the
+   crossfade between the two screens has no change of colour. */
+body:has(.welcome),
+body:has(.dashboard) {
   background: #fdfcf8;
+  color: #1a1a1a;
 }
 
 .welcome {
@@ -56,6 +59,122 @@ body:has(.welcome) {
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+
+/* As wide as the logo, but no wider than the button image's own size. */
+.get-started {
+  display: block;
+  width: clamp(16rem, min(40vw, 40vh * 997 / 868), 457px);
+  width: clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px);
+  max-width: 100%;
+  margin-top: 1.5rem;
+  transition: transform 0.2s ease-in-out;
+}
+
+.get-started img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Only where the device can hover, so a tap on a phone does not leave the
+   button swollen. */
+@media (hover: hover) {
+  .get-started:hover {
+    transform: scale(1.05);
+  }
+}
+
+.get-started:active {
+  transform: scale(0.95);
+  transition-duration: 0.1s;
+}
+
+.get-started:focus-visible {
+  outline: 3px solid #1a1a1a;
+  outline-offset: 4px;
+}
+
+/* Phones in landscape: logo on the left, button on the right. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .welcome {
+    flex-direction: row;
+    gap: 2rem;
+  }
+
+  .welcome h1 {
+    width: auto;
+  }
+
+  .get-started {
+    margin-top: 0;
+  }
+}
+
+.dashboard {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard header {
+  padding: 1rem 1.5rem;
+}
+
+.dashboard h1 {
+  margin: 0;
+}
+
+.dashboard h1 img {
+  display: block;
+  width: 7.5rem;
+  height: auto;
+}
+
+.dashboard main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.dashboard main p {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+/* The crossfade between screens, for links with React Router's
+   viewTransition: the old screen fades out as the new one fades in. */
+::view-transition-group(root) {
+  animation-duration: 1s;
+}
+
+::view-transition-old(root) {
+  animation-duration: 1s;
+  animation-timing-function: ease-out;
+}
+
+::view-transition-new(root) {
+  animation-duration: 1s;
+  animation-timing-function: ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .get-started,
+  .get-started:hover,
+  .get-started:active {
+    transform: none;
+    transition: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
 }
 
 .error {
