@@ -91,10 +91,9 @@ deployed site.
    latest commit on `main` in GitHub.
 2. Open the production address in a private window that is not signed in to
    anything. The welcome screen appears without a sign-in prompt.
-3. View the page source. The welcome text is in the HTML sent by the server.
-4. In the browser's developer tools, the Console shows no errors and the
+3. In the browser's developer tools, the Console shows no errors and the
    Network tab shows the styles and scripts loaded without failures.
-5. Open an address that does not exist, such as `/no-such-page`. The 404 page
+4. Open an address that does not exist, such as `/no-such-page`. The 404 page
    appears.
 
 ### Trying Vercel's build locally
