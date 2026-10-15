@@ -216,7 +216,6 @@ function buildCss(v: Values) {
   align-items: center;
   align-self: flex-end;
   height: var(--size-track);
-  color: #666;
   font-size: 11px;
 }
 .size-slider {
@@ -230,17 +229,21 @@ function buildCss(v: Values) {
   color: #666;
   font-size: 11px;
 }
+/* The 100% line runs behind the slider, so it shows on either side of
+   the track. */
 .size-slider-track {
   position: relative;
+  isolation: isolate;
   display: block;
 }
 .size-slider-track::after {
   content: "";
   position: absolute;
+  z-index: -1;
   top: 50%;
   left: -6px;
   right: -6px;
-  border-top: 1px solid #666;
+  border-top: 1px solid #1a1a1a;
   pointer-events: none;
 }
 .size-slider input {
