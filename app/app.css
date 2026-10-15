@@ -618,11 +618,11 @@ body:has(.dashboard) {
 }
 
 /* As the form appears, the assignees arrive one by one: each fades in over
-   0.15 seconds, 0.07 seconds after the one above. --arrival is the option's
+   0.4 seconds, 0.07 seconds after the one above. --arrival is the option's
    place in the list. */
 @media (prefers-reduced-motion: no-preference) {
   .assignee-option {
-    animation: assignee-arrive 0.15s ease-out both;
+    animation: assignee-arrive 0.4s ease-out both;
     animation-delay: calc(var(--arrival, 0) * 0.07s);
   }
 }
