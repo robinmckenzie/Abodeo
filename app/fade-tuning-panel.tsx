@@ -42,10 +42,6 @@ const ranges: Record<keyof Values, [number, number]> = {
 const storageKey = "abodeo-fade-tuning";
 const styleId = "fade-tuning-css";
 
-// Runs in the page's head, before the page first appears, so that the fades
-// start with the tuned values rather than jumping to them later.
-export const fadeTuningScript = `try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)}));if(s&&typeof s.css==="string"){var e=document.createElement("style");e.id=${JSON.stringify(styleId)};e.textContent=s.css;document.head.appendChild(e)}}catch(e){}`;
-
 function formatCurve(v: Values) {
   return `cubic-bezier(${v.x1}, ${v.y1}, ${v.x2}, ${v.y2})`;
 }
@@ -86,14 +82,17 @@ function buildCss(v: Values) {
   padding: 0 4px;
 }
 /* On a phone in landscape the panel goes above the logo and button, which
-   stay side by side. */
+   stay side by side and shrink to fit, as with the T panel. */
 @media (orientation: landscape) and (max-height: 500px) {
   .welcome:has(> .fade-tuning-panel) {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
     align-content: center;
+    align-items: center;
+    column-gap: 2rem;
   }
   .fade-tuning-panel {
-    flex-basis: 100%;
     grid-column: 1 / -1;
   }
 }`;
@@ -146,7 +145,12 @@ function save({ visible, values }: Saved) {
     } else {
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ visible, values, css: buildCss(values) }),
+        JSON.stringify({
+          visible,
+          values,
+          css: buildCss(values),
+          cssVersion,
+        }),
       );
     }
   } catch {
@@ -154,7 +158,26 @@ function save({ visible, values }: Saved) {
   }
 }
 
-const round = (n: number) => Math.round(n * 100) / 100;
+// Changes whenever buildCss does, so that CSS saved by an earlier version of
+// this panel is not applied before the page first appears.
+const cssVersion = [...buildCss(defaultValues)].reduce(
+  (hash, c) => (hash * 31 + c.charCodeAt(0)) | 0,
+  0,
+);
+
+// Runs in the page's head, before the page first appears, so that the fades
+// start with the tuned values rather than jumping to them later. It applies
+// the saved CSS only if this version of the panel built it from values in
+// range. Otherwise the defaults apply until the panel loads.
+export const fadeTuningScript = `try{
+var s=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)})),v=s&&s.values,r=${JSON.stringify(ranges)},ok=!!v&&s.cssVersion===${cssVersion}&&typeof s.css==="string";
+for(var k in r)ok=ok&&typeof v[k]==="number"&&v[k]>=r[k][0]&&v[k]<=r[k][1];
+if(ok&&v.buttonEnd>v.buttonStart){var e=document.createElement("style");e.id=${JSON.stringify(styleId)};e.textContent=s.css;document.head.appendChild(e)}
+}catch(e){}`;
+
+function round(n: number) {
+  return Math.round(n * 100) / 100;
+}
 
 // Opacity at a fraction x of a fade's duration, on the cubic Bezier curve.
 // The curve's time runs from 0 to 1 without turning back, because x1 and x2
@@ -278,9 +301,13 @@ function subscribe(listener: () => void) {
 export function FadeTuningPanel() {
   const saved = useSyncExternalStore(subscribe, readSaved, () => null);
 
-  // Brings CSS saved by an earlier version of this panel up to date.
+  // Applies the checked values, replacing any CSS from fadeTuningScript, and
+  // saves them again so that the next reload can apply them before the page
+  // first appears.
   useEffect(() => {
-    if (saved) applyCss(buildCss(saved.values));
+    if (!saved) return;
+    applyCss(buildCss(saved.values));
+    save(saved);
   }, [saved]);
 
   // F shows and hides the panel. A held key, browser shortcuts and typing
