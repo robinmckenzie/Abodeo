@@ -1,8 +1,13 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router";
 
 import type { Route } from "./+types/home";
 import { FadeTuningPanel } from "../fade-tuning-panel";
+import {
+  hasProjectsAttribute,
+  hasSavedProjects,
+  isWelcomeRequested,
+} from "../projects/project-storage";
 import { TuningPanel } from "../tuning-panel";
 import getStartedButton from "../images/get-started-button.png";
 import logo from "../images/abodeo-home-logo.jpeg";
@@ -14,11 +19,49 @@ export const meta: Route.MetaFunction = () => [
 
 export default function Home() {
   const [isReleased, setIsReleased] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // With projects saved, the page shows only the logo, which fades in and
+  // holds, then crossfades to the dashboard. The page is marked before it
+  // first appears by hasProjectsScript, and again here for a visit to this
+  // screen from within the app, before the browser paints. The timing comes
+  // from a clock animation that app.css runs on the logo from when it
+  // appears, so that the wait for the app to load counts towards the hold.
+  // The welcome screen is replaced in the browser history, so that Back from
+  // the dashboard does not return to it only to be moved on again.
+  useLayoutEffect(() => {
+    const isReturning =
+      hasSavedProjects() && !isWelcomeRequested(location.search);
+    document.documentElement.toggleAttribute(hasProjectsAttribute, isReturning);
+    if (!isReturning) return;
+    let isCancelled = false;
+    const showDashboard = () => {
+      if (!isCancelled) {
+        navigate("/dashboard", { replace: true, viewTransition: true });
+      }
+    };
+    const clock = headingRef.current
+      ?.getAnimations?.()
+      .find(
+        (animation) =>
+          animation instanceof CSSAnimation &&
+          animation.animationName === "returning-clock",
+      );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (clock) clock.finished.then(showDashboard, () => {});
+    else timer = setTimeout(showDashboard, returningHold);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [location.search, navigate]);
 
   return (
     <main className="welcome">
       <FadeTuningPanel />
-      <h1>
+      <h1 ref={headingRef}>
         <img
           src={logo}
           alt="Abodeo - Your home, sorted."
@@ -34,6 +77,7 @@ export default function Home() {
           held. */}
       <Link
         to="/dashboard"
+        state={{ openAddProject: true }}
         className={isReleased ? "get-started is-released" : "get-started"}
         prefetch="render"
         viewTransition
@@ -57,6 +101,10 @@ export default function Home() {
     </main>
   );
 }
+
+// The returning-visitor fade-in and hold, as in app.css, for browsers that
+// cannot report the clock animation.
+const returningHold = 1400;
 
 // True when the button is showing its hovered size: a mouse is over it,
 // whether it was clicked or used from the keyboard. A tap is excluded, because

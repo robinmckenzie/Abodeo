@@ -5,6 +5,7 @@
 // button's size sliders.
 import { useEffect, useState } from "react";
 
+import { isTextField } from "./keyboard";
 import { SizeSliders } from "./size-sliders";
 import {
   buildSpringEasing,
@@ -650,13 +651,5 @@ Screen fade: ${v.fadeDuration}s`}
       </fieldset>
       <SizeSliders />
     </div>
-  );
-}
-
-export function isTextField(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      target.matches("input:not([type=range]), textarea, select"))
   );
 }

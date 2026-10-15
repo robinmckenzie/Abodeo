@@ -1,6 +1,11 @@
 :root {
   color-scheme: light dark;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -279,11 +284,20 @@ body:has(.dashboard) {
   }
 }
 
+/* The form's controls stay light on the cream background in dark mode too. */
 .dashboard {
   position: relative;
+  color-scheme: light;
 }
 
-/* Out of the flow, so that the message is centred on the whole screen. */
+/* Lower in priority than any class, so components set their own colours. */
+.dashboard :where(button, input, textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+/* Out of the flow, so that the list's column is centred on the whole
+   screen. */
 .dashboard header {
   position: absolute;
   top: 0;
@@ -304,11 +318,18 @@ body:has(.dashboard) {
 .dashboard main {
   min-height: 100vh;
   min-height: 100dvh;
+  width: min(46rem, 100%);
+  margin: 0 auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  text-align: center;
+  flex-direction: column;
+  padding: 2.5rem 1.5rem 3rem;
+}
+
+/* Where the column would reach the logo, it starts below it. */
+@media (max-width: 64rem) {
+  .dashboard main {
+    padding-top: 8.5rem;
+  }
 }
 
 /* Focus is only moved here for screen readers, so no outline is needed. */
@@ -316,9 +337,279 @@ body:has(.dashboard) {
   outline: none;
 }
 
-.dashboard main p {
-  margin: 0;
+.dashboard-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.25rem;
+}
+
+.add-project,
+.project-form-footer button {
+  padding: 0.55rem 1.15rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1a1a1a;
+  color: #fdfcf8;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.add-project:hover,
+.project-form-footer button:hover {
+  background: #3a3833;
+}
+
+.dashboard :is(button, [role="button"]):focus-visible {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 3px;
+}
+
+.dashboard-notice {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: #f8e9e6;
+  color: #8c2a1e;
+}
+
+/* Centred in the space below the button, as the dashboard's message was. */
+.dashboard-empty {
+  margin: auto 0;
+  padding-bottom: 6rem;
+  text-align: center;
   font-size: 1.25rem;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.625rem;
+}
+
+.project-bar > button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e7e2d6;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.project-bar > button:hover {
+  border-color: #cfc8b8;
+  box-shadow: 0 2px 10px rgb(26 26 26 / 0.06);
+}
+
+.project-bar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.project-bar-assignee {
+  color: #6b665c;
+  font-size: 0.9rem;
+}
+
+.project-bar-unsaved {
+  color: #a12a2a;
+  font-size: 0.85rem;
+}
+
+.project-bar.is-expanded {
+  padding: 1.25rem 1.5rem 1.5rem;
+  border: 1px solid #cfc8b8;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgb(26 26 26 / 0.08);
+}
+
+.project-window {
+  width: min(44rem, calc(100vw - 3rem));
+  max-height: calc(100dvh - 3rem);
+  padding: 1.25rem 1.75rem 1.5rem;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
+}
+
+.project-window::backdrop {
+  background: rgb(26 26 26 / 0.22);
+}
+
+.project-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.project-form h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.project-form-close {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #6b665c;
+  cursor: pointer;
+}
+
+.project-form-close:hover {
+  background: #f3f0e8;
+  color: #1a1a1a;
+}
+
+.project-form-close svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* The assignees on the left, the title and notes on the right. */
+.project-form-body {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 1.75rem;
+}
+
+.assignee-list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+}
+
+.assignee-list legend,
+.project-form-fields label {
+  margin-bottom: 0.375rem;
+  padding: 0;
+  color: #6b665c;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.assignee-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.assignee-option:hover {
+  background: #f7f5ef;
+}
+
+/* Hidden, but still focusable and operated by keyboard; its icon shows the
+   choice and the focus. */
+.assignee-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.assignee-icon {
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.assignee-option input:focus-visible + .assignee-icon {
+  border-radius: 50%;
+  outline: 2px solid #1a1a1a;
+  outline-offset: 2px;
+}
+
+.project-form-fields {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.project-form-fields input,
+.project-form-fields textarea {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #ddd7c9;
+  border-radius: 10px;
+  background: #fdfcf8;
+}
+
+.project-form-fields :is(input, textarea):focus-visible {
+  border-color: #1a1a1a;
+  outline: 1px solid #1a1a1a;
+}
+
+.project-form-fields input {
+  font-size: 1.125rem;
+}
+
+.project-form-fields textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.project-form-hint {
+  margin: -0.625rem 0 1rem;
+  color: #6b665c;
+  font-size: 0.85rem;
+}
+
+.project-form-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.project-form-footer p {
+  flex: 1;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.project-form-error {
+  color: #a12a2a;
 }
 
 /* The crossfade between screens, for links with React Router's
@@ -413,6 +704,38 @@ body:has(.dashboard) {
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none;
+  }
+}
+
+/* With projects saved, the welcome screen shows only the logo, which fades
+   in over 0.6 seconds and holds until 1.4 seconds, when Home crossfades to
+   the dashboard. The returning-clock animation changes nothing visible: Home
+   waits for it to end, so the hold counts from when the logo appears. The
+   selector outranks the F panel's :root .welcome h1, so its timings do not
+   apply here, while its curve still does. hasProjectsScript sets the
+   attribute before the page first appears. */
+html[data-has-projects] .welcome h1 {
+  animation-name: welcome-fade-in, returning-clock;
+  animation-duration: 0.6s, 1.4s;
+}
+
+html[data-has-projects] :is(.get-started, .tuning-panel, .fade-tuning-panel) {
+  display: none;
+}
+
+@keyframes returning-clock {
+  from {
+    --returning-clock: 0;
+  }
+  to {
+    --returning-clock: 1;
+  }
+}
+
+/* With reduce motion, the logo shows at once, and only the clock runs. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-has-projects] .welcome h1 {
+    animation: returning-clock 1.4s linear both;
   }
 }
 
