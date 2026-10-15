@@ -61,14 +61,24 @@ body:has(.dashboard) {
   margin: 0 auto;
 }
 
-/* As wide as the logo, but no wider than the button image's own size. */
+/* Overshoot the target by about 45% and 80% of the change, then settle on
+   it: the hover goes to about 109% before settling at 105%. */
+:root {
+  --spring: cubic-bezier(0.3, 2.5, 0.6, 1);
+  --spring-hover: cubic-bezier(0.3, 3.35, 0.6, 1);
+}
+
+/* As wide as the logo, but no wider than the button image's own size. The
+   view transition name gives the button its own snapshot when the screen
+   fades out, so that it can spring back on release (see below). */
 .get-started {
   display: block;
   width: clamp(16rem, min(40vw, 40vh * 997 / 868), 457px);
   width: clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px);
   max-width: 100%;
   margin-top: 1.5rem;
-  transition: transform 0.2s ease-in-out;
+  transition: transform 0.2s var(--spring);
+  view-transition-name: get-started;
 }
 
 .get-started img {
@@ -82,12 +92,20 @@ body:has(.dashboard) {
 @media (hover: hover) {
   .get-started:hover {
     transform: scale(1.05);
+    transition-timing-function: var(--spring-hover);
   }
 }
 
 .get-started:active {
   transform: scale(0.95);
-  transition-duration: 0.1s;
+  transition-duration: 0.2s;
+  transition-timing-function: var(--spring);
+}
+
+/* Released: held at the pressed size for the fade's snapshot. */
+.get-started.is-released {
+  transform: scale(0.95);
+  transition: none;
 }
 
 .get-started:focus-visible {
@@ -172,10 +190,48 @@ body:has(.dashboard) {
   animation-timing-function: ease-in;
 }
 
+/* The fade-out snapshot is still, so the release is animated on the button's
+   own snapshot: from its pressed 95% back to its size before the press, 105%
+   under a mouse or 100% on touch, while it fades with the screen. */
+::view-transition-group(get-started) {
+  animation-duration: 1s;
+}
+
+::view-transition-old(get-started) {
+  animation:
+    get-started-release 0.3s var(--spring) both,
+    get-started-fade-out 1s ease-out both;
+}
+
+@media (hover: hover) {
+  ::view-transition-old(get-started) {
+    animation-name: get-started-release-hovered, get-started-fade-out;
+  }
+}
+
+@keyframes get-started-release {
+  to {
+    transform: scale(calc(1 / 0.95));
+  }
+}
+
+@keyframes get-started-release-hovered {
+  to {
+    transform: scale(calc(1.05 / 0.95));
+  }
+}
+
+@keyframes get-started-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .get-started,
   .get-started:hover,
-  .get-started:active {
+  .get-started:active,
+  .get-started.is-released {
     transform: none;
     transition: none;
   }

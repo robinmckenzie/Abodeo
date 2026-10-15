@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
@@ -10,6 +11,8 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 export default function Home() {
+  const [isReleased, setIsReleased] = useState(false);
+
   return (
     <main className="welcome">
       <h1>
@@ -21,12 +24,19 @@ export default function Home() {
         />
       </h1>
       {/* Loads the dashboard's code straight away, so that the crossfade
-          starts as soon as the button is released. */}
+          starts as soon as the button is released. On release the button is
+          held at its pressed size until the fade's snapshot is taken, so that
+          it springs back from that size as the screen fades. A click that
+          opens a new tab or window does not leave this screen, so it is not
+          held. */}
       <Link
         to="/dashboard"
-        className="get-started"
+        className={isReleased ? "get-started is-released" : "get-started"}
         prefetch="render"
         viewTransition
+        onClick={(event) => {
+          if (!isOpeningElsewhere(event)) setIsReleased(true);
+        }}
       >
         <img
           src={getStartedButton}
@@ -36,5 +46,15 @@ export default function Home() {
         />
       </Link>
     </main>
+  );
+}
+
+function isOpeningElsewhere(event: React.MouseEvent) {
+  return (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
   );
 }
