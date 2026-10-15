@@ -24,12 +24,12 @@ type Values = {
 export const defaultValues: Values = {
   hoverScale: 1.05,
   hoverDuration: 0.31,
-  hoverSpring: { first: 0.8, dip: 0.15, second: 0.1, peakAt: 0.25 },
+  hoverSpring: { first: 0.8, dip: 0.16, second: 0.1, peakAt: 0.25 },
   pressScale: 0.95,
   pressDuration: 0.31,
-  pressSpring: { first: 0.45, dip: 0.15, second: 0.1, peakAt: 0.3 },
+  pressSpring: { first: 0.45, dip: 0.16, second: 0.1, peakAt: 0.3 },
   releaseDuration: 0.3,
-  releaseSpring: { first: 0.45, dip: 0.15, second: 0.05, peakAt: 0.3 },
+  releaseSpring: { first: 0.45, dip: 0.16, second: 0.06, peakAt: 0.3 },
   fadeDuration: 1,
 };
 
