@@ -63,7 +63,9 @@ export function ProjectForm({
       }}
       onBlur={onFieldBlur}
     >
-      <div className="project-form-header">
+      <div
+        className={isNew ? "project-form-header is-new" : "project-form-header"}
+      >
         <h2 id={`${id}-heading`}>{isNew ? "Add project" : "Project"}</h2>
         <div className="project-form-close-area">
           <button
