@@ -11,15 +11,29 @@ export function ProjectBar({
   hasUnsavedChanges: boolean;
   onOpen: () => void;
 }) {
+  const assigneeName = findAssigneeName(project.assignee);
+  // Screen readers hear the title first, and not the notes preview, whose
+  // notes they read once the project is opened.
+  const label = [
+    project.title,
+    assigneeName,
+    hasUnsavedChanges && "last changes not saved",
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <li className="project-bar">
-      <button type="button" data-project-id={project.id} onClick={onOpen}>
-        <span className="project-bar-assignee">
-          {findAssigneeName(project.assignee)}
-        </span>
+      <button
+        type="button"
+        data-project-id={project.id}
+        aria-label={label}
+        onClick={onOpen}
+      >
+        <span className="project-bar-assignee">{assigneeName}</span>
         <span className="project-bar-text">
           <span className="project-bar-title">{project.title}</span>
-          {project.notes && (
+          {project.notes.trim() && (
             <span className="project-bar-notes">{project.notes}</span>
           )}
         </span>

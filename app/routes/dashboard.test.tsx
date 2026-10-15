@@ -109,10 +109,18 @@ describe("Dashboard", () => {
         ?.textContent,
     ).toBe("Tiles\nGrout");
     expect(second.querySelector(".project-bar-notes")).toBeNull();
+    // Screen readers name the bar by its title and assignee, not the notes.
+    expect(screen.getByRole("button", { name: "Kitchen, Andy" })).toBe(first);
     expect(savedProjects().find((p) => p.assignee === "andy").notes).toBe(
       "Tiles\nGrout",
     );
     expect(screen.queryByText("No projects added yet.")).toBeNull();
+  });
+
+  it("shows no notes preview for notes of only spaces", async () => {
+    renderDashboard();
+    await addProject("Kitchen", "  \n ");
+    expect(bars()[0].querySelector(".project-bar-notes")).toBeNull();
   });
 
   it("opens the Add project form in a floating window, with Unassigned chosen", () => {
