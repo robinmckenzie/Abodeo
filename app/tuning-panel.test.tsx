@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { TuningPanel } from "./tuning-panel";
+import { buildSpringEasing } from "./spring-easing";
+import { defaultValues, TuningPanel } from "./tuning-panel";
 
 function pressT() {
   fireEvent.keyDown(window, { key: "t" });
@@ -31,7 +34,7 @@ describe("TuningPanel", () => {
     render(<TuningPanel />);
     const css = readStyle();
     expect(css).toContain("transform: scale(1.05)");
-    expect(css).toContain("cubic-bezier(0.3, 3.35, 0.6, 1)");
+    expect(css).toContain(buildSpringEasing(defaultValues.hoverSpring));
     expect(css).toContain("transform: scale(0.95)");
   });
 
@@ -48,6 +51,22 @@ describe("TuningPanel", () => {
     const { unmount } = render(<TuningPanel />);
     unmount();
     expect(readStyle()).toContain("tune-release");
+  });
+
+  it("starts from the same movements as app.css", () => {
+    // Tests run from the repository root.
+    const css = readFileSync("app/app.css", "utf8");
+    const readVariable = (name: string) =>
+      css.match(new RegExp(`--${name}:\\s*(linear\\([^)]*\\))`))?.[1];
+    const normalise = (easing = "") => easing.replace(/\s+/g, "");
+    expect(normalise(readVariable("spring-hover"))).toBe(
+      normalise(buildSpringEasing(defaultValues.hoverSpring)),
+    );
+    // app.css uses one curve for both the press and the release.
+    expect(normalise(readVariable("spring"))).toBe(
+      normalise(buildSpringEasing(defaultValues.pressSpring)),
+    );
+    expect(defaultValues.releaseSpring).toEqual(defaultValues.pressSpring);
   });
 
   it("ignores T pressed with Ctrl, so browser shortcuts still work", () => {

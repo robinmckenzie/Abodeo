@@ -1,40 +1,42 @@
 // A panel for tuning the Get Started button's movement, shown and hidden with
 // T on the welcome screen. It overrides the values in app.css with a style
-// element, and its starting values match them.
+// element in the page's head, and its starting values match them.
 import { useEffect, useState } from "react";
 
-type Curve = { x1: number; y1: number; x2: number; y2: number };
+import {
+  buildSpringEasing,
+  calculateSpringProgress,
+  type Spring,
+} from "./spring-easing";
 
 type Values = {
   hoverScale: number;
   hoverDuration: number;
-  hoverCurve: Curve;
+  hoverSpring: Spring;
   pressScale: number;
   pressDuration: number;
-  pressCurve: Curve;
+  pressSpring: Spring;
   releaseDuration: number;
-  releaseCurve: Curve;
+  releaseSpring: Spring;
   fadeDuration: number;
+};
+
+export const defaultValues: Values = {
+  hoverScale: 1.05,
+  hoverDuration: 0.2,
+  hoverSpring: { first: 0.8, dip: 0.3, second: 0.15, peakAt: 0.3 },
+  pressScale: 0.95,
+  pressDuration: 0.2,
+  pressSpring: { first: 0.45, dip: 0.2, second: 0.1, peakAt: 0.3 },
+  releaseDuration: 0.3,
+  releaseSpring: { first: 0.45, dip: 0.2, second: 0.1, peakAt: 0.3 },
+  fadeDuration: 1,
 };
 
 // Kept outside the component so that values survive going to the dashboard
 // and back. A page reload resets them.
+let saved = defaultValues;
 let savedVisible = false;
-
-let saved: Values = {
-  hoverScale: 1.05,
-  hoverDuration: 0.2,
-  hoverCurve: { x1: 0.3, y1: 3.35, x2: 0.6, y2: 1 },
-  pressScale: 0.95,
-  pressDuration: 0.2,
-  pressCurve: { x1: 0.3, y1: 2.5, x2: 0.6, y2: 1 },
-  releaseDuration: 0.3,
-  releaseCurve: { x1: 0.3, y1: 2.5, x2: 0.6, y2: 1 },
-  fadeDuration: 1,
-};
-
-const formatBezier = (c: Curve) =>
-  `cubic-bezier(${c.x1}, ${c.y1}, ${c.x2}, ${c.y2})`;
 
 function buildCss(v: Values) {
   return `
@@ -43,13 +45,13 @@ function buildCss(v: Values) {
     .get-started:hover {
       transform: scale(${v.hoverScale});
       transition-duration: ${v.hoverDuration}s;
-      transition-timing-function: ${formatBezier(v.hoverCurve)};
+      transition-timing-function: ${buildSpringEasing(v.hoverSpring)};
     }
   }
   .get-started:active {
     transform: scale(${v.pressScale});
     transition-duration: ${v.pressDuration}s;
-    transition-timing-function: ${formatBezier(v.pressCurve)};
+    transition-timing-function: ${buildSpringEasing(v.pressSpring)};
   }
   .get-started.is-released {
     transform: scale(${v.pressScale});
@@ -62,7 +64,7 @@ function buildCss(v: Values) {
   }
   ::view-transition-old(get-started) {
     animation:
-      tune-release ${v.releaseDuration}s ${formatBezier(v.releaseCurve)} both,
+      tune-release ${v.releaseDuration}s ${buildSpringEasing(v.releaseSpring)} both,
       get-started-fade-out ${v.fadeDuration}s ease-out both;
   }
   .get-started-hovered::view-transition-old(get-started) {
@@ -83,20 +85,38 @@ function buildCss(v: Values) {
   gap: 16px;
   font-size: 14px;
 }
+.tuning-panel fieldset {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+.tuning-panel legend {
+  font-weight: 700;
+  padding: 0 4px;
+}
 .tuning-panel svg {
   display: block;
   width: 100%;
   height: auto;
 }
-/* On a phone in landscape the panel goes below the logo and button, not
-   beside them. */
+/* On a phone in landscape the panel goes below the logo and button, which
+   stay side by side and shrink to fit. */
 @media (orientation: landscape) and (max-height: 500px) {
   .welcome:has(> .tuning-panel) {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
     align-content: center;
+    align-items: center;
+    column-gap: 2rem;
   }
   .tuning-panel {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
   }
 }`;
 }
@@ -114,41 +134,36 @@ function applyCss(css: string) {
   style.textContent = css;
 }
 
-// Samples a CSS cubic-bezier as (time fraction, progress) points.
-function sampleCurve(c: Curve, steps = 200) {
-  const points: [number, number][] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const u = 1 - t;
-    const x = 3 * u * u * t * c.x1 + 3 * u * t * t * c.x2 + t * t * t;
-    const y = 3 * u * u * t * c.y1 + 3 * u * t * t * c.y2 + t * t * t;
-    points.push([x, y]);
-  }
-  return points;
-}
+const formatPercent = (s: number) => `${(s * 100).toFixed(1)}%`;
 
 function Graph({
   title,
   from,
   to,
   duration,
-  curve,
+  spring,
   fadeDuration,
 }: {
   title: string;
   from: number;
   to: number;
   duration: number;
-  curve: Curve;
+  spring: Spring;
   fadeDuration?: number;
 }) {
   const width = 340;
   const height = 170;
   const pad = 32;
   const maxTime = Math.max(duration, fadeDuration ?? 0, 0.4);
-  const points = sampleCurve(curve).map(
-    ([x, y]) => [x * duration, from + (to - from) * y] as const,
-  );
+  const points: [number, number][] = [];
+  for (let i = 0; i <= 200; i++) {
+    const t = i / 200;
+    points.push([
+      t * duration,
+      from + (to - from) * calculateSpringProgress(spring, t),
+    ]);
+  }
+  points.push([maxTime, to]);
   const scales = points.map(([, s]) => s);
   const extreme = to > from ? Math.max(...scales) : Math.min(...scales);
   const lo = Math.min(0.85, ...scales, from, to) - 0.01;
@@ -156,14 +171,25 @@ function Graph({
   const px = (t: number) => pad + (t / maxTime) * (width - pad - 8);
   const py = (s: number) =>
     height - pad + 8 - ((s - lo) / (hi - lo)) * (height - pad);
-  const path = [...points, [maxTime, to] as const]
-    .map(
-      ([t, s], i) => `${i ? "L" : "M"}${px(t).toFixed(1)},${py(s).toFixed(1)}`,
-    )
-    .join(" ");
+  const toPath = (line: [number, number][]) =>
+    line
+      .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(" ");
   const ticks = [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15].filter(
     (s) => s >= lo && s <= hi,
   );
+  // The screen's ease-out fade, from fully visible at the top to gone at the
+  // bottom.
+  const fade: [number, number][] = [];
+  if (fadeDuration !== undefined) {
+    for (let i = 0; i <= 50; i++) {
+      const t = i / 50;
+      const u = 1 - t;
+      const x = 3 * u * t * t * 0.58 + t * t * t;
+      const y = 3 * u * t * t + t * t * t;
+      fade.push([px(x * fadeDuration), 8 + y * (height - pad)]);
+    }
+  }
 
   return (
     <figure style={{ margin: 0 }}>
@@ -191,20 +217,20 @@ function Graph({
           stroke="#2a7"
           strokeDasharray="4 3"
         />
-        {fadeDuration !== undefined && (
+        {fade.length > 0 && (
           <path
-            d={sampleCurve({ x1: 0, y1: 0, x2: 0.58, y2: 1 }, 50)
-              .map(
-                ([x, y], i) =>
-                  `${i ? "L" : "M"}${px(x * fadeDuration).toFixed(1)},${(8 + y * (height - pad)).toFixed(1)}`,
-              )
-              .join(" ")}
+            d={toPath(fade)}
             fill="none"
             stroke="#c84"
             strokeDasharray="2 3"
           />
         )}
-        <path d={path} fill="none" stroke="#1a1a1a" strokeWidth={2} />
+        <path
+          d={toPath(points.map(([t, s]) => [px(t), py(s)]))}
+          fill="none"
+          stroke="#1a1a1a"
+          strokeWidth={2}
+        />
         <text x={pad} y={height - 6} fontSize={10} fill="#888">
           0s
         </text>
@@ -212,16 +238,16 @@ function Graph({
           {maxTime.toFixed(2)}s
         </text>
       </svg>
-      {fadeDuration !== undefined && (
-        <div style={{ fontSize: 12, color: "#c84" }}>
-          Dotted: the screen fading out (opacity, top = fully visible)
-        </div>
-      )}
+      {/* Every graph has this line, empty except for the fade, so that the
+          three graphs line up. */}
+      <div style={{ fontSize: 12, color: "#c84" }}>
+        {fadeDuration !== undefined
+          ? "Dotted: the screen fading out (top = fully visible)"
+          : " "}
+      </div>
     </figure>
   );
 }
-
-const formatPercent = (s: number) => `${(s * 100).toFixed(1)}%`;
 
 function Slider({
   label,
@@ -261,41 +287,53 @@ function Slider({
   );
 }
 
-function CurveSliders({
-  curve,
+function SpringSliders({
+  spring,
   onChange,
 }: {
-  curve: Curve;
-  onChange: (c: Curve) => void;
+  spring: Spring;
+  onChange: (spring: Spring) => void;
 }) {
   return (
     <>
       <Slider
-        label="Bounce (y1)"
-        value={curve.y1}
-        min={1}
-        max={5}
+        label="First bounce"
+        value={spring.first}
+        min={0}
+        max={2}
         step={0.05}
-        onChange={(y1) => onChange({ ...curve, y1 })}
+        onChange={(first) => onChange({ ...spring, first })}
       />
       <Slider
-        label="Attack (x1)"
-        value={curve.x1}
+        label="Dip"
+        value={spring.dip}
         min={0}
         max={1}
-        step={0.01}
-        onChange={(x1) => onChange({ ...curve, x1 })}
+        step={0.05}
+        onChange={(dip) => onChange({ ...spring, dip })}
       />
       <Slider
-        label="Settle (x2)"
-        value={curve.x2}
+        label="Second bounce"
+        value={spring.second}
         min={0}
         max={1}
-        step={0.01}
-        onChange={(x2) => onChange({ ...curve, x2 })}
+        step={0.05}
+        onChange={(second) => onChange({ ...spring, second })}
+      />
+      <Slider
+        label="First peak at"
+        value={spring.peakAt}
+        min={0.1}
+        max={0.7}
+        step={0.05}
+        onChange={(peakAt) => onChange({ ...spring, peakAt })}
       />
     </>
   );
+}
+
+function formatSpring(spring: Spring) {
+  return `first bounce ${spring.first}, dip ${spring.dip}, second bounce ${spring.second}, first peak at ${spring.peakAt}`;
 }
 
 export function TuningPanel() {
@@ -325,129 +363,125 @@ export function TuningPanel() {
     setV(saved);
   };
 
-  const section: React.CSSProperties = {
-    display: "grid",
-    gap: 6,
-    padding: 12,
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    background: "#fff",
-  };
+  if (!visible) return null;
+
+  // Without hover, as on a touch screen, the button starts and ends a press
+  // at its normal size.
+  const canHover = window.matchMedia?.("(hover: hover)").matches ?? true;
+  const restingScale = canHover ? v.hoverScale : 1;
 
   return (
-    visible && (
-      <div className="tuning-panel">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-            gap: 16,
-          }}
-        >
-          <div style={section}>
-            <strong>1. Hover</strong>
-            <Slider
-              label="Size"
-              value={v.hoverScale}
-              min={1}
-              max={1.2}
-              step={0.005}
-              onChange={(hoverScale) => update({ hoverScale })}
-            />
-            <Slider
-              label="Duration (s)"
-              value={v.hoverDuration}
-              min={0.05}
-              max={1}
-              step={0.01}
-              onChange={(hoverDuration) => update({ hoverDuration })}
-            />
-            <CurveSliders
-              curve={v.hoverCurve}
-              onChange={(hoverCurve) => update({ hoverCurve })}
-            />
-            <Graph
-              title="Hover"
-              from={1}
-              to={v.hoverScale}
-              duration={v.hoverDuration}
-              curve={v.hoverCurve}
-            />
-          </div>
-          <div style={section}>
-            <strong>2. Mouse down</strong>
-            <Slider
-              label="Size"
-              value={v.pressScale}
-              min={0.8}
-              max={1}
-              step={0.005}
-              onChange={(pressScale) => update({ pressScale })}
-            />
-            <Slider
-              label="Duration (s)"
-              value={v.pressDuration}
-              min={0.05}
-              max={1}
-              step={0.01}
-              onChange={(pressDuration) => update({ pressDuration })}
-            />
-            <CurveSliders
-              curve={v.pressCurve}
-              onChange={(pressCurve) => update({ pressCurve })}
-            />
-            <Graph
-              title="Mouse down"
-              from={v.hoverScale}
-              to={v.pressScale}
-              duration={v.pressDuration}
-              curve={v.pressCurve}
-            />
-          </div>
-          <div style={section}>
-            <strong>3. Mouse up</strong>
-            <Slider
-              label="Duration (s)"
-              value={v.releaseDuration}
-              min={0.05}
-              max={1}
-              step={0.01}
-              onChange={(releaseDuration) => update({ releaseDuration })}
-            />
-            <CurveSliders
-              curve={v.releaseCurve}
-              onChange={(releaseCurve) => update({ releaseCurve })}
-            />
-            <Slider
-              label="Screen fade (s)"
-              value={v.fadeDuration}
-              min={0.2}
-              max={3}
-              step={0.1}
-              onChange={(fadeDuration) => update({ fadeDuration })}
-            />
-            <Graph
-              title="Mouse up"
-              from={v.pressScale}
-              to={v.hoverScale}
-              duration={v.releaseDuration}
-              curve={v.releaseCurve}
-              fadeDuration={v.fadeDuration}
-            />
-          </div>
-        </div>
-        <div style={section}>
-          <strong>Current values</strong>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
-            {`Hover: size ${v.hoverScale}, ${v.hoverDuration}s, ${formatBezier(v.hoverCurve)}
-Mouse down: size ${v.pressScale}, ${v.pressDuration}s, ${formatBezier(v.pressCurve)}
-Mouse up: ${v.releaseDuration}s, ${formatBezier(v.releaseCurve)}
-Screen fade: ${v.fadeDuration}s`}
-          </pre>
-        </div>
+    <div className="tuning-panel">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+          gap: 16,
+        }}
+      >
+        <fieldset>
+          <legend>1. Hover</legend>
+          <Slider
+            label="Size"
+            value={v.hoverScale}
+            min={1}
+            max={1.2}
+            step={0.005}
+            onChange={(hoverScale) => update({ hoverScale })}
+          />
+          <Slider
+            label="Duration (s)"
+            value={v.hoverDuration}
+            min={0.05}
+            max={1.5}
+            step={0.01}
+            onChange={(hoverDuration) => update({ hoverDuration })}
+          />
+          <SpringSliders
+            spring={v.hoverSpring}
+            onChange={(hoverSpring) => update({ hoverSpring })}
+          />
+          <Graph
+            title="Hover"
+            from={1}
+            to={v.hoverScale}
+            duration={v.hoverDuration}
+            spring={v.hoverSpring}
+          />
+        </fieldset>
+        <fieldset>
+          <legend>2. Mouse down</legend>
+          <Slider
+            label="Size"
+            value={v.pressScale}
+            min={0.8}
+            max={1}
+            step={0.005}
+            onChange={(pressScale) => update({ pressScale })}
+          />
+          <Slider
+            label="Duration (s)"
+            value={v.pressDuration}
+            min={0.05}
+            max={1.5}
+            step={0.01}
+            onChange={(pressDuration) => update({ pressDuration })}
+          />
+          <SpringSliders
+            spring={v.pressSpring}
+            onChange={(pressSpring) => update({ pressSpring })}
+          />
+          <Graph
+            title="Mouse down"
+            from={restingScale}
+            to={v.pressScale}
+            duration={v.pressDuration}
+            spring={v.pressSpring}
+          />
+        </fieldset>
+        <fieldset>
+          <legend>3. Mouse up</legend>
+          <Slider
+            label="Duration (s)"
+            value={v.releaseDuration}
+            min={0.05}
+            max={1.5}
+            step={0.01}
+            onChange={(releaseDuration) => update({ releaseDuration })}
+          />
+          <SpringSliders
+            spring={v.releaseSpring}
+            onChange={(releaseSpring) => update({ releaseSpring })}
+          />
+          <Slider
+            label="Screen fade (s)"
+            value={v.fadeDuration}
+            min={0.2}
+            max={3}
+            step={0.1}
+            onChange={(fadeDuration) => update({ fadeDuration })}
+          />
+          <Graph
+            title="Mouse up"
+            from={v.pressScale}
+            to={restingScale}
+            duration={v.releaseDuration}
+            spring={v.releaseSpring}
+            fadeDuration={v.fadeDuration}
+          />
+        </fieldset>
       </div>
-    )
+      <fieldset>
+        <legend>Current values</legend>
+        <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
+          {`Hover: size ${v.hoverScale}, ${v.hoverDuration}s, ${formatSpring(v.hoverSpring)}
+Mouse down: size ${v.pressScale}, ${v.pressDuration}s, ${formatSpring(v.pressSpring)}
+Mouse up: ${v.releaseDuration}s, ${formatSpring(v.releaseSpring)}
+Screen fade: ${v.fadeDuration}s`}
+        </pre>
+      </fieldset>
+    </div>
   );
 }
 
