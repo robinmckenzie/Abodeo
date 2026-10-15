@@ -358,13 +358,13 @@ body:has(.dashboard) {
 }
 
 /* The welcome screen fades in as it appears: the logo over its first second
-   and the button from 0.5 to 1.5 seconds, both easing out. */
+   and the button from 0.5 to 1.5 seconds, easing in and out on an S-curve. */
 .welcome h1 {
-  animation: welcome-fade-in 1s cubic-bezier(0, 0, 0.58, 1) both;
+  animation: welcome-fade-in 1s cubic-bezier(0.42, 0, 0.58, 1) both;
 }
 
 .get-started {
-  animation: welcome-fade-in 1s cubic-bezier(0, 0, 0.58, 1) 0.5s both;
+  animation: welcome-fade-in 1s cubic-bezier(0.42, 0, 0.58, 1) 0.5s both;
 }
 
 @keyframes welcome-fade-in {
