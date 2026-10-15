@@ -475,9 +475,27 @@ body:has(.dashboard) {
 
 .project-form-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+/* Level with the heading, which the close button is as tall as. */
+.project-form-header h2 {
+  line-height: 2rem;
+}
+
+/* The close button, with the autosave note in small text beneath it. */
+.project-form-close-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.project-form-autosave {
+  margin: 0.125rem 0 0;
+  color: #6b665c;
+  font-size: 0.75rem;
 }
 
 .project-form h2 {

@@ -65,16 +65,25 @@ export function ProjectForm({
     >
       <div className="project-form-header">
         <h2 id={`${id}-heading`}>{isNew ? "Add project" : "Project"}</h2>
-        <button
-          type="button"
-          className="project-form-close"
-          aria-label="Close"
-          onClick={onClose}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M3 3l10 10M13 3L3 13" />
-          </svg>
-        </button>
+        <div className="project-form-close-area">
+          <button
+            type="button"
+            className="project-form-close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 3l10 10M13 3L3 13" />
+            </svg>
+          </button>
+          {/* Only for an opened project, as a new one is saved by Create,
+              and not while a save has failed, which the form reports. */}
+          {!isNew && !message?.isError && (
+            <p className="project-form-autosave">
+              Changes saved automatically.
+            </p>
+          )}
+        </div>
       </div>
       <div className="project-form-body">
         <fieldset className="assignee-list">

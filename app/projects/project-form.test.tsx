@@ -1,15 +1,15 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectForm } from "./project-form";
+import { ProjectForm, type FormMessage } from "./project-form";
 import { newProjectFields } from "./projects";
 
-function renderForm(isNew = true) {
+function renderForm(isNew = true, message: FormMessage = null) {
   render(
     <ProjectForm
       values={{ ...newProjectFields, assignee: "boris" }}
       isNew={isNew}
-      message={null}
+      message={message}
       getFocusField={() => "title"}
       onChange={vi.fn()}
       onFieldFocus={vi.fn()}
@@ -62,5 +62,19 @@ describe("ProjectForm", () => {
     cleanup();
     renderForm(false);
     expect(screen.queryByRole("button", { name: "Create" })).toBeNull();
+  });
+
+  it("says changes are saved automatically in an opened project only", () => {
+    const note = () => screen.queryByText("Changes saved automatically.");
+    renderForm(false);
+    expect(note()).toBeTruthy();
+    cleanup();
+    renderForm(true);
+    expect(note()).toBeNull();
+  });
+
+  it("does not say changes are saved while a save has failed", () => {
+    renderForm(false, { text: "Not saved: full.", isError: true });
+    expect(screen.queryByText("Changes saved automatically.")).toBeNull();
   });
 });
