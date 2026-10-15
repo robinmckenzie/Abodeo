@@ -10,6 +10,21 @@ requirements, commitments, or scheduled work.
   (2026-09-29) supports only React Router 7, so AD #4 deployed without it.
   Reconsider if a release supports React Router 8 and a feature needs it.
 
+## Screen sizes
+
+- Phone and tablet: descoped by Robin on 2026-10-15 to save testing time, so
+  work is designed and checked for desktop only. The phone and tablet layouts
+  from AD #18 remain but are no longer tested. Revisit before relying on them.
+
+## Saving projects
+
+- Autosave with a database: AD #16 saves project edits automatically to local
+  storage. Moving to a database should not mean a request per keystroke:
+  save after a pause in typing and when a field or project is closed, send only
+  changed fields, and consider keeping local storage as a buffer that syncs in
+  the background. Shared projects will also need a way to spot two people
+  editing the same project, such as a version number checked on saving.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
