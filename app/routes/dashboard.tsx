@@ -35,19 +35,34 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 // The project being added (id null) or opened, with the values in its form
-// and its collapsed bar's height, which an expanded bar grows from.
+// and its collapsed bar's height, which an expanded bar grows from. Each
+// opening has its own key, so that a bar still squashing after one opening
+// is never mistaken for the bar of the next.
 type OpenProject = {
+  key: string;
   id: string | null;
   values: ProjectFields;
   message: FormMessage;
   barHeight: number;
 };
 
+let openings = 0;
+
+function createOpeningKey() {
+  openings += 1;
+  return `opening-${openings}`;
+}
+
 export default function Dashboard() {
   const mainRef = useRef<HTMLElement>(null);
   const projects = useProjects();
   const presentation = usePresentation();
+  const isInPlace = presentation === "in-place";
   const [open, setOpen] = useState<OpenProject | null>(null);
+  // In place, projects left open when another was opened, kept as they were
+  // while their bars squash closed alongside the new one expanding.
+  const [closing, setClosing] = useState<OpenProject[]>([]);
+  if (!isInPlace && closing.length > 0) setClosing([]);
   const [unsavedIds, setUnsavedIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -100,10 +115,17 @@ export default function Dashboard() {
     setOpen(null);
   };
 
-  const openNewProject = () => {
+  // In place, the project left open squashes closed as the next one opens.
+  const closeForNextProject = () => {
+    if (open && isInPlace) setClosing((bars) => [...bars, open]);
     closeProject();
+  };
+
+  const openNewProject = () => {
+    closeForNextProject();
     focusFieldRef.current = "title";
     setOpen({
+      key: createOpeningKey(),
       id: null,
       values: newProjectFields,
       message: null,
@@ -112,7 +134,7 @@ export default function Dashboard() {
   };
 
   const openProject = (project: Project, barHeight: number) => {
-    closeProject();
+    closeForNextProject();
     const { id } = project;
     saverRef.current = createAutosaver({
       save: async (changes) => {
@@ -139,6 +161,7 @@ export default function Dashboard() {
     focusFieldRef.current = "start";
     const { title, notes, assignee } = project;
     setOpen({
+      key: createOpeningKey(),
       id,
       values: { title, notes, assignee },
       message: null,
@@ -159,6 +182,7 @@ export default function Dashboard() {
   if (isAddProjectDue && handledRequest !== location.key) {
     setHandledRequest(location.key);
     setOpen({
+      key: createOpeningKey(),
       id: null,
       values: newProjectFields,
       message: null,
@@ -201,7 +225,6 @@ export default function Dashboard() {
 
   const list = projects?.ok ? projects.projects : [];
   const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
-  const isInPlace = presentation === "in-place";
 
   // In place, the expanded bar closes the form its own way, squashing.
   const form = open && (
@@ -221,6 +244,32 @@ export default function Dashboard() {
       }
       hasCloseButton={!isInPlace}
     />
+  );
+
+  // Keeps the same key as when the project was open, so that its bar and
+  // form stay as they are, and only start squashing.
+  const renderClosingBar = (bar: OpenProject) => (
+    <ExpandedProjectBar
+      key={bar.key}
+      barHeight={bar.barHeight}
+      isClosing
+      onCollapse={() =>
+        setClosing((bars) => bars.filter(({ key }) => key !== bar.key))
+      }
+    >
+      <ProjectForm
+        values={bar.values}
+        isNew={bar.id === null}
+        message={bar.message}
+        getFocusField={() => "start"}
+        onChange={() => {}}
+        onFieldFocus={() => {}}
+        onFieldBlur={() => {}}
+        onCreate={() => {}}
+        onClose={() => {}}
+        hasCloseButton={false}
+      />
+    </ExpandedProjectBar>
   );
 
   return (
@@ -260,28 +309,34 @@ export default function Dashboard() {
           </p>
         )}
         <ul className="project-list" aria-label="Projects">
-          {list.map((project) =>
-            isInPlace && open?.id === project.id ? (
-              <ExpandedProjectBar
-                key={project.id}
-                ref={expandedBarRef}
-                barHeight={open.barHeight}
-                onCollapse={closeProject}
-              >
-                {form}
-              </ExpandedProjectBar>
-            ) : (
+          {list.map((project) => {
+            const closingBar = closing.find((bar) => bar.id === project.id);
+            if (isInPlace && open?.id === project.id) {
+              return (
+                <ExpandedProjectBar
+                  key={open.key}
+                  ref={expandedBarRef}
+                  barHeight={open.barHeight}
+                  onCollapse={closeProject}
+                >
+                  {form}
+                </ExpandedProjectBar>
+              );
+            }
+            if (closingBar) return renderClosingBar(closingBar);
+            return (
               <ProjectBar
                 key={project.id}
                 project={project}
                 hasUnsavedChanges={unsavedIds.has(project.id)}
                 onOpen={(barHeight) => openProject(project, barHeight)}
               />
-            ),
-          )}
+            );
+          })}
+          {closing.filter((bar) => bar.id === null).map(renderClosingBar)}
           {isInPlace && open?.id === null && (
             <ExpandedProjectBar
-              key="new"
+              key={open.key}
               ref={expandedBarRef}
               barHeight={0}
               onCollapse={closeProject}

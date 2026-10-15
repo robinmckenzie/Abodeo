@@ -65,24 +65,34 @@ export function ProjectBar({
 // With reduce motion, neither is animated. While animating, the bar clips
 // its content with overflow: clip rather than hidden, which cannot scroll,
 // so focusing the title as the bar opens does not scroll the heading out
-// of sight.
+// of sight. A bar marked as closing, because another project was opened,
+// squashes straight away, and cannot be used while it does.
 export type ExpandedProjectBarHandle = { squash: () => void };
 
 export function ExpandedProjectBar({
   ref,
   barHeight,
+  isClosing = false,
   onCollapse,
   children,
 }: {
   ref?: React.Ref<ExpandedProjectBarHandle>;
   // The collapsed bar's height, or 0 for a new project, which has none.
   barHeight: number;
+  isClosing?: boolean;
   onCollapse: () => void;
   children: React.ReactNode;
 }) {
   const barRef = useRef<HTMLLIElement>(null);
   const isSquashingRef = useRef(false);
   const isMountedRef = useRef(false);
+  // The latest, as a bar squashing when another project opens changes from
+  // closing its project to finishing its own closing.
+  const onCollapseRef = useRef(onCollapse);
+
+  useLayoutEffect(() => {
+    onCollapseRef.current = onCollapse;
+  });
 
   useLayoutEffect(() => {
     isMountedRef.current = true;
@@ -113,7 +123,7 @@ export function ExpandedProjectBar({
     const bar = barRef.current;
     if (isSquashingRef.current) return;
     if (!bar || !canAnimate(bar)) {
-      onCollapse();
+      onCollapseRef.current();
       return;
     }
     isSquashingRef.current = true;
@@ -125,11 +135,10 @@ export function ExpandedProjectBar({
         ],
         { ...squashTiming, fill: "forwards" },
       )
-      // Closes only if this bar is still open: another project opened
-      // during the squash has already closed it, and must stay open.
+      // Closes only if this bar is still shown.
       .finished.then(
         () => {
-          if (isMountedRef.current) onCollapse();
+          if (isMountedRef.current) onCollapseRef.current();
         },
         () => {},
       );
@@ -137,10 +146,16 @@ export function ExpandedProjectBar({
 
   useImperativeHandle(ref, () => ({ squash }));
 
+  useLayoutEffect(() => {
+    if (isClosing) squash();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClosing]);
+
   return (
     <li
       ref={barRef}
       className="project-bar is-expanded"
+      inert={isClosing}
       // Esc from the arrow; the form handles Esc inside it.
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;

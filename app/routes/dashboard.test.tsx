@@ -335,8 +335,8 @@ describe("Dashboard", () => {
     expect(document.activeElement).toBe(bars()[0]);
   });
 
-  it("keeps a project opened while another is squashing open", async () => {
-    // Animations that finish only when told to.
+  // Animations that finish only when told to.
+  function holdAnimations() {
     const finishes: (() => void)[] = [];
     Element.prototype.animate = vi.fn(
       () =>
@@ -345,6 +345,18 @@ describe("Dashboard", () => {
           cancel: () => {},
         }) as unknown as Animation,
     );
+    return () => act(async () => finishes.forEach((finish) => finish()));
+  }
+
+  // The titles shown, with whether each is in a bar squashing closed.
+  const shownTitles = () =>
+    screen.getAllByRole("textbox", { name: "Title" }).map((field) => [
+      (field as HTMLInputElement).value,
+      field.closest("li")!.hasAttribute("inert"),
+    ]);
+
+  it("keeps a project opened while another is squashing open", async () => {
+    const finishAnimations = holdAnimations();
     try {
       renderDashboard();
       await addProject("First");
@@ -354,9 +366,39 @@ describe("Dashboard", () => {
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
       // Opens the second project while the first is still squashing.
       fireEvent.click(bars()[1]);
-      expect(titleField()).toHaveProperty("value", "Second");
-      await act(async () => finishes.forEach((finish) => finish()));
-      expect(titleField()).toHaveProperty("value", "Second");
+      expect(shownTitles()).toEqual([
+        ["First", true],
+        ["Second", false],
+      ]);
+      await finishAnimations();
+      expect(shownTitles()).toEqual([["Second", false]]);
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
+  });
+
+  it("squashes an open project closed, as it was, while the next one opens", async () => {
+    const finishAnimations = holdAnimations();
+    try {
+      renderDashboard();
+      await addProject("First");
+      await addProject("Second");
+      pressKey("e");
+      fireEvent.click(bars()[0]);
+      fireEvent.change(notesField(), { target: { value: "Typed" } });
+      await act(async () => {
+        fireEvent.click(bars()[1]);
+      });
+      expect(shownTitles()).toEqual([
+        ["First", true],
+        ["Second", false],
+      ]);
+      expect(savedProjects().find((p) => p.title === "First").notes).toBe(
+        "Typed",
+      );
+      await finishAnimations();
+      expect(shownTitles()).toEqual([["Second", false]]);
+      expect(bars()[0]).toHaveProperty("dataset.projectId");
     } finally {
       delete (Element.prototype as Partial<Element>).animate;
     }
