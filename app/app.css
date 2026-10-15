@@ -311,7 +311,7 @@ body:has(.dashboard) {
 
 .dashboard h1 img {
   display: block;
-  width: 7.5rem;
+  width: 11.25rem;
   height: auto;
 }
 
@@ -326,9 +326,9 @@ body:has(.dashboard) {
 }
 
 /* Where the column would reach the logo, it starts below it. */
-@media (max-width: 64rem) {
+@media (max-width: 72rem) {
   .dashboard main {
-    padding-top: 8.5rem;
+    padding-top: 11.75rem;
   }
 }
 
