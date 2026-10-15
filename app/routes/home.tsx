@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
+import { TuningPanel } from "../tuning-panel";
 import getStartedButton from "../images/get-started-button.png";
 import logo from "../images/abodeo-home-logo.jpeg";
 
@@ -50,6 +51,7 @@ export default function Home() {
           height={136}
         />
       </Link>
+      <TuningPanel />
     </main>
   );
 }
