@@ -182,7 +182,7 @@ function buildCss(v: Values) {
    controls. The logo and button keep their places and sizes. Below 700px
    there is too little room, so the panel covers a band of the page, which
    scrolls past it. */
-@media (min-width: 700px) and (max-width: 1400px) {
+@media (min-width: 700px) and (max-width: 1500px) {
   .welcome:has(.size-sliders) > :is(.tuning-panel, .fade-tuning-panel) {
     padding-right: 184px;
   }
