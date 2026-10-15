@@ -236,6 +236,12 @@ body:has(.dashboard) {
     transition: none;
   }
 
+  /* Switches the whole screen at once, without a separate snapshot of the
+     button that could linger over the dashboard for a frame. */
+  .get-started {
+    view-transition-name: none;
+  }
+
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
