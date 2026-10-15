@@ -177,6 +177,16 @@ function buildCss(v: Values) {
   width: 100%;
   height: auto;
 }
+/* Where the window is too narrow for both, the T and F panels leave room on
+   the right for the size sliders' panel, so that it does not cover their
+   controls. The logo and button keep their places and sizes. Below 700px
+   there is too little room, so the panel covers a band of the page, which
+   scrolls past it. */
+@media (min-width: 700px) and (max-width: 1400px) {
+  .welcome:has(.size-sliders) > :is(.tuning-panel, .fade-tuning-panel) {
+    padding-right: 148px;
+  }
+}
 /* The size sliders' panel stays at the right-hand edge of the window. */
 .size-sliders {
   position: fixed;
