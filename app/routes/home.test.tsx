@@ -41,7 +41,8 @@ describe("Home", () => {
   it("opens the dashboard on Get Started, without saving anything", async () => {
     renderHome();
     fireEvent.click(screen.getByRole("link", { name: "Get Started" }));
-    expect(await screen.findByText("No projects added yet.")).toBeTruthy();
+    const message = await screen.findByText("No projects added yet.");
+    expect(document.activeElement).toBe(message.closest("main"));
     expect(localStorage.length).toBe(0);
   });
 });

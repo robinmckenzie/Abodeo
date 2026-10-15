@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
 
@@ -7,6 +9,14 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 export default function Dashboard() {
+  const mainRef = useRef<HTMLElement>(null);
+
+  // The Get Started link disappears when it is used, so focus moves to the
+  // dashboard's content and screen readers announce the new screen.
+  useEffect(() => {
+    mainRef.current?.focus();
+  }, []);
+
   return (
     <div className="dashboard">
       <header>
@@ -19,7 +29,7 @@ export default function Dashboard() {
           />
         </h1>
       </header>
-      <main>
+      <main ref={mainRef} tabIndex={-1}>
         <p>No projects added yet.</p>
       </main>
     </div>
