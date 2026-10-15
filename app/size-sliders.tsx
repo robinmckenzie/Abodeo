@@ -1,8 +1,9 @@
-// Vertical sliders to the right of the welcome screen's logo and Get Started
-// button, shown with the T panel, that scale each from its normal size. The
+// A panel fixed to the right-hand edge of the window, shown with the T panel,
+// with vertical sliders that scale the welcome screen's logo and Get Started
+// button from their normal sizes. It stays put as they change size. The
 // sizes are kept in local storage, and sizeTuningScript applies them before
 // the page first appears, so that nothing visibly changes size afterwards.
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 type Sizes = { logo: number; button: number };
 
@@ -91,96 +92,31 @@ function readSizes() {
 
 const formatPercent = (size: number) => `${Math.round(size * 100)}%`;
 
-// The element's layout box in page coordinates, leaving out transforms, so
-// that the button's springs do not move its slider.
-function measureLayoutBox(element: HTMLElement) {
-  let left = 0;
-  let top = 0;
-  for (
-    let e: HTMLElement | null = element;
-    e;
-    e = e.offsetParent as HTMLElement | null
-  ) {
-    left += e.offsetLeft;
-    top += e.offsetTop;
-  }
-  return {
-    left,
-    top,
-    width: element.offsetWidth,
-    height: element.offsetHeight,
-  };
-}
-
-// Keeps a slider beside the element it sizes, in page coordinates, and as
-// tall as that element. It checks every frame, because the element can move
-// without changing size, such as when the F panel opens or the other slider
-// moves. It stays on screen, over the element if there is no room beside it.
-function usePositionBeside(
-  selector: string,
-  ref: React.RefObject<HTMLDivElement | null>,
-) {
-  useLayoutEffect(() => {
-    const target = document.querySelector<HTMLElement>(selector);
-    const slider = ref.current;
-    if (!target || !slider) return;
-    let last = "";
-    let frame = 0;
-    // The percentage and slider span the element's height, and anything
-    // after them, such as the reset button, hangs below it.
-    const position = () => {
-      const box = measureLayoutBox(target);
-      const viewportWidth = document.documentElement.clientWidth;
-      const key = `${box.left},${box.top},${box.width},${box.height},${viewportWidth},${window.scrollX}`;
-      if (key !== last) {
-        last = key;
-        const input = slider.querySelector("input");
-        const percent = slider.querySelector("span");
-        if (input && percent) {
-          const height = box.height - percent.offsetHeight - 4;
-          input.style.height = `${Math.max(height, 48)}px`;
-        }
-        const maxLeft = window.scrollX + viewportWidth - slider.offsetWidth - 4;
-        const left = Math.min(box.left + box.width + 12, maxLeft);
-        slider.style.left = `${left}px`;
-        slider.style.top = `${box.top}px`;
-      }
-      frame = requestAnimationFrame(position);
-    };
-    position();
-    return () => cancelAnimationFrame(frame);
-  }, [selector, ref]);
-}
-
 function SizeSlider({
   label,
-  selector,
+  name,
   value,
   onChange,
-  children,
 }: {
   label: string;
-  selector: string;
+  name: string;
   value: number;
   onChange: (value: number) => void;
-  children?: React.ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  usePositionBeside(selector, ref);
   return (
-    <div className="size-slider" ref={ref}>
+    <label className="size-slider">
+      <span>{label}</span>
       <span>{formatPercent(value)}</span>
       <input
         type="range"
-        aria-label={label}
+        aria-label={name}
         min={minSize}
         max={maxSize}
         step={0.01}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      {children}
-    </div>
+    </label>
   );
 }
 
@@ -195,23 +131,24 @@ export function SizeSliders() {
   };
 
   return (
-    <>
-      <SizeSlider
-        label="Logo size"
-        selector=".welcome h1 img"
-        value={sizes.logo}
-        onChange={(logo) => update({ ...sizes, logo })}
-      />
-      <SizeSlider
-        label="Button size"
-        selector=".get-started"
-        value={sizes.button}
-        onChange={(button) => update({ ...sizes, button })}
-      >
-        <button type="button" onClick={() => update(defaultSizes)}>
-          Reset to default
-        </button>
-      </SizeSlider>
-    </>
+    <div className="size-sliders">
+      <div className="size-sliders-row">
+        <SizeSlider
+          label="Logo"
+          name="Logo size"
+          value={sizes.logo}
+          onChange={(logo) => update({ ...sizes, logo })}
+        />
+        <SizeSlider
+          label="Button"
+          name="Button size"
+          value={sizes.button}
+          onChange={(button) => update({ ...sizes, button })}
+        />
+      </div>
+      <button type="button" onClick={() => update(defaultSizes)}>
+        Reset to default
+      </button>
+    </div>
   );
 }

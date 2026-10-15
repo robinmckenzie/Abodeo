@@ -153,9 +153,7 @@ function buildCss(v: Values) {
 .tuning-panel {
   width: 100%;
   max-width: 1100px;
-  /* Leaves room for the size sliders' reset button, which hangs below
-     the Get Started button. */
-  margin-top: 64px;
+  margin-top: 32px;
   display: grid;
   gap: 16px;
   font-size: 14px;
@@ -179,37 +177,54 @@ function buildCss(v: Values) {
   width: 100%;
   height: auto;
 }
+/* The size sliders' panel stays at the right-hand edge of the window. */
+.size-sliders {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  z-index: 1;
+  transform: translateY(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-size: 12px;
+}
+.size-sliders-row {
+  display: flex;
+  gap: 12px;
+}
 .size-slider {
-  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 52px;
-  font-size: 12px;
-  text-align: center;
 }
 .size-slider input {
   writing-mode: vertical-lr;
   direction: rtl;
   width: 24px;
+  height: clamp(100px, 40vh, 240px);
   margin: 0;
 }
-.size-slider button {
-  padding: 2px;
+.size-sliders button {
+  padding: 2px 6px;
   font-size: 11px;
 }
 /* On a phone in landscape the panel goes below the logo and button, which
-   stay side by side and shrink to fit, with room between them for the
-   logo's size slider. :root keeps the room when the F panel is open too. */
+   stay side by side and shrink to fit. */
 @media (orientation: landscape) and (max-height: 500px) {
-  :root .welcome:has(> .tuning-panel) {
+  .welcome:has(> .tuning-panel) {
     display: grid;
     grid-template-columns: auto auto;
     justify-content: center;
     align-content: center;
     align-items: center;
-    column-gap: 6rem;
+    column-gap: 2rem;
   }
   .tuning-panel {
     grid-column: 1 / -1;
