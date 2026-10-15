@@ -309,7 +309,7 @@ function SpringSliders({
         value={spring.dip}
         min={0}
         max={0.5}
-        step={0.05}
+        step={0.02}
         onChange={(dip) => onChange({ ...spring, dip })}
       />
       <Slider
@@ -317,7 +317,7 @@ function SpringSliders({
         value={spring.second}
         min={0}
         max={0.5}
-        step={0.05}
+        step={0.02}
         onChange={(second) => onChange({ ...spring, second })}
       />
       <Slider
