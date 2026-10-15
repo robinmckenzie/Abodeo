@@ -55,6 +55,9 @@ export function useSwitchPresentationKey() {
       if (e.key !== "e" && e.key !== "E") return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.isComposing || isTextField(e.target)) return;
+      // Switching moves focus to a field in the other presentation, which
+      // the browser would otherwise type the E into.
+      e.preventDefault();
       switchPresentation();
     };
     window.addEventListener("keydown", onKey);

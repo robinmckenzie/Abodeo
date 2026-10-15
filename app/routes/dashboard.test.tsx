@@ -277,10 +277,15 @@ describe("Dashboard", () => {
     renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Draft" } });
-    pressKey("E", screen.getByRole("button", { name: "Create" }));
+    const isTyped = fireEvent.keyDown(
+      screen.getByRole("button", { name: "Create" }),
+      { key: "E" },
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(titleField()).toHaveProperty("value", "Draft");
     expect(document.activeElement).toBe(titleField());
+    // The E that switched is not typed into the newly focused title.
+    expect(isTyped).toBe(false);
   });
 
   it("types E into a field without switching", () => {
