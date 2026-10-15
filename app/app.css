@@ -283,11 +283,14 @@ body:has(.dashboard) {
     margin-top: 0;
   }
 }
-
-/* The form's controls stay light on the cream background in dark mode too. */
+/* The form's controls stay light on the cream background in dark mode too.
+   A left-hand column holds the logo, and later perhaps a menu, so the list
+   never has to move below the logo. */
 .dashboard {
   position: relative;
   color-scheme: light;
+  display: grid;
+  grid-template-columns: 14.25rem minmax(0, 1fr);
 }
 
 /* Lower in priority than any class, so components set their own colours. */
@@ -296,12 +299,7 @@ body:has(.dashboard) {
   color: inherit;
 }
 
-/* Out of the flow, so that the list's column is centred on the whole
-   screen. */
 .dashboard header {
-  position: absolute;
-  top: 0;
-  left: 0;
   padding: 1rem 1.5rem;
 }
 
@@ -315,6 +313,7 @@ body:has(.dashboard) {
   height: auto;
 }
 
+/* Centred in the space to the right of the left-hand column. */
 .dashboard main {
   min-height: 100vh;
   min-height: 100dvh;
@@ -325,10 +324,16 @@ body:has(.dashboard) {
   padding: 2.5rem 1.5rem 3rem;
 }
 
-/* Where the column would reach the logo, it starts below it. */
-@media (max-width: 72rem) {
+/* On a phone the left-hand column would leave too little room for the
+   list, so the logo goes above it. */
+@media (max-width: 40rem) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .dashboard main {
-    padding-top: 11.75rem;
+    min-height: 0;
+    padding-top: 1rem;
   }
 }
 
