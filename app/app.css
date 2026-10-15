@@ -290,7 +290,8 @@ body:has(.dashboard) {
   position: relative;
   color-scheme: light;
   display: grid;
-  grid-template-columns: 14.25rem minmax(0, 1fr);
+  --side-column: 14.25rem;
+  grid-template-columns: var(--side-column) minmax(0, 1fr);
 }
 
 /* Lower in priority than any class, so components set their own colours. */
@@ -313,12 +314,13 @@ body:has(.dashboard) {
   height: auto;
 }
 
-/* Centred in the space to the right of the left-hand column. */
+/* Centred on the whole screen, as before the left-hand column, but never
+   reaching into it. 100% here is the width to the right of the column. */
 .dashboard main {
   min-height: 100vh;
   min-height: 100dvh;
   width: min(46rem, 100%);
-  margin: 0 auto;
+  margin: 0 auto 0 max(0px, (100% - var(--side-column) - 46rem) / 2);
   display: flex;
   flex-direction: column;
   padding: 2.5rem 1.5rem 3rem;
