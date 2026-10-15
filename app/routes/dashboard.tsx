@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
+import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
 import {
   ExpandedProjectBar,
@@ -224,6 +225,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
+      <AssigneeTuningPanel />
       <header>
         <h1>
           <img

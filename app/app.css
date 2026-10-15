@@ -619,12 +619,49 @@ body:has(.dashboard) {
 
 /* As the form appears, the assignees arrive one by one: each fades in over
    0.4 seconds, 0.07 seconds after the one above. --arrival is the option's
-   place in the list. */
+   place in the list. The dashboard's T panel can tune both times, through
+   --assignee-fade and --assignee-gap. */
 @media (prefers-reduced-motion: no-preference) {
   .assignee-option {
-    animation: assignee-arrive 0.4s ease-out both;
-    animation-delay: calc(var(--arrival, 0) * 0.07s);
+    animation: assignee-arrive var(--assignee-fade, 0.4s) ease-out both;
+    animation-delay: calc(var(--arrival, 0) * var(--assignee-gap, 0.07s));
   }
+}
+
+/* The dashboard's T panel, fixed at the left-hand edge of the window. */
+.assignee-tuning-panel {
+  position: fixed;
+  top: 50%;
+  left: 16px;
+  z-index: 1;
+  width: 20rem;
+  transform: translateY(-50%);
+  font-size: 12px;
+}
+
+.assignee-tuning-panel fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.assignee-tuning-panel legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.assignee-tuning-panel p {
+  margin: 0;
+  color: #6b665c;
+}
+
+.assignee-tuning-panel button {
+  justify-self: start;
 }
 
 @keyframes assignee-arrive {
