@@ -66,8 +66,10 @@ it starts.
    switched off. Add no environment variables. Selecting Deploy starts the
    first deployment. Vercel added the suffix `-kappa` to the address because
    `abodeo.vercel.app` was taken.
-4. In the project's settings, confirm that the production branch is `main`, the
-   Node.js version is 24.x and Deployment Protection is Standard Protection.
+4. In the project's settings, confirm that the production branch is `main`
+   (Environments, then Production), the Node.js version is 24.x (Build and
+   Deployment) and Vercel Authentication is on with Standard Protection
+   (Security, then Deployment Protection).
 
 ### How a change reaches production
 
