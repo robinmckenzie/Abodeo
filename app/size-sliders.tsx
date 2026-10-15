@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 
 type Sizes = { logo: number; button: number };
 
-export const defaultSizes: Sizes = { logo: 1, button: 1 };
+// Robin's tuned sizes, which match the fallbacks in app.css.
+export const defaultSizes: Sizes = { logo: 0.78, button: 0.61 };
 const minSize = 0.5;
 const maxSize = 1.5;
 

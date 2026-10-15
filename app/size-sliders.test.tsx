@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseSizes, sizeTuningScript } from "./size-sliders";
+import { defaultSizes, parseSizes, sizeTuningScript } from "./size-sliders";
 import { TuningPanel } from "./tuning-panel";
 
 function pressT() {
@@ -60,7 +62,7 @@ describe("SizeSliders", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
     expect(localStorage.getItem("abodeo-size-tuning")).toBeNull();
-    expect(readStyle()).toContain("--logo-size: 1;");
+    expect(readStyle()).toContain(`--logo-size: ${defaultSizes.logo};`);
     expect(localStorage.getItem("abodeo-button-tuning")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
   });
@@ -95,9 +97,9 @@ describe("SizeSliders", () => {
   it("uses the default for each saved size that is missing or out of range", () => {
     expect(parseSizes(JSON.stringify({ logo: 1.3, button: 3 }))).toEqual({
       logo: 1.3,
-      button: 1,
+      button: defaultSizes.button,
     });
-    expect(parseSizes("not json")).toEqual({ logo: 1, button: 1 });
+    expect(parseSizes("not json")).toEqual(defaultSizes);
   });
 
   it("applies saved sizes from the page's head, checking them first", () => {
@@ -107,11 +109,28 @@ describe("SizeSliders", () => {
     );
     new Function(sizeTuningScript)();
     expect(readStyle()).toContain("--logo-size: 0.7");
-    expect(readStyle()).toContain("--button-size: 1;");
+    expect(readStyle()).toContain(`--button-size: ${defaultSizes.button};`);
   });
 
   it("adds nothing to the page's head when no sizes are saved", () => {
     new Function(sizeTuningScript)();
     expect(document.getElementById("size-tuning-css")).toBeNull();
+  });
+
+  it("starts from the same sizes as app.css", () => {
+    // Tests run from the repository root.
+    const css = readFileSync("app/app.css", "utf8");
+    const readFallbacks = (name: string) =>
+      [...css.matchAll(new RegExp(`var\\(--${name}, ([\\d.]+)\\)`, "g"))].map(
+        (match) => Number(match[1]),
+      );
+    expect(readFallbacks("logo-size")).toEqual([
+      defaultSizes.logo,
+      defaultSizes.logo,
+    ]);
+    expect(readFallbacks("button-size")).toEqual([
+      defaultSizes.button,
+      defaultSizes.button,
+    ]);
   });
 });

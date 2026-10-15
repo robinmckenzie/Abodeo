@@ -51,14 +51,15 @@ body:has(.dashboard) {
 /* Takes 40% of the window's width or height, whichever runs out first, but no
    smaller than 16rem and no larger than the logo's own size. Below 16rem plus
    padding it fits the width available. 997 / 868 is the logo's
-   width / height. --logo-size scales it, set by the T panel's size slider. */
+   width / height. --logo-size scales it: 0.78 is Robin's tuned default, and
+   the T panel's size slider can change it. */
 .welcome img {
   display: block;
   width: calc(
-    clamp(16rem, min(40vw, 40vh * 997 / 868), 997px) * var(--logo-size, 1)
+    clamp(16rem, min(40vw, 40vh * 997 / 868), 997px) * var(--logo-size, 0.78)
   );
   width: calc(
-    clamp(16rem, min(40vw, 40dvh * 997 / 868), 997px) * var(--logo-size, 1)
+    clamp(16rem, min(40vw, 40dvh * 997 / 868), 997px) * var(--logo-size, 0.78)
   );
   max-width: 100%;
   height: auto;
@@ -209,10 +210,10 @@ body:has(.dashboard) {
 .get-started {
   display: block;
   width: calc(
-    clamp(16rem, min(40vw, 40vh * 997 / 868), 457px) * var(--button-size, 1)
+    clamp(16rem, min(40vw, 40vh * 997 / 868), 457px) * var(--button-size, 0.61)
   );
   width: calc(
-    clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px) * var(--button-size, 1)
+    clamp(16rem, min(40vw, 40dvh * 997 / 868), 457px) * var(--button-size, 0.61)
   );
   max-width: 100%;
   margin-top: 1.5rem;
