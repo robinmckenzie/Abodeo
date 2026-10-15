@@ -14,13 +14,18 @@ export function ProjectBar({
   return (
     <li className="project-bar">
       <button type="button" data-project-id={project.id} onClick={onOpen}>
-        <span className="project-bar-title">{project.title}</span>
-        {hasUnsavedChanges && (
-          <span className="project-bar-unsaved">Last changes not saved</span>
-        )}
         <span className="project-bar-assignee">
           {findAssigneeName(project.assignee)}
         </span>
+        <span className="project-bar-text">
+          <span className="project-bar-title">{project.title}</span>
+          {project.notes && (
+            <span className="project-bar-notes">{project.notes}</span>
+          )}
+        </span>
+        {hasUnsavedChanges && (
+          <span className="project-bar-unsaved">Last changes not saved</span>
+        )}
       </button>
     </li>
   );

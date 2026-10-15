@@ -98,9 +98,17 @@ describe("Dashboard", () => {
     await addProject("Kitchen", "Tiles\nGrout", "Andy");
     await addProject("Kitchen");
     expect(bars().map((bar) => bar.textContent)).toEqual([
-      "KitchenAndy",
-      "KitchenUnassigned",
+      "AndyKitchenTiles\nGrout",
+      "UnassignedKitchen",
     ]);
+    // The notes show under the title, with their line breaks, and a project
+    // without notes has none.
+    const [first, second] = bars();
+    expect(
+      first.querySelector(".project-bar-title + .project-bar-notes")
+        ?.textContent,
+    ).toBe("Tiles\nGrout");
+    expect(second.querySelector(".project-bar-notes")).toBeNull();
     expect(savedProjects().find((p) => p.assignee === "andy").notes).toBe(
       "Tiles\nGrout",
     );
@@ -162,7 +170,7 @@ describe("Dashboard", () => {
       notes: "One\nTwo",
       assignee: "clement",
     });
-    expect(bars()[0].textContent).toBe("BathroomClement");
+    expect(bars()[0].textContent).toBe("ClementBathroomOne\nTwo");
   });
 
   it("keeps the last valid title when the title is cleared", async () => {
@@ -222,8 +230,8 @@ describe("Dashboard", () => {
     );
     renderDashboard();
     expect(bars().map((bar) => bar.textContent)).toEqual([
-      "MineUnassigned",
-      "TheirsUnassigned",
+      "UnassignedMine",
+      "UnassignedTheirs",
     ]);
   });
 
