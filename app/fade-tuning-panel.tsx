@@ -20,13 +20,13 @@ type Values = {
 type Saved = { visible: boolean; values: Values };
 
 const defaultValues: Values = {
-  x1: 0.42,
+  x1: 0.63,
   y1: 0,
-  x2: 0.58,
-  y2: 1,
-  logoEnd: 1,
-  buttonStart: 0.5,
-  buttonEnd: 1.5,
+  x2: 0.42,
+  y2: 0.94,
+  logoEnd: 1.6,
+  buttonStart: 0.9,
+  buttonEnd: 2.3,
 };
 
 const ranges: Record<keyof Values, [number, number]> = {
