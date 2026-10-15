@@ -182,13 +182,14 @@ function buildCss(v: Values) {
    controls. The logo and button keep their places and sizes. Below 700px
    there is too little room, so the panel covers a band of the page, which
    scrolls past it. */
-@media (min-width: 700px) and (max-width: 1500px) {
+@media (min-width: 700px) and (max-width: 1540px) {
   .welcome:has(.size-sliders) > :is(.tuning-panel, .fade-tuning-panel) {
     padding-right: 184px;
   }
 }
 /* The size sliders' panel stays at the right-hand edge of the window. */
 .size-sliders {
+  --size-track: clamp(100px, 40vh, 240px);
   position: fixed;
   top: 50%;
   right: 16px;
@@ -206,7 +207,17 @@ function buildCss(v: Values) {
 }
 .size-sliders-row {
   display: flex;
-  gap: 12px;
+  gap: 4px;
+}
+/* As tall as the sliders and level with them, so that "100%" sits halfway
+   up, beside their 100% lines. */
+.size-sliders-default {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  height: var(--size-track);
+  color: #666;
+  font-size: 11px;
 }
 .size-slider {
   display: flex;
@@ -219,11 +230,25 @@ function buildCss(v: Values) {
   color: #666;
   font-size: 11px;
 }
+.size-slider-track {
+  position: relative;
+  display: block;
+}
+.size-slider-track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  right: -6px;
+  border-top: 1px solid #666;
+  pointer-events: none;
+}
 .size-slider input {
+  display: block;
   writing-mode: vertical-lr;
   direction: rtl;
   width: 24px;
-  height: clamp(100px, 40vh, 240px);
+  height: var(--size-track);
   margin: 0;
 }
 .size-sliders button {

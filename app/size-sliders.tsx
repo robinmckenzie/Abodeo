@@ -157,15 +157,18 @@ function SizeSlider({
       <span className="size-slider-shown">
         {isCapped ? `(${formatPercent(shown)} here)` : " "}
       </span>
-      <input
-        type="range"
-        aria-label={name}
-        min={minSize}
-        max={maxSize}
-        step={0.01}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
+      {/* Marks 100%, halfway up, with a line across the slider. */}
+      <span className="size-slider-track">
+        <input
+          type="range"
+          aria-label={name}
+          min={minSize}
+          max={maxSize}
+          step={0.01}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      </span>
     </label>
   );
 }
@@ -191,6 +194,9 @@ export function SizeSliders() {
           shown={shown?.logo}
           onChange={(logo) => update({ ...sizes, logo })}
         />
+        <span className="size-sliders-default" aria-hidden="true">
+          100%
+        </span>
         <SizeSlider
           label="Button"
           name="Button size"
