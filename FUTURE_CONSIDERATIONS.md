@@ -27,7 +27,10 @@ requirements, commitments, or scheduled work.
   background. A save started as the page is left must still complete, which a
   network request may not. Shared projects will also need a way to spot two
   people editing the same project, such as a version number checked on
-  saving; for now the later save of a field wins.
+  saving. For now the later save of a field wins, and, as each project is one
+  entry, two tabs saving different fields of one project within moments of
+  each other can lose the earlier change (accepted by Robin for AD #16 Simple
+  Projects as very unlikely).
 
 ## Ruled out
 

@@ -23,8 +23,13 @@ function onStorage(event: StorageEvent) {
   if (isProjectKey(event.key)) refreshProjects();
 }
 
+// Reads storage again on starting to listen, as other tabs may have saved
+// while nothing was listening.
 function subscribe(listener: () => void) {
-  if (listeners.size === 0) window.addEventListener("storage", onStorage);
+  if (listeners.size === 0) {
+    current = loadProjects();
+    window.addEventListener("storage", onStorage);
+  }
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

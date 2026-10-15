@@ -209,6 +209,24 @@ describe("Dashboard", () => {
     expect(bars()[0].textContent).toMatch(/Last changes not saved/);
   });
 
+  it("shows projects saved in another tab while the dashboard was closed", async () => {
+    const { unmount } = renderDashboard();
+    unmount();
+    renderDashboard();
+    await addProject("Mine");
+    const mine = Object.keys(localStorage)[0];
+    cleanup();
+    localStorage.setItem(
+      `${projectKeyPrefix}theirs`,
+      localStorage.getItem(mine)!.replace("Mine", "Theirs"),
+    );
+    renderDashboard();
+    expect(bars().map((bar) => bar.textContent)).toEqual([
+      "MineUnassigned",
+      "TheirsUnassigned",
+    ]);
+  });
+
   it("says when saved projects cannot be read, and leaves them alone", () => {
     localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
     refreshProjects();
