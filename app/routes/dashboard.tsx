@@ -174,6 +174,11 @@ export default function Dashboard() {
     setOpen(null);
   };
 
+  const list = projects?.ok ? projects.projects : [];
+  const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
+  const isInPlace = presentation === "in-place";
+
+  // In place, the expanding bar closes the form with its own arrow.
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -185,12 +190,9 @@ export default function Dashboard() {
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
       onClose={closeProject}
+      hasCloseButton={!isInPlace}
     />
   );
-
-  const list = projects?.ok ? projects.projects : [];
-  const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
-  const isInPlace = presentation === "in-place";
 
   return (
     <div className="dashboard">
@@ -230,7 +232,9 @@ export default function Dashboard() {
         <ul className="project-list" aria-label="Projects">
           {list.map((project) =>
             isInPlace && open?.id === project.id ? (
-              <ExpandedProjectBar key={project.id}>{form}</ExpandedProjectBar>
+              <ExpandedProjectBar key={project.id} onCollapse={closeProject}>
+                {form}
+              </ExpandedProjectBar>
             ) : (
               <ProjectBar
                 key={project.id}
@@ -241,7 +245,9 @@ export default function Dashboard() {
             ),
           )}
           {isInPlace && open?.id === null && (
-            <ExpandedProjectBar key="new">{form}</ExpandedProjectBar>
+            <ExpandedProjectBar key="new" onCollapse={closeProject}>
+              {form}
+            </ExpandedProjectBar>
           )}
         </ul>
         {projects?.ok && list.length === 0 && unreadableCount === 0 && (

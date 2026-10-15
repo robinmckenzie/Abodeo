@@ -288,6 +288,35 @@ describe("Dashboard", () => {
     expect(isTyped).toBe(false);
   });
 
+  it("closes a project in place with the arrow below it, without the X or autosave note", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    fireEvent.click(bars()[0]);
+    const expanded = titleField().closest("li")!;
+    expect(screen.queryByText(/Changes saved/)).toBeNull();
+    const closeButtons = screen.getAllByRole("button", { name: "Close" });
+    expect(closeButtons).toHaveLength(1);
+    expect(closeButtons[0].parentElement).toBe(expanded);
+    expect(expanded.lastElementChild).toBe(closeButtons[0]);
+
+    fireEvent.change(notesField(), { target: { value: "Squashed" } });
+    await act(async () => {
+      fireEvent.click(closeButtons[0]);
+    });
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(savedProjects()[0].notes).toBe("Squashed");
+  });
+
+  it("keeps the X and autosave note in the floating window", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(within(dialog).getByText(/Changes saved/)).toBeTruthy();
+  });
+
   it("types E into a field without switching", () => {
     renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));

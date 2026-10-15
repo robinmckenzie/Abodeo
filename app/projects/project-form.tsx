@@ -17,6 +17,7 @@ export function ProjectForm({
   onFieldBlur,
   onCreate,
   onClose,
+  hasCloseButton = true,
 }: {
   values: ProjectFields;
   isNew: boolean;
@@ -28,6 +29,9 @@ export function ProjectForm({
   onFieldBlur: () => void;
   onCreate: () => void;
   onClose: () => void;
+  // False where the container closes the form its own way, as the in-place
+  // bar does with its collapse arrow.
+  hasCloseButton?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
@@ -43,8 +47,9 @@ export function ProjectForm({
   }, []);
 
   // Only for an opened project, as a new one is saved by Create, and not
-  // while a save has failed, which the form reports.
-  const showsAutosaveNote = !isNew && !message?.isError;
+  // while a save has failed, which the form reports. It sits under the
+  // close button, so goes with it.
+  const showsAutosaveNote = hasCloseButton && !isNew && !message?.isError;
 
   return (
     <form
@@ -75,23 +80,25 @@ export function ProjectForm({
         }
       >
         <h2 id={`${id}-heading`}>{isNew ? "Add project" : "Project"}</h2>
-        <div className="project-form-close-area">
-          <button
-            type="button"
-            className="project-form-close"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3 3l10 10M13 3L3 13" />
-            </svg>
-          </button>
-          {showsAutosaveNote && (
-            <p className="project-form-autosave">
-              Changes saved <span>automatically.</span>
-            </p>
-          )}
-        </div>
+        {hasCloseButton && (
+          <div className="project-form-close-area">
+            <button
+              type="button"
+              className="project-form-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 3l10 10M13 3L3 13" />
+              </svg>
+            </button>
+            {showsAutosaveNote && (
+              <p className="project-form-autosave">
+                Changes saved <span>automatically.</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
       <div className="project-form-body">
         <fieldset className="assignee-list">
