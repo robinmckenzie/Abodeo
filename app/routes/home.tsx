@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
+import { FadeTuningPanel } from "../fade-tuning-panel";
 import { TuningPanel } from "../tuning-panel";
 import getStartedButton from "../images/get-started-button.png";
 import logo from "../images/abodeo-home-logo.jpeg";
@@ -16,6 +17,7 @@ export default function Home() {
 
   return (
     <main className="welcome">
+      <FadeTuningPanel />
       <h1>
         <img
           src={logo}

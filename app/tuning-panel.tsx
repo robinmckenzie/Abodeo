@@ -249,7 +249,7 @@ function Graph({
   );
 }
 
-function Slider({
+export function Slider({
   label,
   value,
   min,
@@ -485,7 +485,7 @@ Screen fade: ${v.fadeDuration}s`}
   );
 }
 
-function isTextField(target: EventTarget | null) {
+export function isTextField(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
     (target.isContentEditable ||
