@@ -56,7 +56,10 @@ export function ProjectBar({
 // centre or Esc, rather than the form's close button. The arrow is the
 // assignee icon's, turned to point up, without its circle. The squash is
 // also offered through ref, for the form's own closing, such as by Esc.
-// With reduce motion, neither is animated.
+// With reduce motion, neither is animated. While animating, the bar clips
+// its content with overflow: clip rather than hidden, which cannot scroll,
+// so focusing the title as the bar opens does not scroll the heading out
+// of sight.
 export type ExpandedProjectBarHandle = { squash: () => void };
 
 export function ExpandedProjectBar({
@@ -88,8 +91,8 @@ export function ExpandedProjectBar({
     const height = bar.offsetHeight;
     const expanding = bar.animate(
       [
-        { height: `${barHeight}px`, overflow: "hidden" },
-        { height: `${height}px`, overflow: "hidden" },
+        { height: `${barHeight}px`, overflow: "clip" },
+        { height: `${height}px`, overflow: "clip" },
       ],
       { duration: resizeDuration, easing: "ease-out" },
     );
@@ -111,8 +114,8 @@ export function ExpandedProjectBar({
     bar
       .animate(
         [
-          { height: `${bar.offsetHeight}px`, overflow: "hidden" },
-          { height: `${barHeight}px`, overflow: "hidden" },
+          { height: `${bar.offsetHeight}px`, overflow: "clip" },
+          { height: `${barHeight}px`, overflow: "clip" },
         ],
         { duration: resizeDuration, easing: "ease-in", fill: "forwards" },
       )
