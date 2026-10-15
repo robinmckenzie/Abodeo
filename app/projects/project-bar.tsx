@@ -73,6 +73,14 @@ export function ExpandedProjectBar({
 }) {
   const barRef = useRef<HTMLLIElement>(null);
   const isSquashingRef = useRef(false);
+  const isMountedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -104,7 +112,14 @@ export function ExpandedProjectBar({
         ],
         { duration: resizeDuration, easing: "ease-in", fill: "forwards" },
       )
-      .finished.then(onCollapse, onCollapse);
+      // Closes only if this bar is still open: another project opened
+      // during the squash has already closed it, and must stay open.
+      .finished.then(
+        () => {
+          if (isMountedRef.current) onCollapse();
+        },
+        () => {},
+      );
   };
 
   useImperativeHandle(ref, () => ({ squash }));

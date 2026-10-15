@@ -323,6 +323,32 @@ describe("Dashboard", () => {
     expect(document.activeElement).toBe(bars()[0]);
   });
 
+  it("keeps a project opened while another is squashing open", async () => {
+    // Animations that finish only when told to.
+    const finishes: (() => void)[] = [];
+    Element.prototype.animate = vi.fn(
+      () =>
+        ({
+          finished: new Promise<void>((resolve) => finishes.push(resolve)),
+        }) as unknown as Animation,
+    );
+    try {
+      renderDashboard();
+      await addProject("First");
+      await addProject("Second");
+      pressKey("e");
+      fireEvent.click(bars()[0]);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      // Opens the second project while the first is still squashing.
+      fireEvent.click(bars()[1]);
+      expect(titleField()).toHaveProperty("value", "Second");
+      await act(async () => finishes.forEach((finish) => finish()));
+      expect(titleField()).toHaveProperty("value", "Second");
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
+  });
+
   it("keeps the X and autosave note in the floating window", async () => {
     renderDashboard();
     await addProject("Kitchen");
