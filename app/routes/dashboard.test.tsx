@@ -377,6 +377,29 @@ describe("Dashboard", () => {
     }
   });
 
+  it("keeps a new project's form as it was while it squashes for another", async () => {
+    const finishAnimations = holdAnimations();
+    try {
+      renderDashboard();
+      pressKey("e");
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Draft" } });
+      const draftField = titleField();
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      expect(shownTitles()).toEqual([
+        ["Draft", true],
+        ["", false],
+      ]);
+      expect(screen.getAllByRole("textbox", { name: "Title" })[0]).toBe(
+        draftField,
+      );
+      await finishAnimations();
+      expect(shownTitles()).toEqual([["", false]]);
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
+  });
+
   it("squashes an open project closed, as it was, while the next one opens", async () => {
     const finishAnimations = holdAnimations();
     try {

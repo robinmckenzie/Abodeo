@@ -333,17 +333,21 @@ export default function Dashboard() {
               />
             );
           })}
-          {closing.filter((bar) => bar.id === null).map(renderClosingBar)}
-          {isInPlace && open?.id === null && (
-            <ExpandedProjectBar
-              key={open.key}
-              ref={expandedBarRef}
-              barHeight={0}
-              onCollapse={closeProject}
-            >
-              {form}
-            </ExpandedProjectBar>
-          )}
+          {/* New projects' bars, in one array so that an open one keeps its
+              bar and form as it starts closing. */}
+          {[
+            ...closing.filter((bar) => bar.id === null).map(renderClosingBar),
+            isInPlace && open?.id === null && (
+              <ExpandedProjectBar
+                key={open.key}
+                ref={expandedBarRef}
+                barHeight={0}
+                onCollapse={closeProject}
+              >
+                {form}
+              </ExpandedProjectBar>
+            ),
+          ]}
         </ul>
         {projects?.ok && list.length === 0 && unreadableCount === 0 && (
           <p className="dashboard-empty">No projects added yet.</p>
