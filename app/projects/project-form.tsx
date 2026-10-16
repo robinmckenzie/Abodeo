@@ -1,7 +1,7 @@
 // The Add project form and an opened project's details. Both presentations,
 // the floating window and the expanding bar, show this same form, so that
 // they behave the same and either can be removed later without touching it.
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { DueDatePicker } from "./due-date-picker";
 import { assignees, hasTitle, type ProjectFields } from "./projects";
@@ -18,6 +18,8 @@ export function ProjectForm({
   onFieldBlur,
   onCreate,
   onClose,
+  getCalendarDate,
+  onCalendarDateChange,
   hasCloseButton = true,
 }: {
   values: ProjectFields;
@@ -31,12 +33,17 @@ export function ProjectForm({
   onFieldBlur: () => void;
   onCreate: () => void;
   onClose: () => void;
+  // The calendar's day, kept outside the form, as the field to focus is, so
+  // that switching presentation shows the same month and day.
+  getCalendarDate?: () => string | null;
+  onCalendarDateChange?: (date: string) => void;
   // False where the container closes the form its own way, as the in-place
   // bar does with its collapse arrow.
   hasCloseButton?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
+  const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
 
   // Focuses the field on appearing only, not when it changes. A new project
   // focuses it without scrolling, as in place its bar scrolls the page to
@@ -134,6 +141,8 @@ export function ProjectForm({
           <DueDatePicker
             value={values.dueDate}
             onChange={(dueDate) => onChange({ dueDate })}
+            startDate={calendarDate}
+            onActiveDateChange={onCalendarDateChange}
             className="arrives"
             style={arriveAt(assignees.length)}
           />

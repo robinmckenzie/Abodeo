@@ -70,6 +70,8 @@ export default function Dashboard() {
   // The field last focused in the form, so that switching presentation
   // returns to it, and where focus goes when the form closes.
   const focusFieldRef = useRef("title");
+  // Likewise the calendar's day, so that switching keeps its month and day.
+  const calendarDateRef = useRef<string | null>(null);
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
 
@@ -124,6 +126,7 @@ export default function Dashboard() {
   const openNewProject = () => {
     closeForNextProject();
     focusFieldRef.current = "title";
+    calendarDateRef.current = null;
     setOpen({
       key: createOpeningKey(),
       id: null,
@@ -159,6 +162,7 @@ export default function Dashboard() {
     // Just before the title, so opening a project does not put the cursor in
     // it, while Tab does.
     focusFieldRef.current = "start";
+    calendarDateRef.current = null;
     const { title, notes, assignee, dueDate } = project;
     setOpen({
       key: createOpeningKey(),
@@ -242,6 +246,8 @@ export default function Dashboard() {
       getFocusField={() => focusFieldRef.current}
       onChange={changeOpenProject}
       onFieldFocus={(name) => (focusFieldRef.current = name)}
+      getCalendarDate={() => calendarDateRef.current}
+      onCalendarDateChange={(date) => (calendarDateRef.current = date)}
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
       onClose={() =>

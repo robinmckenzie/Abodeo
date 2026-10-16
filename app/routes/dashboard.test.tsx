@@ -575,6 +575,27 @@ describe("Dashboard due dates", () => {
     },
   );
 
+  it("keeps the calendar's month and day when E switches presentation", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    const nextMonth = screen.getByRole("button", { name: "Next month" });
+    nextMonth.focus();
+    fireEvent.click(nextMonth);
+    fireEvent.click(nextMonth);
+    pressKey("e");
+    expect(screen.getByRole("group", { name: "December 2026" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next month" }),
+    );
+    day("Thursday 10 December 2026").focus();
+    pressKey("ArrowDown", document.activeElement!);
+    pressKey("e");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.activeElement).toBe(day("Thursday 17 December 2026"));
+    expect(savedProjects()[0].dueDate).toBeNull();
+  });
+
   it("creates a project without a due date, showing no icon", async () => {
     renderDashboard();
     await addProject("Kitchen");

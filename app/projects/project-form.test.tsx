@@ -197,4 +197,21 @@ describe("ProjectForm's due date", () => {
     expect(document.activeElement).toBe(day("Friday 30 October 2026"));
     expect(tabbable()).toEqual([day("Friday 30 October 2026")]);
   });
+
+  it("goes no further than the dates that can be saved", () => {
+    const onChange = renderWithDueDate("9999-12-31");
+    day("Friday 31 December 9999").focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    expect(screen.getByRole("group", { name: "December 9999" })).toBeTruthy();
+    expect(document.activeElement).toBe(day("Friday 31 December 9999"));
+    cleanup();
+    renderWithDueDate("0000-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    day("Saturday 1 January 0").focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(screen.getByRole("group", { name: "January 0" })).toBeTruthy();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

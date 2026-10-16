@@ -3,7 +3,10 @@
 // circles. The days are one stop for Tab, and the arrow keys move between
 // them, into the next or previous month where needed. Every day button is
 // named dueDate, so that the form remembers focus in the calendar; only the
-// one Tab reaches is focusable from code.
+// one Tab reaches is focusable from code. The day the arrow keys move from is
+// reported as it changes and can be given back, so that switching
+// presentation keeps the calendar where it was. Moves past the dates that
+// can be saved, years 0 to 9999, are ignored.
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -11,6 +14,7 @@ import {
   addMonths,
   describeDueDate,
   findToday,
+  isCalendarDate,
   listMonthWeeks,
   monthNames,
   readCalendarDate,
@@ -27,22 +31,34 @@ const arrowKeySteps: Record<string, number> = {
 export function DueDatePicker({
   value,
   onChange,
+  startDate = null,
+  onActiveDateChange,
   className,
   style,
 }: {
   value: string | null;
   onChange: (dueDate: string | null) => void;
+  // The day to start from instead of the due date or today.
+  startDate?: string | null;
+  onActiveDateChange?: (date: string) => void;
   className?: string;
   style?: React.CSSProperties;
 }) {
   const id = useId();
   const [today] = useState(findToday);
   // The day the arrow keys move from, which sets the month shown.
-  const [activeDate, setActiveDate] = useState(value ?? today);
+  const [activeDate, setActiveDate] = useState(startDate ?? value ?? today);
   const daysRef = useRef<HTMLDivElement>(null);
   const isMovingFocusRef = useRef(false);
 
   const { year, month } = readCalendarDate(activeDate);
+
+  const moveTo = (date: string) => {
+    if (!isCalendarDate(date)) return false;
+    setActiveDate(date);
+    onActiveDateChange?.(date);
+    return true;
+  };
   const weeks = listMonthWeeks(year, month);
 
   // Focus follows the arrow keys into a newly shown month.
@@ -63,14 +79,14 @@ export function DueDatePicker({
       <div className="due-date-month">
         <MonthButton
           direction="previous"
-          onClick={() => setActiveDate(addMonths(activeDate, -1))}
+          onClick={() => moveTo(addMonths(activeDate, -1))}
         />
         <span id={`${id}-month`} aria-live="polite">
           {monthNames[month]} {year}
         </span>
         <MonthButton
           direction="next"
-          onClick={() => setActiveDate(addMonths(activeDate, 1))}
+          onClick={() => moveTo(addMonths(activeDate, 1))}
         />
       </div>
       <div className="due-date-weekdays" aria-hidden="true">
@@ -87,8 +103,9 @@ export function DueDatePicker({
           const step = arrowKeySteps[event.key];
           if (step === undefined) return;
           event.preventDefault();
-          isMovingFocusRef.current = true;
-          setActiveDate(addDays(activeDate, step));
+          if (moveTo(addDays(activeDate, step))) {
+            isMovingFocusRef.current = true;
+          }
         }}
       >
         {weeks.flat().map((date, index) =>
@@ -105,7 +122,7 @@ export function DueDatePicker({
               aria-pressed={date === value}
               aria-current={date === today ? "date" : undefined}
               onClick={() => {
-                setActiveDate(date);
+                moveTo(date);
                 onChange(date);
               }}
             >
