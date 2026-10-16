@@ -2,6 +2,8 @@
 // an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
+import { describeDueDate } from "./due-date";
+import { DueDateIcon } from "./due-date-icon";
 import { findAssigneeName, type Project } from "./projects";
 
 // Expanding starts at about the speed of a plain 0.3-second ease-out, then
@@ -38,6 +40,7 @@ export function ProjectBar({
   const label = [
     project.title,
     assigneeName,
+    project.dueDate && `due ${describeDueDate(project.dueDate)}`,
     hasUnsavedChanges && "last changes not saved",
   ]
     .filter(Boolean)
@@ -51,7 +54,10 @@ export function ProjectBar({
         aria-label={label}
         onClick={(event) => onOpen(event.currentTarget.offsetHeight)}
       >
-        <span className="project-bar-assignee">{assigneeName}</span>
+        <span className="project-bar-side">
+          <span className="project-bar-assignee">{assigneeName}</span>
+          {project.dueDate && <DueDateIcon dueDate={project.dueDate} />}
+        </span>
         <span className="project-bar-text">
           <span className="project-bar-title">{project.title}</span>
           {project.notes.trim() && (

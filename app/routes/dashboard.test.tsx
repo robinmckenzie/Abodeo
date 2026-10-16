@@ -50,10 +50,11 @@ function renderDashboard(state?: unknown) {
 
 const titleField = () => screen.getByRole("textbox", { name: "Title" });
 const notesField = () => screen.getByRole("textbox", { name: "Notes" });
+// The collapsed bars, not the buttons in an expanded one's form.
 const bars = () =>
-  within(screen.getByRole("list", { name: "Projects" })).queryAllByRole(
-    "button",
-  );
+  within(screen.getByRole("list", { name: "Projects" }))
+    .queryAllByRole("button")
+    .filter((button) => button.dataset.projectId);
 const savedProjects = () =>
   Object.keys(localStorage)
     .filter((key) => key.startsWith(projectKeyPrefix))
@@ -407,7 +408,9 @@ describe("Dashboard", () => {
       fireEvent.click(bars()[0]);
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
       // Opens the second project while the first is still squashing.
-      fireEvent.click(bars()[1]);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Second, Unassigned" }),
+      );
       expect(shownTitles()).toEqual([
         ["First", true],
         ["Second", false],
@@ -452,7 +455,9 @@ describe("Dashboard", () => {
       fireEvent.click(bars()[0]);
       fireEvent.change(notesField(), { target: { value: "Typed" } });
       await act(async () => {
-        fireEvent.click(bars()[1]);
+        fireEvent.click(
+          screen.getByRole("button", { name: "Second, Unassigned" }),
+        );
       });
       expect(shownTitles()).toEqual([
         ["First", true],
@@ -491,5 +496,106 @@ describe("Dashboard", () => {
     renderDashboard({ openAddProject: true });
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(document.activeElement).toBe(titleField());
+  });
+});
+
+describe("Dashboard due dates", () => {
+  // Today is Saturday 10 October 2026, so the calendar opens at October.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 10, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const day = (name: string) => screen.getByRole("button", { name });
+  const icon = () => bars()[0].querySelector(".due-date-icon");
+
+  async function reopenApp() {
+    cleanup();
+    refreshProjects();
+    renderDashboard();
+  }
+
+  it.each([
+    ["the floating window", false],
+    ["in place", true],
+  ])(
+    "adds, changes and clears a due date in %s, keeping it after reopening",
+    async (_, isInPlace) => {
+      renderDashboard();
+      if (isInPlace) pressKey("e");
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Kitchen" } });
+      fireEvent.click(day("Friday 16 October 2026"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+
+      // The weekday above the number, then the month's strip in its colour.
+      expect(icon()?.textContent).toBe("Friday16October");
+      expect(
+        (icon() as HTMLElement).style.getPropertyValue("--month-colour"),
+      ).toBe("#c8245c");
+      expect(icon()?.getAttribute("aria-hidden")).toBe("true");
+      expect(
+        bars()[0].querySelector(".project-bar-assignee + .due-date-icon"),
+      ).toBe(icon());
+      expect(bars()[0].getAttribute("aria-label")).toBe(
+        "Kitchen, Unassigned, due Friday 16 October 2026",
+      );
+      expect(savedProjects()[0].dueDate).toBe("2026-10-16");
+
+      // Changing it saves straight away and updates the icon.
+      fireEvent.click(bars()[0]);
+      fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+      await act(async () => {
+        fireEvent.click(day("Monday 2 November 2026"));
+      });
+      expect(savedProjects()[0].dueDate).toBe("2026-11-02");
+      await closeForm();
+      expect(icon()?.textContent).toBe("Monday2November");
+
+      await reopenApp();
+      expect(icon()?.textContent).toBe("Monday2November");
+
+      // Clearing it removes the icon.
+      fireEvent.click(bars()[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      });
+      expect(savedProjects()[0].dueDate).toBeNull();
+      await closeForm();
+      expect(icon()).toBeNull();
+      await reopenApp();
+      expect(icon()).toBeNull();
+      expect(bars()[0].getAttribute("aria-label")).toBe("Kitchen, Unassigned");
+    },
+  );
+
+  it("creates a project without a due date, showing no icon", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    expect(savedProjects()[0].dueDate).toBeNull();
+    expect(icon()).toBeNull();
+  });
+
+  it("loads a project saved before due dates with none, keeping the rest", () => {
+    const older = {
+      version: 1,
+      title: "Kitchen",
+      notes: "Tiles",
+      assignee: "andy",
+      createdAt: "2026-10-15T10:00:00.000Z",
+      updatedAt: "2026-10-15T10:00:00.000Z",
+    };
+    localStorage.setItem(`${projectKeyPrefix}old`, JSON.stringify(older));
+    refreshProjects();
+    renderDashboard();
+    expect(bars().map((bar) => bar.textContent)).toEqual(["AndyKitchenTiles"]);
+    expect(icon()).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

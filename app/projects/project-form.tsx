@@ -3,6 +3,7 @@
 // they behave the same and either can be removed later without touching it.
 import { useEffect, useId, useRef } from "react";
 
+import { DueDatePicker } from "./due-date-picker";
 import { assignees, hasTitle, type ProjectFields } from "./projects";
 
 export type FormMessage = { text: string; isError: boolean } | null;
@@ -40,13 +41,15 @@ export function ProjectForm({
   // Focuses the field on appearing only, not when it changes. A new project
   // focuses it without scrolling, as in place its bar scrolls the page to
   // show it, and the browser would otherwise jump to it on the first frame.
+  // Of a group sharing a name, such as the assignees or the calendar's days,
+  // it focuses the one that Tab would reach.
   useEffect(() => {
     const field = getFocusField();
     formRef.current
       ?.querySelector<HTMLElement>(
         field === "start"
           ? ".project-form-fields"
-          : `[name="${field}"]:is(:checked, :not([type=radio]))`,
+          : `[name="${field}"]:is(:checked, :not([type=radio])):not([tabindex="-1"])`,
       )
       ?.focus({ preventScroll: isNew });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,26 +110,34 @@ export function ProjectForm({
         )}
       </div>
       <div className="project-form-body">
-        <fieldset className="assignee-list">
-          <legend>Assigned to</legend>
-          {assignees.map((assignee, index) => (
-            <label
-              key={assignee.id}
-              className="assignee-option arrives"
-              style={arriveAt(index)}
-            >
-              <input
-                type="radio"
-                name="assignee"
-                value={assignee.id}
-                checked={values.assignee === assignee.id}
-                onChange={() => onChange({ assignee: assignee.id })}
-              />
-              <AssigneeIcon isSelected={values.assignee === assignee.id} />
-              <span>{assignee.name}</span>
-            </label>
-          ))}
-        </fieldset>
+        <div className="project-form-side">
+          <fieldset className="assignee-list">
+            <legend>Assigned to</legend>
+            {assignees.map((assignee, index) => (
+              <label
+                key={assignee.id}
+                className="assignee-option arrives"
+                style={arriveAt(index)}
+              >
+                <input
+                  type="radio"
+                  name="assignee"
+                  value={assignee.id}
+                  checked={values.assignee === assignee.id}
+                  onChange={() => onChange({ assignee: assignee.id })}
+                />
+                <AssigneeIcon isSelected={values.assignee === assignee.id} />
+                <span>{assignee.name}</span>
+              </label>
+            ))}
+          </fieldset>
+          <DueDatePicker
+            value={values.dueDate}
+            onChange={(dueDate) => onChange({ dueDate })}
+            className="arrives"
+            style={arriveAt(assignees.length)}
+          />
+        </div>
         {/* Focusable only from code, as the starting point for an opened
             project: Tab goes from it into the title, and screen readers
             announce the project. */}
@@ -194,9 +205,10 @@ export function ProjectForm({
 }
 
 // As the form appears, parts of it arrive one after another, timed by their
-// place in the sequence: the assignees down the left, and alongside them
-// the title field, the notes label and the notes box, after the title's
-// label, which shows at once with the first assignee.
+// place in the sequence: the assignees down the left, then the calendar
+// below them, and alongside them the title field, the notes label and the
+// notes box, after the title's label, which shows at once with the first
+// assignee.
 function arriveAt(place: number) {
   return { "--arrival": place } as React.CSSProperties;
 }

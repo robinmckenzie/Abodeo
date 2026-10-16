@@ -13,6 +13,7 @@ const fields = {
   title: "Kitchen",
   notes: "Tiles\nGrout",
   assignee: "andy" as const,
+  dueDate: null,
 };
 
 afterEach(() => {
@@ -32,6 +33,20 @@ describe("project storage", () => {
       "Kitchen",
     ]);
     expect(loaded.ok && loaded.projects[0].notes).toBe("Tiles\nGrout");
+  });
+
+  it("keeps a due date, and its change or clearing", async () => {
+    const created = await createProject({ ...fields, dueDate: "2026-10-16" });
+    if (!created.ok) throw new Error("not created");
+    const loadDueDate = () => {
+      const loaded = loadProjects();
+      return loaded.ok && loaded.projects[0].dueDate;
+    };
+    expect(loadDueDate()).toBe("2026-10-16");
+    await saveProjectChanges(created.project.id, { dueDate: "2027-02-28" });
+    expect(loadDueDate()).toBe("2027-02-28");
+    await saveProjectChanges(created.project.id, { dueDate: null });
+    expect(loadDueDate()).toBeNull();
   });
 
   it("does not create a project without a title", async () => {

@@ -159,11 +159,11 @@ export default function Dashboard() {
     // Just before the title, so opening a project does not put the cursor in
     // it, while Tab does.
     focusFieldRef.current = "start";
-    const { title, notes, assignee } = project;
+    const { title, notes, assignee, dueDate } = project;
     setOpen({
       key: createOpeningKey(),
       id,
-      values: { title, notes, assignee },
+      values: { title, notes, assignee, dueDate },
       message: null,
       barHeight,
     });
@@ -200,8 +200,11 @@ export default function Dashboard() {
     setOpen({ ...open, values: { ...open.values, ...changes } });
     if (open.id === null) return;
     saverRef.current?.change(changes);
-    // A choice of assignee is complete, so it is saved straight away.
-    if (changes.assignee !== undefined) saverRef.current?.saveNow();
+    // A choice of assignee or due date is complete, so it is saved straight
+    // away.
+    if (changes.assignee !== undefined || changes.dueDate !== undefined) {
+      saverRef.current?.saveNow();
+    }
   };
 
   const createOpenProject = async () => {
