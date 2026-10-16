@@ -313,7 +313,7 @@ describe("Dashboard", () => {
     await act(async () => {
       fireEvent.blur(notesField());
     });
-    expect(screen.getByRole("alert").textContent).toMatch(/Not saved/);
+    expect(screen.getByText(/^Not saved/).getAttribute("role")).toBe("alert");
     await closeForm();
     expect(bars()[0].textContent).toMatch(/Last changes not saved/);
   });
@@ -832,5 +832,248 @@ describe("Dashboard due dates", () => {
     expect(bars().map((bar) => bar.textContent)).toEqual(["AndyKitchenTiles"]);
     expect(icon()).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("tasks", () => {
+  const entryBox = () =>
+    screen.getByRole("textbox", { name: "Add tasks, one per line" });
+  const taskTitles = () =>
+    screen
+      .queryAllByRole("button", { name: /^Edit / })
+      .map((button) => button.textContent);
+  const savedTasks = (): { title: string; isDone: boolean }[] =>
+    savedProjects()[0].tasks;
+
+  async function openKitchen() {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+  }
+
+  async function enterTasks(text: string) {
+    fireEvent.change(entryBox(), { target: { value: text } });
+    await act(async () => {
+      fireEvent.keyDown(entryBox(), { key: "Enter" });
+    });
+  }
+
+  async function click(name: string) {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name }));
+    });
+  }
+
+  it("are not part of the Add project form", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(screen.queryByRole("heading", { name: "Tasks" })).toBeNull();
+  });
+
+  it("adds a task per line with Enter, after the notes, and keeps them", async () => {
+    await openKitchen();
+    expect(
+      notesField().compareDocumentPosition(entryBox()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    entryBox().focus();
+    // Shift+Enter leaves the line break to the box.
+    fireEvent.change(entryBox(), { target: { value: "- Tiles" } });
+    fireEvent.keyDown(entryBox(), { key: "Enter", shiftKey: true });
+    expect(taskTitles()).toEqual([]);
+    await enterTasks("- Tiles\n\n2. [x] **Grout**\n- [ ]\n  Seal  ");
+
+    expect(taskTitles()).toEqual(["Tiles", "**Grout**", "Seal"]);
+    expect(
+      screen.getByRole("checkbox", { name: "Mark **Grout** as done" }),
+    ).toHaveProperty("checked", true);
+    expect(entryBox()).toHaveProperty("value", "");
+    expect(document.activeElement).toBe(entryBox());
+    expect(savedTasks().map(({ title, isDone }) => [title, isDone])).toEqual([
+      ["Tiles", false],
+      ["**Grout**", true],
+      ["Seal", false],
+    ]);
+    // Not on the dashboard's bar.
+    await closeForm();
+    expect(bars()[0].textContent).toBe("UnassignedKitchen");
+    cleanup();
+    refreshProjects();
+    renderDashboard();
+    fireEvent.click(bars()[0]);
+    expect(taskTitles()).toEqual(["Tiles", "**Grout**", "Seal"]);
+  });
+
+  it("marks a task done without moving it", async () => {
+    await openKitchen();
+    await enterTasks("Tiles\nGrout");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Mark Tiles as done" }),
+      );
+    });
+    expect(taskTitles()).toEqual(["Tiles", "Grout"]);
+    expect(savedTasks()[0].isDone).toBe(true);
+  });
+
+  it("keeps the text and says so when adding cannot be saved", async () => {
+    await openKitchen();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    await enterTasks("Tiles");
+    expect(taskTitles()).toEqual([]);
+    expect(entryBox()).toHaveProperty("value", "Tiles");
+    expect(screen.getByText(/^Not saved/).id).toBe(
+      entryBox().getAttribute("aria-describedby"),
+    );
+  });
+
+  it("puts a change back when it cannot be saved", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    await click("Delete Tiles");
+    expect(taskTitles()).toEqual(["Tiles"]);
+    expect(screen.queryByRole("button", { name: /^Undo/ })).toBeNull();
+    expect(screen.getByText(/^Not saved/)).toBeTruthy();
+  });
+
+  it("keeps unsubmitted text when the project is closed and reopened", async () => {
+    await openKitchen();
+    fireEvent.change(entryBox(), { target: { value: "Half typed" } });
+    await closeForm();
+    fireEvent.click(bars()[0]);
+    expect(entryBox()).toHaveProperty("value", "Half typed");
+    expect(savedTasks()).toEqual([]);
+  });
+
+  it("edits a title with Enter, trimmed, and cancels with Escape without closing", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tiles" }));
+    const field = screen.getByRole("textbox", { name: "Title of task Tiles" });
+    expect(document.activeElement).toBe(field);
+    fireEvent.change(field, { target: { value: "  Wall tiles " } });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Enter" });
+    });
+    expect(taskTitles()).toEqual(["Wall tiles"]);
+    expect(savedTasks()[0].title).toBe("Wall tiles");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Edit Wall tiles" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Wall tiles" }));
+    fireEvent.change(document.activeElement!, { target: { value: "Oops" } });
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(taskTitles()).toEqual(["Wall tiles"]);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Edit Wall tiles" }),
+    );
+  });
+
+  it("saves an edit on leaving it, unless it is empty", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tiles" }));
+    fireEvent.change(document.activeElement!, { target: { value: "   " } });
+    fireEvent.blur(document.activeElement!);
+    expect(taskTitles()).toEqual(["Tiles"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tiles" }));
+    fireEvent.change(document.activeElement!, { target: { value: "Grout" } });
+    await act(async () => {
+      fireEvent.blur(document.activeElement!);
+    });
+    expect(savedTasks()[0].title).toBe("Grout");
+  });
+
+  it("saves an edit when the project is closed", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tiles" }));
+    fireEvent.change(document.activeElement!, { target: { value: "Grout" } });
+    await act(async () => {
+      pressKey("Escape", screen.getByRole("heading", { name: "Tasks" }));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(savedTasks()[0].title).toBe("Grout");
+  });
+
+  it("cancels an edit with Escape in place without closing the project", async () => {
+    pressKey("e");
+    await openKitchen();
+    await enterTasks("Tiles");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tiles" }));
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.getByRole("heading", { name: "Tasks" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Tiles" })).toBeTruthy();
+  });
+
+  it("deletes a task, with Undo putting it back where it was", async () => {
+    await openKitchen();
+    await enterTasks("Tiles\nGrout\nSeal");
+    await click("Delete Grout");
+    expect(taskTitles()).toEqual(["Tiles", "Seal"]);
+    expect(savedTasks()).toHaveLength(2);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Undo deleting Grout" }),
+    );
+    await click("Undo deleting Grout");
+    expect(taskTitles()).toEqual(["Tiles", "Grout", "Seal"]);
+    expect(savedTasks()).toHaveLength(3);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Edit Grout" }),
+    );
+  });
+
+  it("offers Undo for 8 seconds, then moves focus to the entry box", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    vi.useFakeTimers();
+    try {
+      await click("Delete Tiles");
+      act(() => vi.advanceTimersByTime(7900));
+      expect(screen.getByRole("button", { name: "Undo deleting Tiles" }));
+      act(() => vi.advanceTimersByTime(200));
+      expect(
+        screen.queryByRole("button", { name: "Undo deleting Tiles" }),
+      ).toBeNull();
+      expect(document.activeElement).toBe(entryBox());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ends Undo when the project closes", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    await click("Delete Tiles");
+    await closeForm();
+    fireEvent.click(bars()[0]);
+    expect(screen.queryByRole("button", { name: /^Undo/ })).toBeNull();
+  });
+
+  it("moves tasks up and down, keeping focus on the button", async () => {
+    await openKitchen();
+    await enterTasks("Tiles\nGrout\nSeal");
+    await click("Move Tiles down");
+    expect(taskTitles()).toEqual(["Grout", "Tiles", "Seal"]);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Move Tiles down" }),
+    );
+    await click("Move Seal up");
+    expect(taskTitles()).toEqual(["Grout", "Seal", "Tiles"]);
+    // Already at the top.
+    await click("Move Grout up");
+    expect(savedTasks().map(({ title }) => title)).toEqual([
+      "Grout",
+      "Seal",
+      "Tiles",
+    ]);
   });
 });

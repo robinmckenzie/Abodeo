@@ -15,6 +15,7 @@ import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
   saveProjectChanges,
+  saveProjectTasks,
   type SaveFailure,
 } from "../projects/project-storage";
 import {
@@ -27,6 +28,7 @@ import {
   usePresentation,
   useSwitchPresentationKey,
 } from "../projects/presentation";
+import { TaskList, type TaskChange } from "../projects/task-list";
 import { refreshProjects, useProjects } from "../projects/use-projects";
 
 export const meta: Route.MetaFunction = () => [
@@ -74,6 +76,8 @@ export default function Dashboard() {
   const calendarDateRef = useRef<string | null>(null);
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
+  // Saves a task title being edited when the project closes.
+  const finishTaskEditRef = useRef<(() => void) | null>(null);
 
   useSwitchPresentationKey();
 
@@ -109,6 +113,7 @@ export default function Dashboard() {
 
   const closeProject = () => {
     if (!open) return;
+    finishTaskEditRef.current?.();
     saverRef.current?.saveNow();
     saverRef.current = null;
     focusAfterCloseRef.current = open.id
@@ -163,11 +168,11 @@ export default function Dashboard() {
     // it, while Tab does.
     focusFieldRef.current = "start";
     calendarDateRef.current = null;
-    const { title, notes, assignee, dueDate } = project;
+    const { title, notes, assignee, dueDate, tasks } = project;
     setOpen({
       key: createOpeningKey(),
       id,
-      values: { title, notes, assignee, dueDate },
+      values: { title, notes, assignee, dueDate, tasks },
       message: null,
       barHeight,
     });
@@ -209,6 +214,31 @@ export default function Dashboard() {
     if (changes.assignee !== undefined || changes.dueDate !== undefined) {
       saverRef.current?.saveNow();
     }
+  };
+
+  // Shows a change to the opened project's tasks at once and saves it
+  // straight away, going back to the tasks as they were if saving fails.
+  const changeOpenTasks = async (change: TaskChange) => {
+    if (!open?.id) return null;
+    const { id } = open;
+    const before = open.values.tasks;
+    const showTasks = (update: TaskChange) =>
+      setOpen((current) =>
+        current?.id === id
+          ? {
+              ...current,
+              values: {
+                ...current.values,
+                tasks: update(current.values.tasks),
+              },
+            }
+          : current,
+      );
+    showTasks(change);
+    const result = await saveProjectTasks(id, change);
+    refreshProjects();
+    showTasks(() => (result.ok ? result.tasks : before));
+    return result.ok ? null : describeFailure(result.reason).text;
   };
 
   const createOpenProject = async () => {
@@ -256,6 +286,18 @@ export default function Dashboard() {
           : closeProject()
       }
       hasCloseButton={!isInPlace}
+      tasks={
+        open.id !== null && (
+          <TaskList
+            className="arrives-in-turn"
+            style={{ "--arrival": 4 } as React.CSSProperties}
+            projectId={open.id}
+            tasks={open.values.tasks}
+            onChange={changeOpenTasks}
+            finishEditRef={finishTaskEditRef}
+          />
+        )
+      }
     />
   );
 
@@ -282,6 +324,15 @@ export default function Dashboard() {
         onCreate={() => {}}
         onClose={() => {}}
         hasCloseButton={false}
+        tasks={
+          bar.id !== null && (
+            <TaskList
+              projectId={bar.id}
+              tasks={bar.values.tasks}
+              onChange={async () => null}
+            />
+          )
+        }
       />
     </ExpandedProjectBar>
   );
@@ -385,7 +436,7 @@ function toggleId(ids: ReadonlySet<string>, id: string, isIncluded: boolean) {
   return next;
 }
 
-function describeFailure(reason: SaveFailure): FormMessage {
+function describeFailure(reason: SaveFailure) {
   const text = {
     "no-title": "A project needs a title.",
     full: "Not saved: this browser's storage for Abodeo is full.",
@@ -393,5 +444,5 @@ function describeFailure(reason: SaveFailure): FormMessage {
     unreadable:
       "Not saved: the saved copy of this project cannot be read, so it has been left as it is.",
   }[reason];
-  return { text, isError: true };
+  return { text, isError: true } satisfies FormMessage;
 }

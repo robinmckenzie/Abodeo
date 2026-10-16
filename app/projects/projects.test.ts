@@ -15,6 +15,10 @@ const project: Project = {
   notes: "Line one\nLine two",
   assignee: "boris",
   dueDate: "2026-10-16",
+  tasks: [
+    { id: "t1", title: "Buy tiles", isDone: true },
+    { id: "t2", title: "**Grout**", isDone: false },
+  ],
   createdAt: "2026-10-15T10:00:00.000Z",
   updatedAt: "2026-10-15T10:00:00.000Z",
 };
@@ -32,6 +36,7 @@ describe("projects", () => {
       notes: "",
       assignee: "unassigned",
       dueDate: null,
+      tasks: [],
     });
   });
 
@@ -48,13 +53,29 @@ describe("projects", () => {
     const older = { ...saved(), version: 1 };
     delete older.dueDate;
     const json = JSON.stringify(older);
-    expect(parseProject("a", json)).toEqual({ ...project, dueDate: null });
+    expect(parseProject("a", json)).toEqual({
+      ...project,
+      dueDate: null,
+      tasks: [],
+    });
+  });
+
+  it("reads a project saved before tasks as having none, keeping the rest", () => {
+    const older = { ...saved(), version: 2 };
+    delete older.tasks;
+    const json = JSON.stringify(older);
+    expect(parseProject("a", json)).toEqual({ ...project, tasks: [] });
+  });
+
+  it("reads back a project with no tasks", () => {
+    const empty = { ...project, tasks: [] };
+    expect(parseProject("a", serialiseProject(empty))).toEqual(empty);
   });
 
   it.each([
     ["damaged JSON", "{"],
     ["nothing", null],
-    ["a later version", JSON.stringify({ ...saved(), version: 3 })],
+    ["a later version", JSON.stringify({ ...saved(), version: 4 })],
     ["an empty title", JSON.stringify({ ...saved(), title: " " })],
     ["missing notes", JSON.stringify({ ...saved(), notes: undefined })],
     ["an unknown assignee", JSON.stringify({ ...saved(), assignee: "zed" })],
@@ -67,6 +88,18 @@ describe("projects", () => {
     [
       "a due date with a time",
       JSON.stringify({ ...saved(), dueDate: "2026-10-16T00:00" }),
+    ],
+    ["missing tasks", JSON.stringify({ ...saved(), tasks: undefined })],
+    [
+      "a task without a title",
+      JSON.stringify({
+        ...saved(),
+        tasks: [{ id: "t", title: " ", isDone: false }],
+      }),
+    ],
+    [
+      "a task without a done state",
+      JSON.stringify({ ...saved(), tasks: [{ id: "t", title: "A" }] }),
     ],
   ])("treats %s as unreadable", (_, json) => {
     expect(parseProject("a", json)).toBeNull();

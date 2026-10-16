@@ -21,6 +21,7 @@ export function ProjectForm({
   getCalendarDate,
   onCalendarDateChange,
   hasCloseButton = true,
+  tasks,
 }: {
   values: ProjectFields;
   isNew: boolean;
@@ -40,6 +41,8 @@ export function ProjectForm({
   // False where the container closes the form its own way, as the in-place
   // bar does with its collapse arrow.
   hasCloseButton?: boolean;
+  // An opened project's tasks, shown below its notes.
+  tasks?: React.ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
@@ -78,7 +81,9 @@ export function ProjectForm({
         if (isNew) onCreate();
       }}
       onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
+        // Not when a field has used Esc itself, as a task's title does to
+        // cancel its edit.
+        if (event.key !== "Escape" || event.defaultPrevented) return;
         event.preventDefault();
         onClose();
       }}
@@ -187,6 +192,7 @@ export function ProjectForm({
             value={values.notes}
             onChange={(event) => onChange({ notes: event.target.value })}
           />
+          {tasks}
         </div>
       </div>
       <div className="project-form-footer">

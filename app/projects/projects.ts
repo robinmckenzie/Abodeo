@@ -2,6 +2,7 @@
 // same rules can apply whether projects are kept in the browser or, later, in
 // a database.
 import { isCalendarDate } from "./due-date";
+import { isTask, type Task } from "./tasks";
 
 // Hard-coded for now. The ids are what is saved, so that the names shown can
 // change without affecting saved projects.
@@ -20,6 +21,7 @@ export type ProjectFields = {
   assignee: AssigneeId;
   // "YYYY-MM-DD", or null for none.
   dueDate: string | null;
+  tasks: Task[];
 };
 
 export type Project = ProjectFields & {
@@ -33,12 +35,14 @@ export const newProjectFields: ProjectFields = {
   notes: "",
   assignee: "unassigned",
   dueDate: null,
+  tasks: [],
 };
 
 // The version of the saved form of a project. A project saved by a later
 // version of the app counts as unreadable, so that it is never overwritten
-// with fields this version does not know about. Version 1 had no due date.
-export const projectVersion = 2;
+// with fields this version does not know about. Version 1 had no due date,
+// and versions 1 and 2 had no tasks.
+export const projectVersion = 3;
 
 export function hasTitle(title: string) {
   return title.trim() !== "";
@@ -55,31 +59,38 @@ export function findAssigneeName(id: AssigneeId) {
 // A project's saved form, as kept under its own storage entry. The id is in
 // the entry's name, not here.
 export function serialiseProject(project: Project) {
-  const { title, notes, assignee, dueDate, createdAt, updatedAt } = project;
+  const { title, notes, assignee, dueDate, tasks, createdAt, updatedAt } =
+    project;
   return JSON.stringify({
     version: projectVersion,
     title,
     notes,
     assignee,
     dueDate,
+    tasks: tasks.map(({ id, title, isDone }) => ({ id, title, isDone })),
     createdAt,
     updatedAt,
   });
 }
 
 // Reads a project's saved form, or returns null if it is damaged, incomplete
-// or from a later version. A project saved before due dates has none.
+// or from a later version. A project saved before due dates or tasks has
+// none.
 export function parseProject(id: string, json: string | null): Project | null {
   try {
     const saved = JSON.parse(json ?? "null");
-    const dueDate = saved?.version === 1 ? null : saved?.dueDate;
+    const version = saved?.version;
+    const dueDate = version === 1 ? null : saved?.dueDate;
+    const tasks = version === 1 || version === 2 ? [] : saved?.tasks;
     if (
-      (saved?.version !== 1 && saved?.version !== projectVersion) ||
+      ![1, 2, projectVersion].includes(version) ||
       typeof saved.title !== "string" ||
       !hasTitle(saved.title) ||
       typeof saved.notes !== "string" ||
       !isAssigneeId(saved.assignee) ||
       (dueDate !== null && !isCalendarDate(dueDate)) ||
+      !Array.isArray(tasks) ||
+      !tasks.every(isTask) ||
       typeof saved.createdAt !== "string" ||
       typeof saved.updatedAt !== "string"
     ) {
@@ -91,6 +102,11 @@ export function parseProject(id: string, json: string | null): Project | null {
       notes: saved.notes,
       assignee: saved.assignee,
       dueDate,
+      tasks: tasks.map(({ id, title, isDone }: Task) => ({
+        id,
+        title,
+        isDone,
+      })),
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };
