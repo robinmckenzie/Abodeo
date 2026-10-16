@@ -92,15 +92,8 @@ function writeProject(project: Project): SaveResult {
   }
 }
 
-// Older browsers report a full storage by code rather than name.
 function isQuotaError(error: unknown) {
-  return (
-    error instanceof DOMException &&
-    (error.name === "QuotaExceededError" ||
-      error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
-      error.code === 22 ||
-      error.code === 1014)
-  );
+  return error instanceof DOMException && error.name === "QuotaExceededError";
 }
 
 function listProjectKeys() {
