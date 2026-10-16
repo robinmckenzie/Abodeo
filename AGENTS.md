@@ -33,7 +33,7 @@
 - Describe the problem and the behaviour wanted, not how to build it. Put a constraint in Requirements only when it is genuinely required, such as one imposed by an external API, security or saved-data compatibility.
 - When asked to stub or draft a ticket, write only that ticket. Do not modify files or other tickets unless explicitly authorised.
 - A draft ticket needs to be coherent enough to be agreed, not to settle every implementation detail. Distinguish product decisions needed before agreement, provisional or tunable defaults, questions for investigation, and product questions that investigation exposes, which are brought back for a decision.
-- When Claude Code turns a STUB into a DRAFT, it has Codex review the draft read-only with `codex exec`. Claude Code revises the ticket, repeating until Codex has no "must fix" finding, for at most three rounds, and then tells Robin the outcome and what is left to decide.
+- After drafting or revising a DRAFT ticket, have Codex review it and the code it relates to, read-only with `codex exec`, and revise the ticket. Review again only if the fixes were substantial enough to need checking, for at most three rounds. Then add a concise signed comment to the ticket listing each round's findings and fixes, summarising how the ticket changed overall and noting any findings left open, and tell Robin the outcome and what is left to decide.
 - When handing over a drafted or revised ticket for review, separately summarise:
     - what it leaves out of scope, whether stated explicitly or left out by omission;
     - any assumptions made while drafting;
