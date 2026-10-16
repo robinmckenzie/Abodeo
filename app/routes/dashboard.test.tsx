@@ -1034,6 +1034,23 @@ describe("tasks", () => {
     );
   });
 
+  it("offers Undo again when putting the task back cannot be saved", async () => {
+    await openKitchen();
+    await enterTasks("Tiles");
+    await click("Delete Tiles");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    await click("Undo deleting Tiles");
+    expect(taskTitles()).toEqual([]);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Undo deleting Tiles" }),
+    );
+    vi.restoreAllMocks();
+    await click("Undo deleting Tiles");
+    expect(taskTitles()).toEqual(["Tiles"]);
+  });
+
   it("offers Undo for 8 seconds, then moves focus to the entry box", async () => {
     await openKitchen();
     await enterTasks("Tiles");

@@ -167,12 +167,17 @@ export function TaskList({
     }
   };
 
-  const undoDelete = () => {
+  // If putting the task back cannot be saved, Undo is offered again.
+  const undoDelete = async () => {
     if (!deleted) return;
-    const { task, index } = deleted;
     setDeleted(null);
-    focusAfterRenderRef.current = titleSelector(task.id);
-    void save((current) => restoreTask(current, task, index));
+    focusAfterRenderRef.current = titleSelector(deleted.task.id);
+    const { task, index } = deleted;
+    const reason = await save((current) => restoreTask(current, task, index));
+    if (reason) {
+      setDeleted({ task, index });
+      focusAfterRenderRef.current = `#${CSS.escape(id)}-undo`;
+    }
   };
 
   // Undo goes after a while. If it had focus, focus moves to the entry box.
