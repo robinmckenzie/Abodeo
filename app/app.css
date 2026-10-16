@@ -797,11 +797,15 @@ body:has(.dashboard) {
 }
 
 /* The month, between its arrows, above a grid of day circles from Monday. */
+/* Its text cannot be selected, so that clicking quickly through the months,
+   which the browser reads as double clicks, does not select the month. */
 .due-date-picker {
   margin: 0;
   padding: 0;
   border: 0;
   min-width: 0;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .due-date-month {
