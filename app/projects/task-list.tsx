@@ -160,7 +160,11 @@ export function TaskList({
     setDeleted({ task, index });
     focusAfterRenderRef.current = `#${CSS.escape(id)}-undo`;
     const reason = await save((current) => deleteTask(current, task.id));
-    if (reason) setDeleted(null);
+    // The task is back, so focus returns to its Delete button.
+    if (reason) {
+      setDeleted(null);
+      focusAfterRenderRef.current = buttonSelector(`${task.id}-delete`);
+    }
   };
 
   const undoDelete = () => {
@@ -185,7 +189,7 @@ export function TaskList({
   // By one place, relative to where the task is saved now. Focus stays on
   // the button pressed, which reordering could otherwise lose.
   const moveBy = (task: Task, step: -1 | 1) => {
-    focusAfterRenderRef.current = `[data-task-move="${CSS.escape(task.id)}${step}"]`;
+    focusAfterRenderRef.current = buttonSelector(`${task.id}${step}`);
     void save((current) =>
       moveTask(
         current,
@@ -328,20 +332,21 @@ export function TaskList({
                 <span className="task-controls">
                   <TaskButton
                     label={`Move ${task.title} up`}
-                    move={`${task.id}-1`}
+                    focusKey={`${task.id}-1`}
                     isDisabled={index === 0}
                     onClick={() => moveBy(task, -1)}
                     path="M8 13V3M4 7l4-4 4 4"
                   />
                   <TaskButton
                     label={`Move ${task.title} down`}
-                    move={`${task.id}1`}
+                    focusKey={`${task.id}1`}
                     isDisabled={index === tasks.length - 1}
                     onClick={() => moveBy(task, 1)}
                     path="M8 3v10M4 9l4 4 4-4"
                   />
                   <TaskButton
                     label={`Delete ${task.title}`}
+                    focusKey={`${task.id}-delete`}
                     onClick={() => removeTask(task, index)}
                     path="M4 4l8 8M12 4l-8 8"
                   />
@@ -390,6 +395,10 @@ export function TaskList({
   );
 }
 
+function buttonSelector(focusKey: string) {
+  return `[data-task-button="${CSS.escape(focusKey)}"]`;
+}
+
 function titleSelector(taskId: string) {
   return `[data-task-title="${CSS.escape(taskId)}"]`;
 }
@@ -398,13 +407,14 @@ function titleSelector(taskId: string) {
 // that a button which has just moved its task there keeps focus.
 function TaskButton({
   label,
-  move,
+  focusKey,
   isDisabled = false,
   onClick,
   path,
 }: {
   label: string;
-  move?: string;
+  // Finds the button again after the list changes, to give it focus.
+  focusKey: string;
   isDisabled?: boolean;
   onClick: () => void;
   path: string;
@@ -415,7 +425,7 @@ function TaskButton({
       className="task-button"
       aria-label={label}
       aria-disabled={isDisabled || undefined}
-      data-task-move={move}
+      data-task-button={focusKey}
       onClick={() => {
         if (!isDisabled) onClick();
       }}

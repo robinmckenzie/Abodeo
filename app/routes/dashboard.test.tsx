@@ -939,6 +939,9 @@ describe("tasks", () => {
     expect(taskTitles()).toEqual(["Tiles"]);
     expect(screen.queryByRole("button", { name: /^Undo/ })).toBeNull();
     expect(screen.getByText(/^Not saved/)).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Delete Tiles" }),
+    );
   });
 
   it("keeps unsubmitted text when the project is closed and reopened", async () => {
