@@ -808,6 +808,11 @@ body:has(.dashboard) {
   text-align: center;
 }
 
+.keyboard-shortcuts .is-current {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Room below the welcome screen's T and F panels, so that the shortcuts
    panel does not cover their foot once the page is scrolled to its end. */
 .welcome:has(.tuning-panel, .fade-tuning-panel) {

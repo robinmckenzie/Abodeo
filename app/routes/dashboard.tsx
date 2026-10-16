@@ -382,7 +382,18 @@ export default function Dashboard() {
           { key: "T", action: "Toggle tuning panel" },
           {
             key: "E",
-            action: "Switch window / in place",
+            action: (
+              <>
+                Switch{" "}
+                <span className={isInPlace ? undefined : "is-current"}>
+                  window
+                </span>{" "}
+                /{" "}
+                <span className={isInPlace ? "is-current" : undefined}>
+                  in place
+                </span>
+              </>
+            ),
             isShown: !isTextFieldFocused,
           },
           { key: "Esc", action: "Close open project", isShown: open !== null },

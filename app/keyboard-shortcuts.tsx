@@ -2,10 +2,12 @@
 // shortcuts, each key as a keycap followed by what it does. A shortcut that
 // applies only some of the time, such as Esc while a project is open, keeps
 // its row's space while it is not shown, so that the panel does not change
-// size. The panel shows in every build.
+// size. Part of an action can be marked with the is-current class, which
+// underlines it, such as the current presentation on the dashboard. The
+// panel shows in every build.
 export type Shortcut = {
   key: string;
-  action: string;
+  action: React.ReactNode;
   isShown?: boolean;
 };
 

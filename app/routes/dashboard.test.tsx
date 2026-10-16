@@ -148,6 +148,17 @@ describe("Dashboard", () => {
     expect(shortcuts()).not.toContain("EscClose open project");
   });
 
+  it("underlines the current presentation in E's shortcut", () => {
+    renderDashboard();
+    const current = () =>
+      screen
+        .getByRole("complementary", { name: "Keyboard shortcuts" })
+        .querySelector(".is-current")?.textContent;
+    expect(current()).toBe("window");
+    pressKey("e");
+    expect(current()).toBe("in place");
+  });
+
   it("does not list E while typing in a field, where it does not work", () => {
     renderDashboard();
     const panel = screen.getByRole("complementary", {
