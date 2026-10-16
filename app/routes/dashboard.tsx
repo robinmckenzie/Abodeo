@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
+import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
@@ -77,6 +78,8 @@ export default function Dashboard() {
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
 
   useSwitchPresentationKey();
+  // E does not work while typing in a field, so it is not listed then.
+  const isTextFieldFocused = useIsTextFieldFocused();
 
   // The Get Started link disappears when it is used, so focus moves to the
   // dashboard's content and screen readers announce the new screen, unless
@@ -377,7 +380,11 @@ export default function Dashboard() {
       <KeyboardShortcuts
         shortcuts={[
           { key: "T", action: "Toggle tuning panel" },
-          { key: "E", action: "Switch window / in place" },
+          {
+            key: "E",
+            action: "Switch window / in place",
+            isShown: !isTextFieldFocused,
+          },
           { key: "Esc", action: "Close open project", isShown: open !== null },
         ]}
       />

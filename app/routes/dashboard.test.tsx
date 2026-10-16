@@ -148,6 +148,25 @@ describe("Dashboard", () => {
     expect(shortcuts()).not.toContain("EscClose open project");
   });
 
+  it("does not list E while typing in a field, where it does not work", () => {
+    renderDashboard();
+    const panel = screen.getByRole("complementary", {
+      name: "Keyboard shortcuts",
+    });
+    const shortcuts = () =>
+      within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(document.activeElement).toBe(titleField());
+    expect(shortcuts()).toEqual([
+      "TToggle tuning panel",
+      "EscClose open project",
+    ]);
+    act(() => screen.getByRole("button", { name: "Close" }).focus());
+    expect(shortcuts()).toContain("ESwitch window / in place");
+  });
+
   it("shows that there are no projects yet", () => {
     renderDashboard();
     expect(screen.getByText("No projects added yet.")).toBeTruthy();
