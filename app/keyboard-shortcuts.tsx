@@ -5,26 +5,46 @@
 // size. Part of an action can be marked with the is-current class, which
 // underlines it, such as the current presentation on the dashboard. The
 // panel shows in every build.
+//
+// Each keycap is also a button. Clicking it presses its key, for the
+// handlers listening on the window, or calls onPress for a key handled
+// elsewhere, such as Esc in the project form.
+import { useId } from "react";
+
 export type Shortcut = {
   key: string;
   action: React.ReactNode;
   isShown?: boolean;
+  onPress?: () => void;
 };
 
 export function KeyboardShortcuts({ shortcuts }: { shortcuts: Shortcut[] }) {
+  const id = useId();
   return (
     <aside className="keyboard-shortcuts" aria-label="Keyboard shortcuts">
       <ul>
-        {shortcuts.map(({ key, action, isShown = true }) => (
+        {shortcuts.map(({ key, action, isShown = true, onPress }) => (
           <li
             key={key}
             style={isShown ? undefined : { visibility: "hidden" }}
           >
-            <kbd>{key}</kbd>
-            <span>{action}</span>
+            <button
+              type="button"
+              aria-describedby={`${id}-${key}`}
+              onClick={onPress ?? (() => pressKey(key))}
+            >
+              <kbd>{key}</kbd>
+            </button>
+            <span id={`${id}-${key}`}>{action}</span>
           </li>
         ))}
       </ul>
     </aside>
+  );
+}
+
+function pressKey(key: string) {
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", { key: key.toLowerCase() }),
   );
 }

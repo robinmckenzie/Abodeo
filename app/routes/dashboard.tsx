@@ -78,7 +78,8 @@ export default function Dashboard() {
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
 
   useSwitchPresentationKey();
-  // E does not work while typing in a field, so it is not listed then.
+  // T and E do not work while typing in a field, so they are not listed
+  // then.
   const isTextFieldFocused = useIsTextFieldFocused();
 
   // The Get Started link disappears when it is used, so focus moves to the
@@ -241,7 +242,11 @@ export default function Dashboard() {
   const isAddingInPlace = isInPlace && open?.id === null;
   const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
 
-  // In place, the expanded bar closes the form its own way, squashing.
+  // In place, the expanded bar closes the form its own way, squashing. Esc
+  // and its keycap in the shortcuts panel both close it this way.
+  const closeOpenProject = () =>
+    expandedBarRef.current ? expandedBarRef.current.squash() : closeProject();
+
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -254,11 +259,7 @@ export default function Dashboard() {
       onCalendarDateChange={(date) => (calendarDateRef.current = date)}
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
-      onClose={() =>
-        expandedBarRef.current
-          ? expandedBarRef.current.squash()
-          : closeProject()
-      }
+      onClose={closeOpenProject}
       hasCloseButton={!isInPlace}
     />
   );
@@ -379,7 +380,11 @@ export default function Dashboard() {
       </main>
       <KeyboardShortcuts
         shortcuts={[
-          { key: "T", action: "Toggle tuning panel" },
+          {
+            key: "T",
+            action: "Toggle tuning panel",
+            isShown: !isTextFieldFocused,
+          },
           {
             key: "E",
             action: (
@@ -396,7 +401,12 @@ export default function Dashboard() {
             ),
             isShown: !isTextFieldFocused,
           },
-          { key: "Esc", action: "Close open project", isShown: open !== null },
+          {
+            key: "Esc",
+            action: "Close open project",
+            isShown: open !== null,
+            onPress: closeOpenProject,
+          },
         ]}
       />
     </div>
