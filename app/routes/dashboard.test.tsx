@@ -129,6 +129,25 @@ describe("Dashboard", () => {
     );
   });
 
+  it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
+    renderDashboard();
+    const panel = screen.getByRole("complementary", {
+      name: "Keyboard shortcuts",
+    });
+    const shortcuts = () =>
+      within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+    expect(shortcuts()).toEqual([
+      "TToggle tuning panel",
+      "ESwitch window / in place",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(shortcuts()).toContain("EscClose open project");
+    await closeForm();
+    expect(shortcuts()).not.toContain("EscClose open project");
+  });
+
   it("shows that there are no projects yet", () => {
     renderDashboard();
     expect(screen.getByText("No projects added yet.")).toBeTruthy();

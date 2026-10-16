@@ -758,6 +758,62 @@ body:has(.dashboard) {
   justify-self: start;
 }
 
+/* The keyboard shortcuts panel (keyboard-shortcuts.tsx), fixed at the
+   bottom left and styled like the tuning panels. On the dashboard it fits
+   under the logo, in the left-hand column (13.5rem, as --side-column),
+   behind the T panel and the floating window's dimming. */
+.keyboard-shortcuts {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  max-width: calc(13.5rem - 16px);
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-size: 12px;
+}
+
+.keyboard-shortcuts ul {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each row shares the list's columns, so the keys take the widest one's
+   width. */
+.keyboard-shortcuts li {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.keyboard-shortcuts kbd {
+  justify-self: start;
+  min-width: 1.5rem;
+  padding: 1px 5px;
+  border: 1px solid #ccc;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #f7f5ef;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Room below the welcome screen's T and F panels, so that the shortcuts
+   panel does not cover their foot once the page is scrolled to its end. */
+.welcome:has(.tuning-panel, .fade-tuning-panel) {
+  padding-bottom: 7rem;
+}
+
 @keyframes form-arrive {
   from {
     opacity: 0;
@@ -1086,7 +1142,8 @@ html[data-has-projects] .welcome h1 {
   animation-duration: 0.6s, 1.4s;
 }
 
-html[data-has-projects] :is(.get-started, .tuning-panel, .fade-tuning-panel) {
+html[data-has-projects]
+  :is(.get-started, .tuning-panel, .fade-tuning-panel, .keyboard-shortcuts) {
   display: none;
 }
 

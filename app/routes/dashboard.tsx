@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
+import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
 import {
@@ -373,6 +374,13 @@ export default function Dashboard() {
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </main>
+      <KeyboardShortcuts
+        shortcuts={[
+          { key: "T", action: "Toggle tuning panel" },
+          { key: "E", action: "Switch window / in place" },
+          { key: "Esc", action: "Close open project", isShown: open !== null },
+        ]}
+      />
     </div>
   );
 }
