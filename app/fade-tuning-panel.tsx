@@ -5,7 +5,8 @@
 // page's head, which fadeTuningScript adds before the page first appears.
 import { useEffect, useSyncExternalStore } from "react";
 
-import { isTextField, Slider } from "./tuning-panel";
+import { isTextField } from "./keyboard";
+import { Slider } from "./tuning-panel";
 
 type Values = {
   x1: number;

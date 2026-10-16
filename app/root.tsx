@@ -9,12 +9,15 @@ import {
 
 import type { Route } from "./+types/root";
 import { fadeTuningScript } from "./fade-tuning-panel";
+import { hasProjectsScript } from "./projects/project-storage";
 import { sizeTuningScript } from "./size-sliders";
 import "./app.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // hasProjectsScript marks this element before the app loads, which React
+    // would otherwise report as a hydration mismatch.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -24,6 +27,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             before the page first appears. */}
         <script dangerouslySetInnerHTML={{ __html: fadeTuningScript }} />
         <script dangerouslySetInnerHTML={{ __html: sizeTuningScript }} />
+        {/* Hides the Get Started button from the first frame when projects
+            are saved. */}
+        <script dangerouslySetInnerHTML={{ __html: hasProjectsScript }} />
       </head>
       <body>
         {children}

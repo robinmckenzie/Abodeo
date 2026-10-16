@@ -18,12 +18,19 @@ requirements, commitments, or scheduled work.
 
 ## Saving projects
 
-- Autosave with a database: AD #16 saves project edits automatically to local
-  storage. Moving to a database should not mean a request per keystroke:
-  save after a pause in typing and when a field or project is closed, send only
-  changed fields, and consider keeping local storage as a buffer that syncs in
-  the background. Shared projects will also need a way to spot two people
-  editing the same project, such as a version number checked on saving.
+- Autosave with a database: AD #16 Simple Projects saves project edits
+  automatically to local storage, already after a 0.5-second pause in typing
+  and when a field or project is closed, sending only changed fields
+  (`app/projects/autosave.ts`). Moving to a database means replacing the
+  functions in `app/projects/project-storage.ts`, which are async for that
+  reason. Consider keeping local storage as a buffer that syncs in the
+  background. A save started as the page is left must still complete, which a
+  network request may not. Shared projects will also need a way to spot two
+  people editing the same project, such as a version number checked on
+  saving. For now the later save of a field wins, and, as each project is one
+  entry, two tabs saving different fields of one project within moments of
+  each other can lose the earlier change (accepted by Robin for AD #16 Simple
+  Projects as very unlikely).
 
 ## Ruled out
 
