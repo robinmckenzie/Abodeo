@@ -53,7 +53,7 @@ describe("KeyboardShortcuts", () => {
     expect(onPress).toHaveBeenCalledOnce();
   });
 
-  it("keeps the space of a shortcut that is not shown", () => {
+  it("hides a shortcut that is not shown with visibility, so that it keeps its space", () => {
     const { container } = render(
       <KeyboardShortcuts
         shortcuts={[
