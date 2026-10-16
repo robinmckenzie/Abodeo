@@ -626,6 +626,27 @@ describe("Dashboard", () => {
       }
     });
 
+    it("stops following when a key scrolls the page", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(100);
+        pressKey("PageDown");
+        layout.scrollTop = 700;
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(700);
+      } finally {
+        layout.restore();
+      }
+    });
+
     it("arrives at the foot as the bar finishes expanding", async () => {
       renderDashboard();
       await addProject("Kitchen");

@@ -19,6 +19,17 @@ const squashTiming = { duration: 300, easing: "ease-in" };
 // page scrolls to show it.
 const scrollMargin = 16;
 
+// Keys that can scroll the page.
+const scrollKeys = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " ",
+]);
+
 // The expanding curve, for scrolling alongside it.
 function easeExpanding(t: number) {
   return 1 - (1 - t) ** 3;
@@ -160,7 +171,7 @@ export function ExpandedProjectBar({
     }
     // Follows the bar as it grows, arriving with it, and keeping its top in
     // sight on the way. A bar that stays in sight leaves the page alone,
-    // and scrolling by hand, or a click, stops the following.
+    // and scrolling by hand, by keyboard or a click, stops the following.
     const startTime = performance.now();
     let frame = 0;
     let isScrolling = false;
@@ -184,10 +195,15 @@ export function ExpandedProjectBar({
     const stop = () => {
       cancelAnimationFrame(frame);
       byHand.forEach((type) => window.removeEventListener(type, stop));
+      window.removeEventListener("keydown", stopOnScrollKey);
+    };
+    const stopOnScrollKey = (event: KeyboardEvent) => {
+      if (scrollKeys.has(event.key)) stop();
     };
     byHand.forEach((type) =>
       window.addEventListener(type, stop, { passive: true }),
     );
+    window.addEventListener("keydown", stopOnScrollKey);
     follow();
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
