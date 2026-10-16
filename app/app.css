@@ -400,12 +400,15 @@ body:has(.dashboard) {
 }
 
 /* A collapsed bar is one button. An expanded bar's buttons are styled on
-   their own. */
+   their own. The title and notes are on two rows beside the assignee and
+   due date, so that the notes can fill the height those set. */
 .project-bar:not(.is-expanded) > button {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
   align-items: baseline;
-  gap: 1rem;
+  column-gap: 1rem;
   padding: 1rem 1.25rem;
   border: 1px solid #e7e2d6;
   border-radius: 12px;
@@ -423,14 +426,11 @@ body:has(.dashboard) {
 }
 
 .project-bar-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  display: contents;
 }
 
 .project-bar-title {
+  grid-column: 2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -440,7 +440,7 @@ body:has(.dashboard) {
 /* A fixed width, so that the titles line up. The due date's calendar page
    goes below the assignee. */
 .project-bar-side {
-  flex: none;
+  grid-row: span 2;
   width: 6.5rem;
   display: flex;
   flex-direction: column;
@@ -515,20 +515,27 @@ body:has(.dashboard) {
   text-transform: uppercase;
 }
 
-/* The first two lines of the notes, as wrapped, with the second fading out as
-   it goes down. Line breaks in the notes are kept. */
+/* The notes, as wrapped, down to the foot of the due date, or for two lines
+   without one, with the last line fading out as it goes down. Their size is
+   contained, so that they do not make the bar taller. Line breaks in the
+   notes are kept. */
 .project-bar-notes {
-  max-height: 2lh;
+  grid-column: 2;
+  align-self: stretch;
+  min-height: 2lh;
+  margin-top: 0.125rem;
+  contain: size;
   overflow: hidden;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: #4a463f;
   font-size: 0.9rem;
   line-height: 1.45;
-  mask-image: linear-gradient(to bottom, #000 1lh, transparent 2lh);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1lh), transparent);
 }
 
 .project-bar-unsaved {
+  grid-area: 1 / 3;
   color: #a12a2a;
   font-size: 0.85rem;
 }
