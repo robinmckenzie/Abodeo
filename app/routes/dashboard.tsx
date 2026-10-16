@@ -349,6 +349,7 @@ export default function Dashboard() {
                 ref={expandedBarRef}
                 barHeight={0}
                 hasCollapseButton={false}
+                scrollsToPageEnd
                 onCollapse={closeProject}
               >
                 {form}

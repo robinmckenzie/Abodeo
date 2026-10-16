@@ -37,7 +37,9 @@ export function ProjectForm({
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
 
-  // Focuses the field on appearing only, not when it changes.
+  // Focuses the field on appearing only, not when it changes, and without
+  // scrolling, which is left to the container: an expanding bar starts too
+  // small to show the field.
   useEffect(() => {
     const field = getFocusField();
     formRef.current
@@ -46,7 +48,7 @@ export function ProjectForm({
           ? ".project-form-fields"
           : `[name="${field}"]:is(:checked, :not([type=radio]))`,
       )
-      ?.focus();
+      ?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
