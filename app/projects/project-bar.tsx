@@ -141,12 +141,14 @@ export function ExpandedProjectBar({
     // the bar itself moves up if a project above it squashes closed. Down
     // only as far as needed to show the bar, but up if its top would
     // otherwise be out of sight.
+    const findTopEnd = () =>
+      bar.getBoundingClientRect().top + page.scrollTop - scrollMargin;
     const findEnd = () => {
-      const top = bar.getBoundingClientRect().top + page.scrollTop;
+      const topEnd = findTopEnd();
       const end = scrollsToPageEnd
         ? page.scrollHeight - page.clientHeight
-        : top + height + scrollMargin - page.clientHeight;
-      return Math.min(Math.max(start, end), top - scrollMargin);
+        : topEnd + height + 2 * scrollMargin - page.clientHeight;
+      return Math.min(Math.max(start, end), topEnd);
     };
     if (!canAnimate(bar)) {
       page.scrollTop = findEnd();
@@ -156,8 +158,9 @@ export function ExpandedProjectBar({
       });
       return () => cancelAnimationFrame(frame);
     }
-    // Follows the bar as it grows, arriving with it. A bar that stays in
-    // sight leaves the page alone, so it can still be scrolled meanwhile.
+    // Follows the bar as it grows, arriving with it, and keeping its top in
+    // sight on the way. A bar that stays in sight leaves the page alone,
+    // and scrolling by hand, or a click, stops the following.
     const startTime = performance.now();
     let frame = 0;
     let isScrolling = false;
@@ -169,12 +172,24 @@ export function ExpandedProjectBar({
       const end = findEnd();
       isScrolling ||= end !== start;
       if (isScrolling) {
-        page.scrollTop = start + (end - start) * easeExpanding(t);
+        page.scrollTop = Math.min(
+          start + (end - start) * easeExpanding(t),
+          findTopEnd(),
+        );
       }
       if (t < 1) frame = requestAnimationFrame(follow);
+      else stop();
     };
+    const byHand = ["wheel", "touchmove", "mousedown"];
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      byHand.forEach((type) => window.removeEventListener(type, stop));
+    };
+    byHand.forEach((type) =>
+      window.addEventListener(type, stop, { passive: true }),
+    );
     follow();
-    return () => cancelAnimationFrame(frame);
+    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

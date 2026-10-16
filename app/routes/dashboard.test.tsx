@@ -562,6 +562,89 @@ describe("Dashboard", () => {
     }
   });
 
+  describe("while a bar expands", () => {
+    // Animation frames come every 16 milliseconds, on demand.
+    function startExpanding(sizes: Parameters<typeof fakeLayout>[0]) {
+      holdAnimations();
+      vi.useFakeTimers({
+        toFake: [
+          "requestAnimationFrame",
+          "cancelAnimationFrame",
+          "performance",
+        ],
+      });
+      return fakeLayout(sizes);
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+      delete (Element.prototype as Partial<Element>).animate;
+    });
+
+    it("keeps an opened project's top in sight as it moves up", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 1000,
+        height: 600,
+        pageHeight: 3000,
+      });
+      layout.scrollTop = 900;
+      try {
+        fireEvent.click(bars()[0]);
+        // A project above squashes closed, moving the bar up.
+        layout.barTop = 450;
+        vi.advanceTimersByTime(16);
+        expect(layout.scrollTop).toBe(434);
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(434);
+      } finally {
+        layout.restore();
+      }
+    });
+
+    it("stops following when the page is scrolled by hand", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(100);
+        expect(layout.scrollTop).toBeGreaterThan(0);
+        fireEvent.wheel(window);
+        layout.scrollTop = 50;
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(50);
+      } finally {
+        layout.restore();
+      }
+    });
+
+    it("arrives at the foot as the bar finishes expanding", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(516);
+      } finally {
+        layout.restore();
+      }
+    });
+  });
+
   it("keeps the X and autosave note in the floating window", async () => {
     renderDashboard();
     await addProject("Kitchen");
