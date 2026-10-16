@@ -2,6 +2,8 @@
 // an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
+import { describeDueDate } from "./due-date";
+import { DueDateIcon } from "./due-date-icon";
 import { findAssigneeName, type Project } from "./projects";
 
 // Expanding starts at about the speed of a plain 0.3-second ease-out, then
@@ -12,6 +14,21 @@ const expandTiming = {
   easing: "cubic-bezier(0.33, 1, 0.68, 1)",
 };
 const squashTiming = { duration: 300, easing: "ease-in" };
+
+// The space kept between an expanded bar and the window's edge when the
+// page scrolls to show it.
+const scrollMargin = 16;
+
+// Keys that can scroll the page.
+const scrollKeys = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " ",
+]);
 
 // The expanding curve, for scrolling alongside it.
 function easeExpanding(t: number) {
@@ -38,6 +55,7 @@ export function ProjectBar({
   const label = [
     project.title,
     assigneeName,
+    project.dueDate && `due ${describeDueDate(project.dueDate)}`,
     hasUnsavedChanges && "last changes not saved",
   ]
     .filter(Boolean)
@@ -51,7 +69,10 @@ export function ProjectBar({
         aria-label={label}
         onClick={(event) => onOpen(event.currentTarget.offsetHeight)}
       >
-        <span className="project-bar-assignee">{assigneeName}</span>
+        <span className="project-bar-side">
+          <span className="project-bar-assignee">{assigneeName}</span>
+          {project.dueDate && <DueDateIcon dueDate={project.dueDate} />}
+        </span>
         <span className="project-bar-text">
           <span className="project-bar-title">{project.title}</span>
           {project.notes.trim() && (
@@ -77,7 +98,10 @@ export function ProjectBar({
 // of sight. A bar marked as closing, because another project was opened,
 // squashes straight away, and cannot be used while it does. A new project's
 // bar has no arrow, as Cancel closes it. It is added at the end of the
-// list, so the page scrolls to its end as the bar expands, to show it.
+// list, so the page scrolls towards its end as the bar expands, to show it.
+// An opened project's bar that would reach below the window likewise
+// scrolls the page just far enough to show its foot. Neither scrolls so far
+// that the bar's top goes out of sight.
 export type ExpandedProjectBarHandle = { squash: () => void };
 
 export function ExpandedProjectBar({
@@ -116,30 +140,72 @@ export function ExpandedProjectBar({
     };
   }, []);
 
+  // Runs before the bar starts expanding, so it measures the bar at its
+  // full height.
   useLayoutEffect(() => {
-    if (!scrollsToPageEnd) return;
     const page = document.scrollingElement;
     const bar = barRef.current;
     if (!page || !bar) return;
-    if (!canAnimate(bar)) {
-      page.scrollTop = page.scrollHeight;
-      return;
-    }
-    // Follows the end of the page as the bar grows, arriving with it.
     const start = page.scrollTop;
+    const height = bar.offsetHeight;
+    // Found again as the bar grows, as the page's end moves with it, and
+    // the bar itself moves up if a project above it squashes closed. Down
+    // only as far as needed to show the bar, but up if its top would
+    // otherwise be out of sight.
+    const findTopEnd = () =>
+      bar.getBoundingClientRect().top + page.scrollTop - scrollMargin;
+    const findEnd = () => {
+      const topEnd = findTopEnd();
+      const end = scrollsToPageEnd
+        ? page.scrollHeight - page.clientHeight
+        : topEnd + height + 2 * scrollMargin - page.clientHeight;
+      return Math.min(Math.max(start, end), topEnd);
+    };
+    if (!canAnimate(bar)) {
+      page.scrollTop = findEnd();
+      // Again once a project above, closed at once, has gone.
+      const frame = requestAnimationFrame(() => {
+        page.scrollTop = findEnd();
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    // Follows the bar as it grows, arriving with it, and keeping its top in
+    // sight on the way. A bar that stays in sight leaves the page alone,
+    // and scrolling by hand, by keyboard or a click, stops the following.
     const startTime = performance.now();
     let frame = 0;
+    let isScrolling = false;
     const follow = () => {
       const t = Math.min(
         (performance.now() - startTime) / expandTiming.duration,
         1,
       );
-      const end = page.scrollHeight - page.clientHeight;
-      page.scrollTop = start + (end - start) * easeExpanding(t);
+      const end = findEnd();
+      isScrolling ||= end !== start;
+      if (isScrolling) {
+        page.scrollTop = Math.min(
+          start + (end - start) * easeExpanding(t),
+          findTopEnd(),
+        );
+      }
       if (t < 1) frame = requestAnimationFrame(follow);
+      else stop();
     };
+    const byHand = ["wheel", "touchmove", "mousedown"];
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      byHand.forEach((type) => window.removeEventListener(type, stop));
+      window.removeEventListener("keydown", stopOnScrollKey);
+    };
+    const stopOnScrollKey = (event: KeyboardEvent) => {
+      if (scrollKeys.has(event.key)) stop();
+    };
+    byHand.forEach((type) =>
+      window.addEventListener(type, stop, { passive: true }),
+    );
+    window.addEventListener("keydown", stopOnScrollKey);
     follow();
-    return () => cancelAnimationFrame(frame);
+    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

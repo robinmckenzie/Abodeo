@@ -50,10 +50,11 @@ function renderDashboard(state?: unknown) {
 
 const titleField = () => screen.getByRole("textbox", { name: "Title" });
 const notesField = () => screen.getByRole("textbox", { name: "Notes" });
+// The collapsed bars, not the buttons in an expanded one's form.
 const bars = () =>
-  within(screen.getByRole("list", { name: "Projects" })).queryAllByRole(
-    "button",
-  );
+  within(screen.getByRole("list", { name: "Projects" }))
+    .queryAllByRole("button")
+    .filter((button) => button.dataset.projectId);
 const savedProjects = () =>
   Object.keys(localStorage)
     .filter((key) => key.startsWith(projectKeyPrefix))
@@ -73,6 +74,46 @@ async function closeForm() {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
   });
+}
+
+// jsdom has no scrolling element, nor any layout, so a 900-pixel window is
+// faked, with any expanded bar at barTop on the page.
+function fakeLayout(sizes: {
+  barTop: number;
+  height: number;
+  pageHeight: number;
+}) {
+  const page = document.documentElement;
+  const layout = {
+    ...sizes,
+    scrollTop: 0,
+    restore() {
+      Reflect.deleteProperty(page, "clientHeight");
+      Reflect.deleteProperty(page, "scrollHeight");
+      Reflect.deleteProperty(page, "scrollTop");
+      Reflect.deleteProperty(document, "scrollingElement");
+    },
+  };
+  Object.defineProperty(document, "scrollingElement", {
+    configurable: true,
+    value: page,
+  });
+  Object.defineProperties(page, {
+    clientHeight: { configurable: true, value: 900 },
+    scrollHeight: { configurable: true, get: () => layout.pageHeight },
+    scrollTop: {
+      configurable: true,
+      get: () => layout.scrollTop,
+      set: (value: number) => (layout.scrollTop = value),
+    },
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(
+    () => layout.height,
+  );
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    () => ({ top: layout.barTop - layout.scrollTop }) as DOMRect,
+  );
+  return layout;
 }
 
 function pressKey(key: string, target: Element = document.body) {
@@ -407,7 +448,9 @@ describe("Dashboard", () => {
       fireEvent.click(bars()[0]);
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
       // Opens the second project while the first is still squashing.
-      fireEvent.click(bars()[1]);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Second, Unassigned" }),
+      );
       expect(shownTitles()).toEqual([
         ["First", true],
         ["Second", false],
@@ -452,7 +495,9 @@ describe("Dashboard", () => {
       fireEvent.click(bars()[0]);
       fireEvent.change(notesField(), { target: { value: "Typed" } });
       await act(async () => {
-        fireEvent.click(bars()[1]);
+        fireEvent.click(
+          screen.getByRole("button", { name: "Second, Unassigned" }),
+        );
       });
       expect(shownTitles()).toEqual([
         ["First", true],
@@ -467,6 +512,158 @@ describe("Dashboard", () => {
     } finally {
       delete (Element.prototype as Partial<Element>).animate;
     }
+  });
+
+  // In a 900-pixel window, a bar expanding in place to its height at barTop
+  // on a page of pageHeight. A 16-pixel margin is kept from the window's
+  // edges.
+  it.each([
+    ["an opened project to show its foot", false, 800, 600, 2000, 516],
+    ["an opened project only when it does not fit", false, 100, 600, 2000, 0],
+    ["a tall opened project only to its top", false, 800, 1200, 2500, 784],
+    ["a new project to the page's end", true, 800, 600, 1500, 600],
+    ["a long page's new project only to its top", true, 1000, 600, 3000, 984],
+  ])(
+    "scrolls %s",
+    async (_, isNew, barTop, height, pageHeight, scrolled) => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = fakeLayout({ barTop, height, pageHeight });
+      try {
+        fireEvent.click(
+          isNew
+            ? screen.getByRole("button", { name: "Add project" })
+            : bars()[0],
+        );
+        expect(layout.scrollTop).toBe(scrolled);
+      } finally {
+        layout.restore();
+      }
+    },
+  );
+
+  it("scrolls back up to an opened project that moves up as another closes", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    // Scrolled to 700, with the bar opening at 1000 and then moving up to
+    // 450 as an open project above it closes.
+    const layout = fakeLayout({ barTop: 1000, height: 600, pageHeight: 3000 });
+    layout.scrollTop = 700;
+    try {
+      fireEvent.click(bars()[0]);
+      expect(layout.scrollTop).toBe(716);
+      layout.barTop = 450;
+      await act(() => new Promise(requestAnimationFrame));
+      expect(layout.scrollTop).toBe(434);
+    } finally {
+      layout.restore();
+    }
+  });
+
+  describe("while a bar expands", () => {
+    // Animation frames come every 16 milliseconds, on demand.
+    function startExpanding(sizes: Parameters<typeof fakeLayout>[0]) {
+      holdAnimations();
+      vi.useFakeTimers({
+        toFake: [
+          "requestAnimationFrame",
+          "cancelAnimationFrame",
+          "performance",
+        ],
+      });
+      return fakeLayout(sizes);
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+      delete (Element.prototype as Partial<Element>).animate;
+    });
+
+    it("keeps an opened project's top in sight as it moves up", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 1000,
+        height: 600,
+        pageHeight: 3000,
+      });
+      layout.scrollTop = 900;
+      try {
+        fireEvent.click(bars()[0]);
+        // A project above squashes closed, moving the bar up.
+        layout.barTop = 450;
+        vi.advanceTimersByTime(16);
+        expect(layout.scrollTop).toBe(434);
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(434);
+      } finally {
+        layout.restore();
+      }
+    });
+
+    it("stops following when the page is scrolled by hand", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(100);
+        expect(layout.scrollTop).toBeGreaterThan(0);
+        fireEvent.wheel(window);
+        layout.scrollTop = 50;
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(50);
+      } finally {
+        layout.restore();
+      }
+    });
+
+    it("stops following when a key scrolls the page", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(100);
+        pressKey("PageDown");
+        layout.scrollTop = 700;
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(700);
+      } finally {
+        layout.restore();
+      }
+    });
+
+    it("arrives at the foot as the bar finishes expanding", async () => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      const layout = startExpanding({
+        barTop: 800,
+        height: 600,
+        pageHeight: 2000,
+      });
+      try {
+        fireEvent.click(bars()[0]);
+        vi.advanceTimersByTime(600);
+        expect(layout.scrollTop).toBe(516);
+      } finally {
+        layout.restore();
+      }
+    });
   });
 
   it("keeps the X and autosave note in the floating window", async () => {
@@ -491,5 +688,149 @@ describe("Dashboard", () => {
     renderDashboard({ openAddProject: true });
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(document.activeElement).toBe(titleField());
+  });
+});
+
+describe("Dashboard due dates", () => {
+  // Today is Saturday 10 October 2026, so the calendar opens at October.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 10, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const day = (name: string) => screen.getByRole("button", { name });
+  const icon = () => bars()[0].querySelector(".due-date-icon");
+
+  async function reopenApp() {
+    cleanup();
+    refreshProjects();
+    renderDashboard();
+  }
+
+  it.each([
+    ["the floating window", false],
+    ["in place", true],
+  ])(
+    "adds, changes and clears a due date in %s, keeping it after reopening",
+    async (_, isInPlace) => {
+      renderDashboard();
+      if (isInPlace) pressKey("e");
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Kitchen" } });
+      fireEvent.click(day("Friday 16 October 2026"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+
+      // The weekday above the number, then the month's strip in its colour.
+      expect(icon()?.textContent).toBe("Friday16October");
+      expect(
+        (icon() as HTMLElement).style.getPropertyValue("--month-colour"),
+      ).toBe("#c8245c");
+      expect(icon()?.getAttribute("aria-hidden")).toBe("true");
+      expect(
+        bars()[0].querySelector(".project-bar-assignee + .due-date-icon"),
+      ).toBe(icon());
+      expect(bars()[0].getAttribute("aria-label")).toBe(
+        "Kitchen, Unassigned, due Friday 16 October 2026",
+      );
+      expect(savedProjects()[0].dueDate).toBe("2026-10-16");
+
+      // Changing it saves straight away and updates the icon.
+      fireEvent.click(bars()[0]);
+      fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+      await act(async () => {
+        fireEvent.click(day("Monday 2 November 2026"));
+      });
+      expect(savedProjects()[0].dueDate).toBe("2026-11-02");
+      await closeForm();
+      expect(icon()?.textContent).toBe("Monday2November");
+
+      await reopenApp();
+      expect(icon()?.textContent).toBe("Monday2November");
+
+      // Clearing it removes the icon.
+      fireEvent.click(bars()[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      });
+      expect(savedProjects()[0].dueDate).toBeNull();
+      await closeForm();
+      expect(icon()).toBeNull();
+      await reopenApp();
+      expect(icon()).toBeNull();
+      expect(bars()[0].getAttribute("aria-label")).toBe("Kitchen, Unassigned");
+    },
+  );
+
+  it("keeps the calendar's month and day when E switches presentation", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    const nextMonth = screen.getByRole("button", { name: "Next month" });
+    nextMonth.focus();
+    fireEvent.click(nextMonth);
+    fireEvent.click(nextMonth);
+    pressKey("e");
+    expect(screen.getByRole("group", { name: "December 2026" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Next month" }),
+    );
+    day("Thursday 10 December 2026").focus();
+    pressKey("ArrowDown", document.activeElement!);
+    pressKey("e");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.activeElement).toBe(day("Thursday 17 December 2026"));
+    expect(savedProjects()[0].dueDate).toBeNull();
+  });
+
+  it("keeps the calendar's day when E follows clearing the due date", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    await act(async () => {
+      fireEvent.click(day("Monday 2 November 2026"));
+    });
+    await closeForm();
+    // Cleared at once, without moving in the calendar, then switched.
+    fireEvent.click(bars()[0]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    });
+    expect(document.activeElement).toBe(day("Monday 2 November 2026"));
+    pressKey("e");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("group", { name: "November 2026" })).toBeTruthy();
+    expect(document.activeElement).toBe(day("Monday 2 November 2026"));
+    expect(savedProjects()[0].dueDate).toBeNull();
+  });
+
+  it("creates a project without a due date, showing no icon", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    expect(savedProjects()[0].dueDate).toBeNull();
+    expect(icon()).toBeNull();
+  });
+
+  it("loads a project saved before due dates with none, keeping the rest", () => {
+    const older = {
+      version: 1,
+      title: "Kitchen",
+      notes: "Tiles",
+      assignee: "andy",
+      createdAt: "2026-10-15T10:00:00.000Z",
+      updatedAt: "2026-10-15T10:00:00.000Z",
+    };
+    localStorage.setItem(`${projectKeyPrefix}old`, JSON.stringify(older));
+    refreshProjects();
+    renderDashboard();
+    expect(bars().map((bar) => bar.textContent)).toEqual(["AndyKitchenTiles"]);
+    expect(icon()).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

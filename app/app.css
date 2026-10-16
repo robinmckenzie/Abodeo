@@ -437,12 +437,82 @@ body:has(.dashboard) {
   font-weight: 500;
 }
 
-/* A fixed width, so that the titles line up. */
-.project-bar-assignee {
+/* A fixed width, so that the titles line up. The due date's calendar page
+   goes below the assignee. */
+.project-bar-side {
   flex: none;
   width: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.project-bar-assignee {
   color: #6b665c;
   font-size: 0.9rem;
+}
+
+/* A calendar page whose spiral's rings stand above its top edge, with the
+   month's strip, in --month-colour, along its foot. */
+.due-date-icon {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 4.5rem;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border: 1px solid #d9d4c7;
+  border-radius: 6px;
+  background: linear-gradient(#fff, #f2f0ea);
+  box-shadow: 0 1px 2px rgb(26 26 26 / 0.08);
+  color: #3a3833;
+  line-height: 1;
+}
+
+.due-date-icon-rings {
+  position: absolute;
+  top: -0.3rem;
+  left: 0;
+  width: 100%;
+  height: 0.5rem;
+  fill: none;
+  stroke: #8a857a;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.due-date-icon-hole {
+  fill: #cfc8b8;
+  stroke: none;
+}
+
+.due-date-icon-weekday {
+  color: #6b665c;
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.due-date-icon-day {
+  margin: 0.125rem 0 0.25rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.due-date-icon-month {
+  align-self: stretch;
+  padding: 0.1875rem 0;
+  border-radius: 0 0 5px 5px;
+  background: var(--month-colour);
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 /* The first two lines of the notes, as wrapped, with the second fading out as
@@ -596,11 +666,18 @@ body:has(.dashboard) {
   stroke-linecap: round;
 }
 
-/* The assignees on the left, the title and notes on the right. */
+/* The assignees and the due date's calendar on the left, the title and notes
+   on the right. */
 .project-form-body {
   display: grid;
-  grid-template-columns: 9.5rem minmax(0, 1fr);
+  grid-template-columns: 11rem minmax(0, 1fr);
   gap: 1.75rem;
+}
+
+.project-form-side {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
 }
 
 .assignee-list {
@@ -614,6 +691,7 @@ body:has(.dashboard) {
 }
 
 .assignee-list legend,
+.due-date-picker legend,
 .project-form-fields label {
   margin-bottom: 0.375rem;
   padding: 0;
@@ -716,6 +794,120 @@ body:has(.dashboard) {
   border-radius: 50%;
   outline: 2px solid #1a1a1a;
   outline-offset: 2px;
+}
+
+/* The month, between its arrows, above a grid of day circles from Monday. */
+/* Its text cannot be selected, so that clicking quickly through the months,
+   which the browser reads as double clicks, does not select the month. */
+.due-date-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.due-date-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.due-date-month button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.due-date-month button:hover {
+  background: #f7f5ef;
+}
+
+.due-date-month svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.due-date-previous svg {
+  transform: scaleX(-1);
+}
+
+.due-date-weekdays,
+.due-date-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+}
+
+.due-date-weekdays {
+  color: #6b665c;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+/* Always six weeks high, the most a month spans, so that the form is as tall
+   as it needs to be from the start and does not change height between
+   months. */
+.due-date-days {
+  grid-template-rows: repeat(6, 1.5rem);
+  row-gap: 0.125rem;
+}
+
+.due-date-days button {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: none;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.due-date-days button:hover {
+  background: #f7f5ef;
+}
+
+.due-date-days button.is-today {
+  border-color: #cfc8b8;
+}
+
+.due-date-days button[aria-pressed="true"] {
+  border-color: #1a1a1a;
+  background: #1a1a1a;
+  color: #fdfcf8;
+}
+
+.due-date-clear {
+  margin-top: 0.5rem;
+  padding: 0.125rem 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #4a463f;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.due-date-clear:hover {
+  background: #f1eee6;
 }
 
 .project-form-fields {

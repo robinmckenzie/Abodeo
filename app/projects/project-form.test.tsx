@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectForm, type FormMessage } from "./project-form";
@@ -86,3 +92,126 @@ function findAutosaveNote() {
       element.textContent === "Changes saved automatically.",
   );
 }
+
+describe("ProjectForm's due date", () => {
+  afterEach(cleanup);
+
+  function renderWithDueDate(dueDate: string | null) {
+    const onChange = vi.fn();
+    render(
+      <ProjectForm
+        values={{ ...newProjectFields, dueDate }}
+        isNew={false}
+        message={null}
+        getFocusField={() => "start"}
+        onChange={onChange}
+        onFieldFocus={vi.fn()}
+        onFieldBlur={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    return onChange;
+  }
+
+  const dueDate = () => screen.getByRole("group", { name: "Due date" });
+  const day = (name: string) => screen.getByRole("button", { name });
+
+  it("shows a calendar below the assignees, opening at the due date's month", () => {
+    renderWithDueDate("2026-10-16");
+    const assignees = screen.getByRole("group", { name: "Assigned to" });
+    expect(
+      assignees.compareDocumentPosition(dueDate()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole("group", { name: "October 2026" })).toBeTruthy();
+    expect(day("Friday 16 October 2026").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(
+      within(dueDate()).getAllByRole("button", { pressed: true }),
+    ).toHaveLength(1);
+  });
+
+  it("opens at this month when there is no due date", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2027, 1, 3, 12));
+    try {
+      renderWithDueDate(null);
+      expect(screen.getByRole("group", { name: "February 2027" })).toBeTruthy();
+      expect(
+        within(dueDate()).queryAllByRole("button", { pressed: true }),
+      ).toHaveLength(0);
+      expect(
+        day("Wednesday 3 February 2027").getAttribute("aria-current"),
+      ).toBe("date");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("chooses a day", () => {
+    const onChange = renderWithDueDate("2026-10-16");
+    fireEvent.click(day("Thursday 29 October 2026"));
+    expect(onChange).toHaveBeenCalledWith({ dueDate: "2026-10-29" });
+  });
+
+  it("moves between months with the arrows", () => {
+    const onChange = renderWithDueDate("2026-10-16");
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    expect(screen.getByRole("group", { name: "January 2027" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    expect(screen.getByRole("group", { name: "December 2026" })).toBeTruthy();
+    fireEvent.click(day("Thursday 24 December 2026"));
+    expect(onChange).toHaveBeenCalledWith({ dueDate: "2026-12-24" });
+  });
+
+  it("clears the due date, with a Clear button shown only when one is set", () => {
+    const onChange = renderWithDueDate("2026-10-16");
+    fireEvent.click(within(dueDate()).getByRole("button", { name: "Clear" }));
+    expect(onChange).toHaveBeenCalledWith({ dueDate: null });
+    cleanup();
+    renderWithDueDate(null);
+    expect(
+      within(dueDate()).queryByRole("button", { name: "Clear" }),
+    ).toBeNull();
+  });
+
+  it("is one Tab stop, whose arrow keys move between days and months", () => {
+    renderWithDueDate("2026-10-30");
+    const tabbable = () =>
+      within(dueDate())
+        .getAllByRole("button", { name: /[0-9]{4}$/ })
+        .filter((button) => button.tabIndex === 0);
+    expect(tabbable()).toEqual([day("Friday 30 October 2026")]);
+    day("Friday 30 October 2026").focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(day("Saturday 31 October 2026"));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(screen.getByRole("group", { name: "November 2026" })).toBeTruthy();
+    expect(document.activeElement).toBe(day("Saturday 7 November 2026"));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(day("Friday 30 October 2026"));
+    expect(tabbable()).toEqual([day("Friday 30 October 2026")]);
+  });
+
+  it("goes no further than the dates that can be saved", () => {
+    const onChange = renderWithDueDate("9999-12-31");
+    day("Friday 31 December 9999").focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    expect(screen.getByRole("group", { name: "December 9999" })).toBeTruthy();
+    expect(document.activeElement).toBe(day("Friday 31 December 9999"));
+    cleanup();
+    renderWithDueDate("0000-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    day("Saturday 1 January 0").focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(screen.getByRole("group", { name: "January 0" })).toBeTruthy();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
