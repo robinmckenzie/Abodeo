@@ -4,7 +4,7 @@
 // them, into the next or previous month where needed. Every day button is
 // named dueDate, so that the form remembers focus in the calendar; only the
 // one Tab reaches is focusable from code. The day the arrow keys move from is
-// reported as it changes and can be given back, so that switching
+// reported and can be given back, so that switching
 // presentation keeps the calendar where it was. Moves past the dates that
 // can be saved, years 0 to 9999, are ignored.
 import { useEffect, useId, useRef, useState } from "react";
@@ -53,10 +53,14 @@ export function DueDatePicker({
 
   const { year, month } = readCalendarDate(activeDate);
 
+  // Reported from the start too, as clearing the due date keeps the day.
+  useEffect(() => {
+    onActiveDateChange?.(activeDate);
+  });
+
   const moveTo = (date: string) => {
     if (!isCalendarDate(date)) return false;
     setActiveDate(date);
-    onActiveDateChange?.(date);
     return true;
   };
   const weeks = listMonthWeeks(year, month);

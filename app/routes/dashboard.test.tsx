@@ -596,6 +596,28 @@ describe("Dashboard due dates", () => {
     expect(savedProjects()[0].dueDate).toBeNull();
   });
 
+  it("keeps the calendar's day when E follows clearing the due date", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    await act(async () => {
+      fireEvent.click(day("Monday 2 November 2026"));
+    });
+    await closeForm();
+    // Cleared at once, without moving in the calendar, then switched.
+    fireEvent.click(bars()[0]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    });
+    expect(document.activeElement).toBe(day("Monday 2 November 2026"));
+    pressKey("e");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("group", { name: "November 2026" })).toBeTruthy();
+    expect(document.activeElement).toBe(day("Monday 2 November 2026"));
+    expect(savedProjects()[0].dueDate).toBeNull();
+  });
+
   it("creates a project without a due date, showing no icon", async () => {
     renderDashboard();
     await addProject("Kitchen");
