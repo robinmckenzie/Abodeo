@@ -515,22 +515,28 @@ body:has(.dashboard) {
   text-transform: uppercase;
 }
 
-/* The notes, as wrapped, down to the foot of the due date, or for two lines
-   without one, with the last line fading out as it goes down. Their size is
-   contained, so that they do not make the bar taller. Line breaks in the
-   notes are kept. */
+/* The first two lines of the notes, as wrapped, with the second fading out as
+   it goes down. Line breaks in the notes are kept. */
 .project-bar-notes {
   grid-column: 2;
-  align-self: stretch;
-  min-height: 2lh;
+  max-height: 2lh;
   margin-top: 0.125rem;
-  contain: size;
   overflow: hidden;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: #4a463f;
   font-size: 0.9rem;
   line-height: 1.45;
+  mask-image: linear-gradient(to bottom, #000 1lh, transparent 2lh);
+}
+
+/* With a due date, which makes the bar taller, the notes run down to its
+   foot instead, with the last line fading out. Their size is contained, so
+   that they do not make the bar taller still. */
+.project-bar:has(.due-date-icon) .project-bar-notes {
+  align-self: stretch;
+  max-height: none;
+  contain: size;
   mask-image: linear-gradient(to bottom, #000 calc(100% - 1lh), transparent);
 }
 
