@@ -471,6 +471,11 @@ body:has(.dashboard) {
   box-shadow: 0 4px 18px rgb(26 26 26 / 0.08);
 }
 
+/* A new project's bar has no arrow, so it keeps space below Create. */
+.project-bar.is-expanded:not(:has(> .project-bar-collapse)) {
+  padding-bottom: 1.25rem;
+}
+
 /* The expanded bar's upward arrow at the bottom centre, styled as the
    form's close button. */
 .project-bar-collapse {
@@ -765,6 +770,17 @@ body:has(.dashboard) {
   flex: 1;
   margin: 0;
   font-size: 0.9rem;
+}
+
+/* Cancel is outlined, to stand back from Create. */
+.project-form-footer .project-form-cancel {
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #1a1a1a;
+}
+
+.project-form-footer .project-form-cancel:hover {
+  background: #f1eee6;
 }
 
 .project-form-error {

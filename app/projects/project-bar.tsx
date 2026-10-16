@@ -16,10 +16,14 @@ const squashTiming = { duration: 300, easing: "ease-in" };
 export function ProjectBar({
   project,
   hasUnsavedChanges,
+  isInert = false,
   onOpen,
 }: {
   project: Project;
   hasUnsavedChanges: boolean;
+  // While a new project is being added in place, so that a click cannot
+  // open another project and lose what was typed.
+  isInert?: boolean;
   // Given the bar's height, so that an expanded bar can grow from it.
   onOpen: (barHeight: number) => void;
 }) {
@@ -35,7 +39,7 @@ export function ProjectBar({
     .join(", ");
 
   return (
-    <li className="project-bar">
+    <li className="project-bar" inert={isInert}>
       <button
         type="button"
         data-project-id={project.id}
@@ -66,13 +70,15 @@ export function ProjectBar({
 // its content with overflow: clip rather than hidden, which cannot scroll,
 // so focusing the title as the bar opens does not scroll the heading out
 // of sight. A bar marked as closing, because another project was opened,
-// squashes straight away, and cannot be used while it does.
+// squashes straight away, and cannot be used while it does. A new project's
+// bar has no arrow, as Cancel closes it.
 export type ExpandedProjectBarHandle = { squash: () => void };
 
 export function ExpandedProjectBar({
   ref,
   barHeight,
   isClosing = false,
+  hasCollapseButton = true,
   onCollapse,
   children,
 }: {
@@ -80,6 +86,7 @@ export function ExpandedProjectBar({
   // The collapsed bar's height, or 0 for a new project, which has none.
   barHeight: number;
   isClosing?: boolean;
+  hasCollapseButton?: boolean;
   onCollapse: () => void;
   children: React.ReactNode;
 }) {
@@ -164,16 +171,18 @@ export function ExpandedProjectBar({
       }}
     >
       {children}
-      <button
-        type="button"
-        className="project-bar-collapse"
-        aria-label="Close"
-        onClick={squash}
-      >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M10 14.5v-9M6.5 9l3.5-3.5M13.5 9l-3.5-3.5" />
-        </svg>
-      </button>
+      {hasCollapseButton && (
+        <button
+          type="button"
+          className="project-bar-collapse"
+          aria-label="Close"
+          onClick={squash}
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 14.5v-9M6.5 9l3.5-3.5M13.5 9l-3.5-3.5" />
+          </svg>
+        </button>
+      )}
     </li>
   );
 }

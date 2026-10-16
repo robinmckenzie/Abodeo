@@ -224,6 +224,10 @@ export default function Dashboard() {
   };
 
   const list = projects?.ok ? projects.projects : [];
+  // In place, a new project's form is the only part of the dashboard that
+  // can be used, as in the floating window, so that what was typed is not
+  // lost by opening something else.
+  const isAddingInPlace = isInPlace && open?.id === null;
   const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
 
   // In place, the expanded bar closes the form its own way, squashing.
@@ -253,6 +257,7 @@ export default function Dashboard() {
       key={bar.key}
       barHeight={bar.barHeight}
       isClosing
+      hasCollapseButton={bar.id !== null}
       onCollapse={() =>
         setClosing((bars) => bars.filter(({ key }) => key !== bar.key))
       }
@@ -286,7 +291,7 @@ export default function Dashboard() {
         </h1>
       </header>
       <main ref={mainRef} tabIndex={-1}>
-        <div className="dashboard-toolbar">
+        <div className="dashboard-toolbar" inert={isAddingInPlace}>
           <button
             type="button"
             className="add-project"
@@ -329,6 +334,7 @@ export default function Dashboard() {
                 key={project.id}
                 project={project}
                 hasUnsavedChanges={unsavedIds.has(project.id)}
+                isInert={isAddingInPlace}
                 onOpen={(barHeight) => openProject(project, barHeight)}
               />
             );
@@ -342,6 +348,7 @@ export default function Dashboard() {
                 key={open.key}
                 ref={expandedBarRef}
                 barHeight={0}
+                hasCollapseButton={false}
                 onCollapse={closeProject}
               >
                 {form}

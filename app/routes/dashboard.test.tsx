@@ -154,6 +154,46 @@ describe("Dashboard", () => {
     );
   });
 
+  it("adds nothing when Cancel is pressed, in either presentation", async () => {
+    renderDashboard();
+    for (const presentation of ["window", "in place"]) {
+      if (presentation === "in place") pressKey("e");
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Unwanted" } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      });
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+      expect(savedProjects()).toHaveLength(0);
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Add project" }),
+      );
+    }
+  });
+
+  it("lets only a new project's form be used while it is added in place", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    const expanded = titleField().closest("li")!;
+    expect(bars()[0].closest("[inert]")).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Add project" }).closest("[inert]"),
+    ).not.toBeNull();
+    expect(expanded.closest("[inert]")).toBeNull();
+    // Closed by Cancel or Esc, without the arrow an opened project has.
+    expect(
+      within(expanded).queryByRole("button", { name: "Close" }),
+    ).toBeNull();
+
+    await act(async () => pressKey("Escape", titleField()));
+    expect(bars()[0].closest("[inert]")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Add project" }).closest("[inert]"),
+    ).toBeNull();
+  });
+
   it("tells the user when a new project cannot be saved", async () => {
     renderDashboard();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
@@ -350,10 +390,12 @@ describe("Dashboard", () => {
 
   // The titles shown, with whether each is in a bar squashing closed.
   const shownTitles = () =>
-    screen.getAllByRole("textbox", { name: "Title" }).map((field) => [
-      (field as HTMLInputElement).value,
-      field.closest("li")!.hasAttribute("inert"),
-    ]);
+    screen
+      .getAllByRole("textbox", { name: "Title" })
+      .map((field) => [
+        (field as HTMLInputElement).value,
+        field.closest("li")!.hasAttribute("inert"),
+      ]);
 
   it("keeps a project opened while another is squashing open", async () => {
     const finishAnimations = holdAnimations();

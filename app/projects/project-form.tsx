@@ -174,7 +174,18 @@ export function ProjectForm({
         >
           {message?.text}
         </p>
-        {isNew && <button type="submit">Create</button>}
+        {isNew && (
+          <>
+            <button
+              type="button"
+              className="project-form-cancel"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button type="submit">Create</button>
+          </>
+        )}
       </div>
     </form>
   );
