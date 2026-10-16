@@ -138,29 +138,39 @@ export function ExpandedProjectBar({
     const start = page.scrollTop;
     const height = bar.offsetHeight;
     // Found again as the bar grows, as the page's end moves with it, and
-    // the bar itself moves up if a project above it squashes closed. Never
-    // above where the page started.
+    // the bar itself moves up if a project above it squashes closed. Down
+    // only as far as needed to show the bar, but up if its top would
+    // otherwise be out of sight.
     const findEnd = () => {
       const top = bar.getBoundingClientRect().top + page.scrollTop;
       const end = scrollsToPageEnd
         ? page.scrollHeight - page.clientHeight
         : top + height + scrollMargin - page.clientHeight;
-      return Math.max(start, Math.min(end, top - scrollMargin));
+      return Math.min(Math.max(start, end), top - scrollMargin);
     };
-    if (findEnd() === start) return;
     if (!canAnimate(bar)) {
       page.scrollTop = findEnd();
-      return;
+      // Again once a project above, closed at once, has gone.
+      const frame = requestAnimationFrame(() => {
+        page.scrollTop = findEnd();
+      });
+      return () => cancelAnimationFrame(frame);
     }
-    // Follows the bar as it grows, arriving with it.
+    // Follows the bar as it grows, arriving with it. A bar that stays in
+    // sight leaves the page alone, so it can still be scrolled meanwhile.
     const startTime = performance.now();
     let frame = 0;
+    let isScrolling = false;
     const follow = () => {
       const t = Math.min(
         (performance.now() - startTime) / expandTiming.duration,
         1,
       );
-      page.scrollTop = start + (findEnd() - start) * easeExpanding(t);
+      const end = findEnd();
+      isScrolling ||= end !== start;
+      if (isScrolling) {
+        page.scrollTop = start + (end - start) * easeExpanding(t);
+      }
       if (t < 1) frame = requestAnimationFrame(follow);
     };
     follow();

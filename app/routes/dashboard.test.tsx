@@ -76,6 +76,46 @@ async function closeForm() {
   });
 }
 
+// jsdom has no scrolling element, nor any layout, so a 900-pixel window is
+// faked, with any expanded bar at barTop on the page.
+function fakeLayout(sizes: {
+  barTop: number;
+  height: number;
+  pageHeight: number;
+}) {
+  const page = document.documentElement;
+  const layout = {
+    ...sizes,
+    scrollTop: 0,
+    restore() {
+      Reflect.deleteProperty(page, "clientHeight");
+      Reflect.deleteProperty(page, "scrollHeight");
+      Reflect.deleteProperty(page, "scrollTop");
+      Reflect.deleteProperty(document, "scrollingElement");
+    },
+  };
+  Object.defineProperty(document, "scrollingElement", {
+    configurable: true,
+    value: page,
+  });
+  Object.defineProperties(page, {
+    clientHeight: { configurable: true, value: 900 },
+    scrollHeight: { configurable: true, get: () => layout.pageHeight },
+    scrollTop: {
+      configurable: true,
+      get: () => layout.scrollTop,
+      set: (value: number) => (layout.scrollTop = value),
+    },
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(
+    () => layout.height,
+  );
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    () => ({ top: layout.barTop - layout.scrollTop }) as DOMRect,
+  );
+  return layout;
+}
+
 function pressKey(key: string, target: Element = document.body) {
   fireEvent.keyDown(target, { key });
 }
@@ -489,43 +529,38 @@ describe("Dashboard", () => {
       renderDashboard();
       await addProject("Kitchen");
       pressKey("e");
-      // jsdom has no scrolling element, nor any layout.
-      const page = document.documentElement;
-      Object.defineProperty(document, "scrollingElement", {
-        configurable: true,
-        value: page,
-      });
-      let scrollTop = 0;
-      Object.defineProperties(page, {
-        clientHeight: { configurable: true, value: 900 },
-        scrollHeight: { configurable: true, value: pageHeight },
-        scrollTop: {
-          configurable: true,
-          get: () => scrollTop,
-          set: (value: number) => (scrollTop = value),
-        },
-      });
-      vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(
-        height,
-      );
-      vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
-        () => ({ top: barTop - scrollTop }) as DOMRect,
-      );
+      const layout = fakeLayout({ barTop, height, pageHeight });
       try {
         fireEvent.click(
           isNew
             ? screen.getByRole("button", { name: "Add project" })
             : bars()[0],
         );
-        expect(scrollTop).toBe(scrolled);
+        expect(layout.scrollTop).toBe(scrolled);
       } finally {
-        Reflect.deleteProperty(page, "clientHeight");
-        Reflect.deleteProperty(page, "scrollHeight");
-        Reflect.deleteProperty(page, "scrollTop");
-        Reflect.deleteProperty(document, "scrollingElement");
+        layout.restore();
       }
     },
   );
+
+  it("scrolls back up to an opened project that moves up as another closes", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    // Scrolled to 700, with the bar opening at 1000 and then moving up to
+    // 450 as an open project above it closes.
+    const layout = fakeLayout({ barTop: 1000, height: 600, pageHeight: 3000 });
+    layout.scrollTop = 700;
+    try {
+      fireEvent.click(bars()[0]);
+      expect(layout.scrollTop).toBe(716);
+      layout.barTop = 450;
+      await act(() => new Promise(requestAnimationFrame));
+      expect(layout.scrollTop).toBe(434);
+    } finally {
+      layout.restore();
+    }
+  });
 
   it("keeps the X and autosave note in the floating window", async () => {
     renderDashboard();
