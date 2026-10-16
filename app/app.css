@@ -856,7 +856,11 @@ body:has(.dashboard) {
   font-weight: 500;
 }
 
+/* Always six weeks high, the most a month spans, so that the form is as tall
+   as it needs to be from the start and does not change height between
+   months. */
 .due-date-days {
+  grid-template-rows: repeat(6, 1.5rem);
   row-gap: 0.125rem;
 }
 
