@@ -638,7 +638,7 @@ body:has(.dashboard) {
    the one before. --arrival is its place in the sequence. The dashboard's T
    panel can tune both times, through --assignee-fade and --assignee-gap. */
 @media (prefers-reduced-motion: no-preference) {
-  .project-form .arrives {
+  .project-form .arrives-in-turn {
     animation: form-arrive var(--assignee-fade, 1.15s) ease-out both;
     animation-delay: calc(var(--arrival, 0) * var(--assignee-gap, 0.07s));
   }

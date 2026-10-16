@@ -112,7 +112,7 @@ export function ProjectForm({
           {assignees.map((assignee, index) => (
             <label
               key={assignee.id}
-              className="assignee-option arrives"
+              className="assignee-option arrives-in-turn"
               style={arriveAt(index)}
             >
               <input
@@ -139,7 +139,7 @@ export function ProjectForm({
           <label htmlFor={`${id}-title`}>Title</label>
           <input
             id={`${id}-title`}
-            className="arrives"
+            className="arrives-in-turn"
             style={arriveAt(1)}
             name="title"
             value={values.title}
@@ -153,14 +153,14 @@ export function ProjectForm({
           )}
           <label
             htmlFor={`${id}-notes`}
-            className="arrives"
+            className="arrives-in-turn"
             style={arriveAt(2)}
           >
             Notes
           </label>
           <textarea
             id={`${id}-notes`}
-            className="arrives"
+            className="arrives-in-turn"
             style={arriveAt(3)}
             name="notes"
             rows={8}
