@@ -135,19 +135,21 @@ export function DueDatePicker({
           ),
         )}
       </div>
-      {value !== null && (
-        <button
-          type="button"
-          name="dueDate-clear"
-          className="due-date-clear"
-          onClick={() => {
-            onChange(null);
-            isMovingFocusRef.current = true;
-          }}
-        >
-          Clear
-        </button>
-      )}
+      {/* Hidden rather than removed without a due date, so that its space
+          is kept and choosing a date does not make the form taller. Hidden,
+          it cannot be reached or heard. */}
+      <button
+        type="button"
+        name="dueDate-clear"
+        className="due-date-clear"
+        style={value === null ? { visibility: "hidden" } : undefined}
+        onClick={() => {
+          onChange(null);
+          isMovingFocusRef.current = true;
+        }}
+      >
+        Clear
+      </button>
     </fieldset>
   );
 }
