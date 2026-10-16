@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import type { Route } from "./+types/home";
 import { FadeTuningPanel } from "../fade-tuning-panel";
+import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import {
   hasProjectsAttribute,
   hasSavedProjects,
@@ -98,6 +99,12 @@ export default function Home() {
         />
       </Link>
       <TuningPanel />
+      <KeyboardShortcuts
+        shortcuts={[
+          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+          { keyboardKeyLabel: "F", action: "Toggle fading panel" },
+        ]}
+      />
     </main>
   );
 }

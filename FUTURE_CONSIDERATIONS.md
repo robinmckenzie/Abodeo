@@ -30,7 +30,11 @@ requirements, commitments, or scheduled work.
   saving. For now the later save of a field wins, and, as each project is one
   entry, two tabs saving different fields of one project within moments of
   each other can lose the earlier change (accepted by Robin for AD #16 Simple
-  Projects as very unlikely).
+  Projects as very unlikely). The welcome screen's splash for a returning
+  visitor also depends on local storage: `hasProjectsScript`, in the same
+  file, looks there for projects before the page first appears and sets
+  `data-has-projects`. With a database, the server would set the attribute
+  when it renders the page instead.
 
 ## Ruled out
 

@@ -62,6 +62,16 @@ describe("Home", () => {
     expect(screen.queryByText("Your home, sorted.")).toBeNull();
   });
 
+  it("lists its keyboard shortcuts", () => {
+    renderHome();
+    const panel = screen.getByRole("complementary", {
+      name: "Keyboard shortcuts",
+    });
+    expect(
+      [...panel.querySelectorAll("li")].map((row) => row.textContent),
+    ).toEqual(["TToggle tuning panel", "FToggle fading panel"]);
+  });
+
   it("shows a Get Started button that goes to the dashboard", () => {
     renderHome();
     const button = screen.getByRole("link", { name: "Get Started" });
