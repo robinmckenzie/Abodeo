@@ -15,6 +15,10 @@ const expandTiming = {
 };
 const squashTiming = { duration: 300, easing: "ease-in" };
 
+// The space kept between an expanded bar and the window's edge when the
+// page scrolls to show it.
+const scrollMargin = 16;
+
 // The expanding curve, for scrolling alongside it.
 function easeExpanding(t: number) {
   return 1 - (1 - t) ** 3;
@@ -83,7 +87,10 @@ export function ProjectBar({
 // of sight. A bar marked as closing, because another project was opened,
 // squashes straight away, and cannot be used while it does. A new project's
 // bar has no arrow, as Cancel closes it. It is added at the end of the
-// list, so the page scrolls to its end as the bar expands, to show it.
+// list, so the page scrolls towards its end as the bar expands, to show it.
+// An opened project's bar that would reach below the window likewise
+// scrolls the page just far enough to show its foot. Neither scrolls so far
+// that the bar's top goes out of sight.
 export type ExpandedProjectBarHandle = { squash: () => void };
 
 export function ExpandedProjectBar({
@@ -122,17 +129,30 @@ export function ExpandedProjectBar({
     };
   }, []);
 
+  // Runs before the bar starts expanding, so it measures the bar at its
+  // full height.
   useLayoutEffect(() => {
-    if (!scrollsToPageEnd) return;
     const page = document.scrollingElement;
     const bar = barRef.current;
     if (!page || !bar) return;
+    const start = page.scrollTop;
+    const height = bar.offsetHeight;
+    // Found again as the bar grows, as the page's end moves with it, and
+    // the bar itself moves up if a project above it squashes closed. Never
+    // above where the page started.
+    const findEnd = () => {
+      const top = bar.getBoundingClientRect().top + page.scrollTop;
+      const end = scrollsToPageEnd
+        ? page.scrollHeight - page.clientHeight
+        : top + height + scrollMargin - page.clientHeight;
+      return Math.max(start, Math.min(end, top - scrollMargin));
+    };
+    if (findEnd() === start) return;
     if (!canAnimate(bar)) {
-      page.scrollTop = page.scrollHeight;
+      page.scrollTop = findEnd();
       return;
     }
-    // Follows the end of the page as the bar grows, arriving with it.
-    const start = page.scrollTop;
+    // Follows the bar as it grows, arriving with it.
     const startTime = performance.now();
     let frame = 0;
     const follow = () => {
@@ -140,8 +160,7 @@ export function ExpandedProjectBar({
         (performance.now() - startTime) / expandTiming.duration,
         1,
       );
-      const end = page.scrollHeight - page.clientHeight;
-      page.scrollTop = start + (end - start) * easeExpanding(t);
+      page.scrollTop = start + (findEnd() - start) * easeExpanding(t);
       if (t < 1) frame = requestAnimationFrame(follow);
     };
     follow();

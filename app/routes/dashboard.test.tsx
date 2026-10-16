@@ -474,6 +474,59 @@ describe("Dashboard", () => {
     }
   });
 
+  // In a 900-pixel window, a bar expanding in place to its height at barTop
+  // on a page of pageHeight. A 16-pixel margin is kept from the window's
+  // edges.
+  it.each([
+    ["an opened project to show its foot", false, 800, 600, 2000, 516],
+    ["an opened project only when it does not fit", false, 100, 600, 2000, 0],
+    ["a tall opened project only to its top", false, 800, 1200, 2500, 784],
+    ["a new project to the page's end", true, 800, 600, 1500, 600],
+    ["a long page's new project only to its top", true, 1000, 600, 3000, 984],
+  ])(
+    "scrolls %s",
+    async (_, isNew, barTop, height, pageHeight, scrolled) => {
+      renderDashboard();
+      await addProject("Kitchen");
+      pressKey("e");
+      // jsdom has no scrolling element, nor any layout.
+      const page = document.documentElement;
+      Object.defineProperty(document, "scrollingElement", {
+        configurable: true,
+        value: page,
+      });
+      let scrollTop = 0;
+      Object.defineProperties(page, {
+        clientHeight: { configurable: true, value: 900 },
+        scrollHeight: { configurable: true, value: pageHeight },
+        scrollTop: {
+          configurable: true,
+          get: () => scrollTop,
+          set: (value: number) => (scrollTop = value),
+        },
+      });
+      vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(
+        height,
+      );
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+        () => ({ top: barTop - scrollTop }) as DOMRect,
+      );
+      try {
+        fireEvent.click(
+          isNew
+            ? screen.getByRole("button", { name: "Add project" })
+            : bars()[0],
+        );
+        expect(scrollTop).toBe(scrolled);
+      } finally {
+        Reflect.deleteProperty(page, "clientHeight");
+        Reflect.deleteProperty(page, "scrollHeight");
+        Reflect.deleteProperty(page, "scrollTop");
+        Reflect.deleteProperty(document, "scrollingElement");
+      }
+    },
+  );
+
   it("keeps the X and autosave note in the floating window", async () => {
     renderDashboard();
     await addProject("Kitchen");
