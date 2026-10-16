@@ -21,8 +21,8 @@ describe("KeyboardShortcuts", () => {
     render(
       <KeyboardShortcuts
         shortcuts={[
-          { key: "T", action: "Toggle tuning panel" },
-          { key: "Esc", action: "Close open project" },
+          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+          { keyboardKeyLabel: "Esc", action: "Close open project" },
         ]}
       />,
     );
@@ -41,8 +41,8 @@ describe("KeyboardShortcuts", () => {
     render(
       <KeyboardShortcuts
         shortcuts={[
-          { key: "T", action: "Toggle tuning panel" },
-          { key: "Esc", action: "Close open project", onPress },
+          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+          { keyboardKeyLabel: "Esc", action: "Close open project", onPress },
         ]}
       />,
     );
@@ -57,8 +57,12 @@ describe("KeyboardShortcuts", () => {
     const { container } = render(
       <KeyboardShortcuts
         shortcuts={[
-          { key: "T", action: "Toggle tuning panel" },
-          { key: "Esc", action: "Close open project", isShown: false },
+          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+          {
+            keyboardKeyLabel: "Esc",
+            action: "Close open project",
+            isShown: false,
+          },
         ]}
       />,
     );

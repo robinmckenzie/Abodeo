@@ -101,8 +101,8 @@ export default function Home() {
       <TuningPanel />
       <KeyboardShortcuts
         shortcuts={[
-          { key: "T", action: "Toggle tuning panel" },
-          { key: "F", action: "Toggle fading panel" },
+          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+          { keyboardKeyLabel: "F", action: "Toggle fading panel" },
         ]}
       />
     </main>

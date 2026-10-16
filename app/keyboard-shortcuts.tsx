@@ -12,7 +12,7 @@
 import { useId } from "react";
 
 export type Shortcut = {
-  key: string;
+  keyboardKeyLabel: string;
   action: React.ReactNode;
   isShown?: boolean;
   onPress?: () => void;
@@ -23,28 +23,30 @@ export function KeyboardShortcuts({ shortcuts }: { shortcuts: Shortcut[] }) {
   return (
     <aside className="keyboard-shortcuts" aria-label="Keyboard shortcuts">
       <ul>
-        {shortcuts.map(({ key, action, isShown = true, onPress }) => (
-          <li
-            key={key}
-            style={isShown ? undefined : { visibility: "hidden" }}
-          >
-            <button
-              type="button"
-              aria-describedby={`${id}-${key}`}
-              onClick={onPress ?? (() => pressKey(key))}
+        {shortcuts.map(
+          ({ keyboardKeyLabel, action, isShown = true, onPress }) => (
+            <li
+              key={keyboardKeyLabel}
+              style={isShown ? undefined : { visibility: "hidden" }}
             >
-              <kbd>{key}</kbd>
-            </button>
-            <span id={`${id}-${key}`}>{action}</span>
-          </li>
-        ))}
+              <button
+                type="button"
+                aria-describedby={`${id}-${keyboardKeyLabel}`}
+                onClick={onPress ?? (() => pressKey(keyboardKeyLabel))}
+              >
+                <kbd>{keyboardKeyLabel}</kbd>
+              </button>
+              <span id={`${id}-${keyboardKeyLabel}`}>{action}</span>
+            </li>
+          ),
+        )}
       </ul>
     </aside>
   );
 }
 
-function pressKey(key: string) {
+function pressKey(keyboardKeyLabel: string) {
   window.dispatchEvent(
-    new KeyboardEvent("keydown", { key: key.toLowerCase() }),
+    new KeyboardEvent("keydown", { key: keyboardKeyLabel.toLowerCase() }),
   );
 }

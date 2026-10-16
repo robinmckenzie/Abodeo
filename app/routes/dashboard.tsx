@@ -381,12 +381,12 @@ export default function Dashboard() {
       <KeyboardShortcuts
         shortcuts={[
           {
-            key: "T",
+            keyboardKeyLabel: "T",
             action: "Toggle tuning panel",
             isShown: !isTextFieldFocused,
           },
           {
-            key: "E",
+            keyboardKeyLabel: "E",
             action: (
               <>
                 Switch{" "}
@@ -402,7 +402,7 @@ export default function Dashboard() {
             isShown: !isTextFieldFocused,
           },
           {
-            key: "Esc",
+            keyboardKeyLabel: "Esc",
             action: "Close open project",
             isShown: open !== null,
             onPress: closeOpenProject,
