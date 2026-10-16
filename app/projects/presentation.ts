@@ -6,20 +6,24 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { isTextField } from "../keyboard";
 
-export type Presentation = "window" | "in-place";
+export type Presentation = "floating-window" | "in-place";
 
 const storageKey = "abodeo-project-presentation";
 
 let current: Presentation | null = null;
 const listeners = new Set<() => void>();
 
+// Anything saved other than "in-place" reads as the floating window,
+// including "window", which earlier versions saved.
 function readPresentation(): Presentation {
   if (!current) {
     try {
       current =
-        localStorage.getItem(storageKey) === "in-place" ? "in-place" : "window";
+        localStorage.getItem(storageKey) === "in-place"
+          ? "in-place"
+          : "floating-window";
     } catch {
-      current = "window";
+      current = "floating-window";
     }
   }
   return current;
@@ -27,7 +31,8 @@ function readPresentation(): Presentation {
 
 // If the choice cannot be saved, it still applies until the page reloads.
 export function switchPresentation() {
-  current = readPresentation() === "window" ? "in-place" : "window";
+  current =
+    readPresentation() === "floating-window" ? "in-place" : "floating-window";
   try {
     localStorage.setItem(storageKey, current);
   } catch {
@@ -44,7 +49,11 @@ function subscribe(listener: () => void) {
 // The floating window on the server and while the page hydrates. Nothing is
 // open then, so a saved choice of in place shows no change.
 export function usePresentation() {
-  return useSyncExternalStore(subscribe, readPresentation, () => "window");
+  return useSyncExternalStore(
+    subscribe,
+    readPresentation,
+    () => "floating-window",
+  );
 }
 
 // E switches the presentation. A held key, browser shortcuts, typing into a
