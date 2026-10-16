@@ -1142,8 +1142,10 @@ html[data-has-projects] .welcome h1 {
   animation-duration: 0.6s, 1.4s;
 }
 
-html[data-has-projects]
-  :is(.get-started, .tuning-panel, .fade-tuning-panel, .keyboard-shortcuts) {
+/* The attribute stays set on the dashboard, so the shortcuts panel is
+   hidden only on this screen. */
+html[data-has-projects] :is(.get-started, .tuning-panel, .fade-tuning-panel),
+html[data-has-projects] .welcome .keyboard-shortcuts {
   display: none;
 }
 
