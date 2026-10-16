@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
 import logo from "../images/abodeo-home-logo.jpeg";
+import { useIsTextFieldFocused } from "../keyboard";
+import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
 import {
@@ -76,6 +78,9 @@ export default function Dashboard() {
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
 
   useSwitchPresentationKey();
+  // T and E do not work while typing in a field, so they are not listed
+  // then.
+  const isTextFieldFocused = useIsTextFieldFocused();
 
   // The Get Started link disappears when it is used, so focus moves to the
   // dashboard's content and screen readers announce the new screen, unless
@@ -237,7 +242,11 @@ export default function Dashboard() {
   const isAddingInPlace = isInPlace && open?.id === null;
   const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
 
-  // In place, the expanded bar closes the form its own way, squashing.
+  // In place, the expanded bar closes the form its own way, squashing. Esc
+  // and its keycap in the shortcuts panel both close it this way.
+  const closeOpenProject = () =>
+    expandedBarRef.current ? expandedBarRef.current.squash() : closeProject();
+
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -250,11 +259,7 @@ export default function Dashboard() {
       onCalendarDateChange={(date) => (calendarDateRef.current = date)}
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
-      onClose={() =>
-        expandedBarRef.current
-          ? expandedBarRef.current.squash()
-          : closeProject()
-      }
+      onClose={closeOpenProject}
       hasCloseButton={!isInPlace}
     />
   );
@@ -373,6 +378,37 @@ export default function Dashboard() {
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </main>
+      <KeyboardShortcuts
+        shortcuts={[
+          {
+            keyboardKeyLabel: "T",
+            action: "Toggle tuning panel",
+            isShown: !isTextFieldFocused,
+          },
+          {
+            keyboardKeyLabel: "E",
+            action: (
+              <>
+                Switch{" "}
+                <span className={isInPlace ? undefined : "is-current"}>
+                  window
+                </span>{" "}
+                /{" "}
+                <span className={isInPlace ? "is-current" : undefined}>
+                  in place
+                </span>
+              </>
+            ),
+            isShown: !isTextFieldFocused,
+          },
+          {
+            keyboardKeyLabel: "Esc",
+            action: "Close open project",
+            isShown: open !== null,
+            onPress: closeOpenProject,
+          },
+        ]}
+      />
     </div>
   );
 }

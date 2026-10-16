@@ -129,6 +129,71 @@ describe("Dashboard", () => {
     );
   });
 
+  it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
+    renderDashboard();
+    const panel = screen.getByRole("complementary", {
+      name: "Keyboard shortcuts",
+    });
+    const shortcuts = () =>
+      within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+    expect(shortcuts()).toEqual([
+      "TToggle tuning panel",
+      "ESwitch window / in place",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(shortcuts()).toContain("EscClose open project");
+    await closeForm();
+    expect(shortcuts()).not.toContain("EscClose open project");
+  });
+
+  it("switches presentation and closes a project from the keycaps", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    fireEvent.click(screen.getByRole("button", { name: "E" }));
+    expect(localStorage.getItem("abodeo-project-presentation")).toBe(
+      "in-place",
+    );
+    fireEvent.click(bars()[0]);
+    expect(titleField()).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Esc" }));
+    });
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+  });
+
+  it("underlines the current presentation in E's shortcut", () => {
+    renderDashboard();
+    const current = () =>
+      screen
+        .getByRole("complementary", { name: "Keyboard shortcuts" })
+        .querySelector(".is-current")?.textContent;
+    expect(current()).toBe("window");
+    pressKey("e");
+    expect(current()).toBe("in place");
+  });
+
+  it("does not list T or E while typing in a field, where they do not work", () => {
+    renderDashboard();
+    const panel = screen.getByRole("complementary", {
+      name: "Keyboard shortcuts",
+    });
+    const shortcuts = () =>
+      within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(document.activeElement).toBe(titleField());
+    expect(shortcuts()).toEqual(["EscClose open project"]);
+    act(() => screen.getByRole("button", { name: "Close" }).focus());
+    expect(shortcuts()).toEqual([
+      "TToggle tuning panel",
+      "ESwitch window / in place",
+      "EscClose open project",
+    ]);
+  });
+
   it("shows that there are no projects yet", () => {
     renderDashboard();
     expect(screen.getByText("No projects added yet.")).toBeTruthy();
