@@ -33,7 +33,7 @@
 - Describe the problem and the behaviour wanted, not how to build it. Put a constraint in Requirements only when it is genuinely required, such as one imposed by an external API, security or saved-data compatibility.
 - When asked to stub or draft a ticket, write only that ticket. Do not modify files or other tickets unless explicitly authorised.
 - A draft ticket needs to be coherent enough to be agreed, not to settle every implementation detail. Distinguish product decisions needed before agreement, provisional or tunable defaults, questions for investigation, and product questions that investigation exposes, which are brought back for a decision.
-- When Claude Code turns a STUB into a DRAFT, it has Codex review the draft read-only with `codex exec`. Claude Code revises the ticket, repeating until Codex has no "must fix" finding, for at most three rounds, and then tells Robin the outcome and what is left to decide.
+- After drafting or substantially revising a DRAFT ticket, review the ticket and relevant code only when the change is complex, ambiguous or high-risk. Record any review in a signed ticket comment.
 - When handing over a drafted or revised ticket for review, separately summarise:
     - what it leaves out of scope, whether stated explicitly or left out by omission;
     - any assumptions made while drafting;
@@ -62,12 +62,16 @@
 
 - Preserve compatibility with data that users have already saved. A change to where or how data is stored must account for existing data.
 - Do not change established behaviour that a ticket does not mention. If a change would alter it, bring that back for a decision.
+## Codex review rounds
+
+- For review rounds, run Codex non-interactively and read-only using `codex exec` on the relevant material. Use one round by default. Run a second round only when substantial findings were fixed and verification is warranted. Never exceed two rounds. Fix findings within the ticket's scope. Record each round's findings and fixes, the overall change, any findings left open, and whether an optional review was skipped. Tell Robin the outcome and what remains to decide. If Codex cannot be run, say so and provide Robin with the prompt instead.
+
 ## Validation
 
 - For code changes, run the project's build, lint and test commands. Report failures and any checks that could not run.
 - Add or update regression tests for changed logic where useful, but not for development-only tools, such as tuning panels, unless Robin asks.
 - For changes to a user interface, verify the affected behaviour in the running application at one desktop size, adding sizes only where the change depends on window width. For development-only tools, a quick look is enough. Phone and tablet are out of scope until Robin brings them back.
-- Implementing a ticket includes a Codex review. After committing, run Codex yourself, non-interactively and read-only, on the commit and the ticket's text. Fix findings that fall within the ticket and run the review again, up to three rounds in all. Report the outcome, and any other findings, in the handover. If Codex cannot be run, say so and give Robin the prompt instead.
+- Implementing a ticket includes one mandatory independent review after committing, covering the commit and ticket text. Record the review in the pull request description.
 - When handing over, summarise the resulting behaviour and any remaining limitations, and state what was verified, what was not, and why. Do not report something as verified if it could not be checked reliably.
 
 ## Future considerations
