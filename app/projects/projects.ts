@@ -46,6 +46,14 @@ const versionWithoutDueDate = 1;
 const versionWithoutTasks = 2;
 export const projectVersion = 3;
 
+// Whether this version of the app can read a project saved in the given
+// version: the current one, or an older one that lacked some fields.
+function isReadableVersion(version: unknown) {
+  return [versionWithoutDueDate, versionWithoutTasks, projectVersion].includes(
+    version as number,
+  );
+}
+
 export function hasTitle(title: string) {
   return title.trim() !== "";
 }
@@ -88,10 +96,7 @@ export function parseProject(id: string, json: string | null): Project | null {
         ? []
         : saved?.tasks;
     if (
-      // See the notes above projectVersion about versions 1 and 2.
-      ![versionWithoutDueDate, versionWithoutTasks, projectVersion].includes(
-        version,
-      ) ||
+      !isReadableVersion(version) ||
       typeof saved.title !== "string" ||
       !hasTitle(saved.title) ||
       typeof saved.notes !== "string" ||
