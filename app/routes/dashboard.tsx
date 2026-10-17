@@ -277,6 +277,27 @@ export default function Dashboard() {
   const closeOpenProject = () =>
     expandedBarRef.current ? expandedBarRef.current.squash() : closeProject();
 
+  // In place, Esc closes the project wherever focus is, such as on the page
+  // after a click on its background or on text in the form. The floating
+  // window's dialog hears Esc wherever focus is already. Not when something
+  // has used Esc itself, as a task's title does to cancel its edit.
+  const closeOpenProjectRef = useRef(closeOpenProject);
+  useEffect(() => {
+    closeOpenProjectRef.current = closeOpenProject;
+  });
+  const isOpenInPlace = isInPlace && open !== null;
+  useEffect(() => {
+    if (!isOpenInPlace) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.repeat || event.isComposing) return;
+      event.preventDefault();
+      closeOpenProjectRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpenInPlace]);
+
   const form = open && (
     <ProjectForm
       values={open.values}

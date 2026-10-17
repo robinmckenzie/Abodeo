@@ -481,6 +481,16 @@ describe("Dashboard", () => {
     expect(document.activeElement).toBe(bars()[0]);
   });
 
+  it("closes a project in place with Esc when focus is outside the form", async () => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    fireEvent.click(bars()[0]);
+    (document.activeElement as HTMLElement).blur();
+    await act(async () => pressKey("Escape"));
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+  });
+
   // Animations that finish only when told to.
   function holdAnimations() {
     const finishes: (() => void)[] = [];
