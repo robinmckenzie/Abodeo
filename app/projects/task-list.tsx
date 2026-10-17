@@ -51,6 +51,7 @@ export function TaskList({
   const id = useId();
   const entryRef = useRef<HTMLTextAreaElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => unsubmittedText.get(projectId) ?? "");
   const [failure, setFailure] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(
@@ -90,11 +91,7 @@ export function TaskList({
   useLayoutEffect(() => {
     const entry = entryRef.current;
     if (!entry) return;
-    const fitText = () => {
-      entry.style.height = "auto";
-      const borders = entry.offsetHeight - entry.clientHeight;
-      entry.style.height = `${entry.scrollHeight + borders}px`;
-    };
+    const fitText = () => fitHeightToText(entry);
     if (entry.getClientRects().length > 0) {
       fitText();
       return;
@@ -103,6 +100,11 @@ export function TaskList({
     const frame = requestAnimationFrame(fitText);
     return () => cancelAnimationFrame(frame);
   }, [text]);
+
+  // A title being edited wraps, and its box grows or shrinks to fit it.
+  useLayoutEffect(() => {
+    if (titleInputRef.current) fitHeightToText(titleInputRef.current);
+  }, [editing?.draft]);
 
   const changeText = (value: string) => {
     setText(value);
@@ -127,8 +129,10 @@ export function TaskList({
     setEditing(edit);
   };
 
-  const changeDraft = (draft: string) => {
+  // A title is one line, so pasted line breaks become spaces.
+  const changeDraft = (value: string) => {
     if (!editingRef.current) return;
+    const draft = value.replace(/\r?\n/g, " ");
     const edit = { ...editingRef.current, draft };
     editingRef.current = edit;
     setEditing(edit);
@@ -299,8 +303,10 @@ export function TaskList({
                   }}
                 />
                 {isEditing ? (
-                  <input
+                  <textarea
+                    ref={titleInputRef}
                     className="task-title-input"
+                    rows={1}
                     value={editing.draft}
                     aria-label={`Title of task ${task.title}`}
                     autoComplete="off"
@@ -398,6 +404,12 @@ export function TaskList({
       </p>
     </section>
   );
+}
+
+function fitHeightToText(box: HTMLTextAreaElement) {
+  box.style.height = "auto";
+  const borders = box.offsetHeight - box.clientHeight;
+  box.style.height = `${box.scrollHeight + borders}px`;
 }
 
 function buttonSelector(focusKey: string) {

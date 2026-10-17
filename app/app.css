@@ -1154,6 +1154,8 @@ body:has(.dashboard) {
   border-color: #1a1a1a;
   outline: 1px solid #1a1a1a;
   background: #fff;
+  resize: none;
+  overflow: hidden;
 }
 
 /* Inside the row, so as not to cover the tasks above and below. */
