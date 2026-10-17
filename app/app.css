@@ -1041,7 +1041,7 @@ body:has(.dashboard) {
 
 /* An opened project's tasks, below its notes. Each task's buttons and drag
    handle show while the pointer is over it or it has keyboard focus, so a
-   moved task does not stay highlighted after a click. */
+   moved task does not keep them after a click. */
 .task-section {
   display: flex;
   flex-direction: column;
@@ -1071,9 +1071,9 @@ body:has(.dashboard) {
   border-radius: 8px;
 }
 
-/* Not the task being edited, so that only one row is highlighted while the
-   pointer is elsewhere. */
-.task:is(:hover, :has(:focus-visible)):not(:has(.task-title-input)) {
+/* Only under the pointer, and not while the task is being edited, so that
+   only one row is ever highlighted. Keyboard focus shows as a ring. */
+.task:hover:not(:has(.task-title-input)) {
   background: #f6f3ec;
 }
 
