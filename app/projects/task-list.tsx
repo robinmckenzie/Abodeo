@@ -5,6 +5,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { canAnimate } from "./project-bar";
+import { calculateSlideStagger, slideTiming } from "./slide-timing";
 import {
   addTasks,
   createTasks,
@@ -32,13 +33,6 @@ const unsubmittedText = new Map<string, string>();
 // and a task dropped into a text field does not type its title there.
 const dragType = "application/x-abodeo-task";
 
-// A reordered task's slide to its new place, and the wait before the next
-// one starts.
-const slideTiming = {
-  duration: 250,
-  easing: "cubic-bezier(0.33, 1, 0.68, 1)",
-};
-const slideStagger = 60;
 const liftedLook: Keyframe = {
   zIndex: 1,
   background: "#fff",
@@ -159,7 +153,7 @@ export function TaskList({
     const slide = (
       row: HTMLElement,
       shift: number,
-      turn: number,
+      delay: number,
       look: Keyframe = {},
     ) => {
       for (const animation of row.getAnimations()) animation.cancel();
@@ -168,22 +162,25 @@ export function TaskList({
           { ...look, transform: `translateY(${shift}px)` },
           { ...look, transform: "none" },
         ],
-        { ...slideTiming, delay: turn * slideStagger, fill: "backwards" },
+        { ...slideTiming, delay, fill: "backwards" },
       );
     };
     const rank = (shift: number, top: number) => (shift < 0 ? -top : top);
     const others = slides.filter(({ row }) => row.dataset.taskId !== movedId);
-    let turns = 0;
-    for (const direction of [-1, 1]) {
-      const wave = others
+    const waves = [-1, 1].map((direction) =>
+      others
         .filter(({ shift }) => Math.sign(shift) === direction)
-        .sort((a, b) => rank(a.shift, a.top) - rank(b.shift, b.top));
-      wave.forEach(({ row, shift }, turn) => slide(row, shift, turn));
-      turns = Math.max(turns, wave.length);
+        .sort((a, b) => rank(a.shift, a.top) - rank(b.shift, b.top)),
+    );
+    // The more places the task moves, the shorter the wait between slides.
+    const places = Math.max(...waves.map((wave) => wave.length));
+    const stagger = calculateSlideStagger(places);
+    for (const wave of waves) {
+      wave.forEach(({ row, shift }, turn) => slide(row, shift, turn * stagger));
     }
     const moved = slides.find(({ row }) => row.dataset.taskId === movedId);
     // Lifted above the others, which it waits on top of and then crosses.
-    if (moved) slide(moved.row, moved.shift, turns, liftedLook);
+    if (moved) slide(moved.row, moved.shift, places * stagger, liftedLook);
   });
 
   // A title being edited wraps, and its box grows or shrinks to fit it.
