@@ -119,6 +119,10 @@ export function TaskList({
     const fitText = () => fitHeightToText(entry);
     if (entry.getClientRects().length > 0) {
       fitText();
+      // Kept in view as it grows, and after tasks are added above it.
+      if (document.activeElement === entry) {
+        entry.scrollIntoView?.({ block: "nearest" });
+      }
       return;
     }
     entry.style.height = "";
@@ -202,8 +206,19 @@ export function TaskList({
     const added = createTasks(entries);
     const reason = await save((current) => addTasks(current, added));
     isAddingRef.current = false;
-    if (!reason) changeText("");
+    if (reason) return;
+    isShowingAddedRef.current = true;
+    changeText("");
   };
+
+  // The list scrolls to show the tasks added at its end.
+  const isShowingAddedRef = useRef(false);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!isShowingAddedRef.current || !list) return;
+    isShowingAddedRef.current = false;
+    list.scrollTop = list.scrollHeight;
+  });
 
   const startEdit = (task: Task) => {
     const edit = { id: task.id, draft: task.title };

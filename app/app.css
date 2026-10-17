@@ -1067,9 +1067,12 @@ body:has(.dashboard) {
   letter-spacing: 0.02em;
 }
 
+/* A long list scrolls, so that the box for adding tasks stays near. */
 .task-list {
+  max-height: 40vh;
   margin: 0 0 0.25rem;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
@@ -1243,8 +1246,10 @@ body:has(.dashboard) {
 }
 
 /* One line high at first, growing a line at a time to 15, then scrolling. */
+/* Kept in view with space below it, as it grows and as tasks are added. */
 .task-entry {
   width: 100%;
+  scroll-margin-bottom: 1rem;
   max-height: calc(15lh + 1.25rem + 2px);
   padding: 0.625rem 0.75rem;
   border: 1px solid #ddd7c9;
