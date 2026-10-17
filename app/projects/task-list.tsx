@@ -39,6 +39,11 @@ const slideTiming = {
   easing: "cubic-bezier(0.33, 1, 0.68, 1)",
 };
 const slideStagger = 60;
+const liftedLook: Keyframe = {
+  zIndex: 1,
+  background: "#fff",
+  boxShadow: "0 4px 18px rgb(26 26 26 / 0.08)",
+};
 
 // Up and Down move focus between the tasks' titles.
 const titleSteps: Partial<Record<string, -1 | 1>> = {
@@ -83,6 +88,9 @@ export function TaskList({
   // Where in the title an edit starts typing: where it was clicked, or, if
   // not known, the end.
   const caretRef = useRef<number | null>(null);
+  // The task being moved by dragging or a Move button, whose slide goes
+  // last.
+  const movedIdRef = useRef<string | null>(null);
   const [deleted, setDeleted] = useState<{ task: Task; index: number } | null>(
     null,
   );
@@ -127,7 +135,8 @@ export function TaskList({
   // When the tasks are reordered, each one that moved slides from its old
   // place to its new one, in turn as a wave: those moving down from the
   // bottom up, and those moving up from the top down, so that the wave
-  // starts where the moved task was.
+  // starts where the moved task was. The task moved here, by dragging or a
+  // Move button, goes last, into the room the others make for it.
   useLayoutEffect(() => {
     const before = rowTopsRef.current;
     const rows = [
@@ -138,6 +147,8 @@ export function TaskList({
       rows.map((row) => [row.dataset.taskId ?? "", row.offsetTop]),
     );
     if (!isReordered([...before.keys()], tasks)) return;
+    const movedId = movedIdRef.current;
+    movedIdRef.current = null;
     const slides = rows
       .filter(canAnimate)
       .map((row) => {
@@ -145,19 +156,34 @@ export function TaskList({
         return { row, top, shift: top - row.offsetTop + findShift(row) };
       })
       .filter(({ shift }) => shift !== 0);
+    const slide = (
+      row: HTMLElement,
+      shift: number,
+      turn: number,
+      look: Keyframe = {},
+    ) => {
+      for (const animation of row.getAnimations()) animation.cancel();
+      row.animate(
+        [
+          { ...look, transform: `translateY(${shift}px)` },
+          { ...look, transform: "none" },
+        ],
+        { ...slideTiming, delay: turn * slideStagger, fill: "backwards" },
+      );
+    };
     const rank = (shift: number, top: number) => (shift < 0 ? -top : top);
+    const others = slides.filter(({ row }) => row.dataset.taskId !== movedId);
+    let turns = 0;
     for (const direction of [-1, 1]) {
-      slides
+      const wave = others
         .filter(({ shift }) => Math.sign(shift) === direction)
-        .sort((a, b) => rank(a.shift, a.top) - rank(b.shift, b.top))
-        .forEach(({ row, shift }, index) => {
-          for (const animation of row.getAnimations()) animation.cancel();
-          row.animate(
-            [{ transform: `translateY(${shift}px)` }, { transform: "none" }],
-            { ...slideTiming, delay: index * slideStagger, fill: "backwards" },
-          );
-        });
+        .sort((a, b) => rank(a.shift, a.top) - rank(b.shift, b.top));
+      wave.forEach(({ row, shift }, turn) => slide(row, shift, turn));
+      turns = Math.max(turns, wave.length);
     }
+    const moved = slides.find(({ row }) => row.dataset.taskId === movedId);
+    // Lifted above the others, which it waits on top of and then crosses.
+    if (moved) slide(moved.row, moved.shift, turns, liftedLook);
   });
 
   // A title being edited wraps, and its box grows or shrinks to fit it.
@@ -258,6 +284,7 @@ export function TaskList({
   // the button pressed, which reordering could otherwise lose.
   const moveBy = (task: Task, step: -1 | 1) => {
     focusAfterRenderRef.current = buttonSelector(`${task.id}${step}`);
+    movedIdRef.current = task.id;
     void save((current) =>
       moveTask(
         current,
@@ -276,7 +303,10 @@ export function TaskList({
     const from = tasks.findIndex(({ id }) => id === draggedId);
     if (draggedId && from !== -1 && dropIndex !== null) {
       const to = dropIndex > from ? dropIndex - 1 : dropIndex;
-      if (to !== from) void save((current) => moveTask(current, draggedId, to));
+      if (to !== from) {
+        movedIdRef.current = draggedId;
+        void save((current) => moveTask(current, draggedId, to));
+      }
     }
     endDrag();
   };
