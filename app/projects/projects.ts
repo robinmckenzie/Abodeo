@@ -88,6 +88,7 @@ export function parseProject(id: string, json: string | null): Project | null {
         ? []
         : saved?.tasks;
     if (
+      // See the notes above projectVersion about versions 1 and 2.
       ![versionWithoutDueDate, versionWithoutTasks, projectVersion].includes(
         version,
       ) ||
