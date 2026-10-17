@@ -40,6 +40,12 @@ const slideTiming = {
 };
 const slideStagger = 60;
 
+// Up and Down move focus between the tasks' titles.
+const titleSteps: Partial<Record<string, -1 | 1>> = {
+  ArrowUp: -1,
+  ArrowDown: 1,
+};
+
 export function TaskList({
   projectId,
   tasks,
@@ -388,6 +394,18 @@ export function TaskList({
                     data-task-title={task.id}
                     aria-label={`Edit ${task.title}`}
                     onClick={() => startEdit(task)}
+                    onKeyDown={(event) => {
+                      const step = titleSteps[event.key];
+                      if (!step) return;
+                      // Also stops the page scrolling at the list's ends.
+                      event.preventDefault();
+                      const next = tasks[index + step];
+                      if (next) {
+                        document
+                          .querySelector<HTMLElement>(titleSelector(next.id))
+                          ?.focus();
+                      }
+                    }}
                   >
                     {task.title}
                   </button>

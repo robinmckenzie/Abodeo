@@ -588,25 +588,20 @@ describe("Dashboard", () => {
     ["a tall opened project only to its top", false, 800, 1200, 2500, 784],
     ["a new project to the page's end", true, 800, 600, 1500, 600],
     ["a long page's new project only to its top", true, 1000, 600, 3000, 984],
-  ])(
-    "scrolls %s",
-    async (_, isNew, barTop, height, pageHeight, scrolled) => {
-      renderDashboard();
-      await addProject("Kitchen");
-      pressKey("e");
-      const layout = fakeLayout({ barTop, height, pageHeight });
-      try {
-        fireEvent.click(
-          isNew
-            ? screen.getByRole("button", { name: "Add project" })
-            : bars()[0],
-        );
-        expect(layout.scrollTop).toBe(scrolled);
-      } finally {
-        layout.restore();
-      }
-    },
-  );
+  ])("scrolls %s", async (_, isNew, barTop, height, pageHeight, scrolled) => {
+    renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    const layout = fakeLayout({ barTop, height, pageHeight });
+    try {
+      fireEvent.click(
+        isNew ? screen.getByRole("button", { name: "Add project" }) : bars()[0],
+      );
+      expect(layout.scrollTop).toBe(scrolled);
+    } finally {
+      layout.restore();
+    }
+  });
 
   it("scrolls back up to an opened project that moves up as another closes", async () => {
     renderDashboard();
@@ -1042,6 +1037,23 @@ describe("tasks", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Edit Wall tiles" }),
     );
+  });
+
+  it("moves focus between titles with Up and Down, stopping at the ends", async () => {
+    await openKitchen();
+    await enterTasks("Tiles\nGrout\nSeal");
+    const title = (name: string) =>
+      screen.getByRole("button", { name: `Edit ${name}` });
+    title("Tiles").focus();
+    fireEvent.keyDown(title("Tiles"), { key: "ArrowUp" });
+    expect(document.activeElement).toBe(title("Tiles"));
+    fireEvent.keyDown(title("Tiles"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(title("Grout"));
+    fireEvent.keyDown(title("Grout"), { key: "ArrowDown" });
+    fireEvent.keyDown(title("Seal"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(title("Seal"));
+    fireEvent.keyDown(title("Seal"), { key: "ArrowUp" });
+    expect(document.activeElement).toBe(title("Grout"));
   });
 
   it("saves an edit on leaving it, unless it is empty", async () => {
