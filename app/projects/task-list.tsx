@@ -193,6 +193,17 @@ export function TaskList({
     if (titleInputRef.current) fitHeightToText(titleInputRef.current);
   }, [editing?.draft]);
 
+  // A narrower window wraps the title onto more lines.
+  const isEditing = editing !== null;
+  useEffect(() => {
+    if (!isEditing) return;
+    const refit = () => {
+      if (titleInputRef.current) fitHeightToText(titleInputRef.current);
+    };
+    window.addEventListener("resize", refit);
+    return () => window.removeEventListener("resize", refit);
+  }, [isEditing]);
+
   const changeText = (value: string) => {
     setText(value);
     if (value) unsubmittedText.set(projectId, value);
