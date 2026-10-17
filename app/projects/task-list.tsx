@@ -326,9 +326,12 @@ export function TaskList({
     };
     window.addEventListener("dragover", trackPointer);
     frame = requestAnimationFrame(scroll);
+    // The browser would also scroll the notes under the pointer.
+    document.documentElement.dataset.draggingTask = "";
     return () => {
       window.removeEventListener("dragover", trackPointer);
       cancelAnimationFrame(frame);
+      delete document.documentElement.dataset.draggingTask;
     };
   }, [draggedId]);
 

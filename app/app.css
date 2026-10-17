@@ -1447,3 +1447,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   overflow-x: auto;
   padding: 1rem;
 }
+
+/* While a task is dragged, the notes do not scroll under the pointer. */
+[data-dragging-task] textarea {
+  overflow: hidden;
+}
