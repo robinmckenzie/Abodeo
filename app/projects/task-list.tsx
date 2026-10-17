@@ -4,6 +4,7 @@
 // saving fails.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { calculateDragScroll } from "./drag-scroll";
 import { canAnimate } from "./project-bar";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
 import {
@@ -305,6 +306,31 @@ export function TaskList({
       ),
     );
   };
+
+  // While a task is dragged, scroll the list when the pointer is near its
+  // edge or beyond it, which the browser would only do a few pixels from it.
+  useEffect(() => {
+    if (!draggedId) return;
+    let pointerY: number | null = null;
+    let frame = 0;
+    const trackPointer = (event: DragEvent) => {
+      pointerY = event.clientY;
+    };
+    const scroll = () => {
+      const list = listRef.current;
+      if (list && pointerY !== null) {
+        const { top, bottom } = list.getBoundingClientRect();
+        list.scrollTop += calculateDragScroll(pointerY, top, bottom);
+      }
+      frame = requestAnimationFrame(scroll);
+    };
+    window.addEventListener("dragover", trackPointer);
+    frame = requestAnimationFrame(scroll);
+    return () => {
+      window.removeEventListener("dragover", trackPointer);
+      cancelAnimationFrame(frame);
+    };
+  }, [draggedId]);
 
   const endDrag = () => {
     setDraggedId(null);
