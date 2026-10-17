@@ -43,6 +43,8 @@ export const newProjectFields: ProjectFields = {
 // with fields this version does not know about. Version 1 had no due date,
 // and versions 1 and 2 had no tasks.
 export const projectVersion = 3;
+const versionWithoutDueDate = 1;
+const versionWithoutTasks = 2;
 
 export function hasTitle(title: string) {
   return title.trim() !== "";
@@ -80,10 +82,15 @@ export function parseProject(id: string, json: string | null): Project | null {
   try {
     const saved = JSON.parse(json ?? "null");
     const version = saved?.version;
-    const dueDate = version === 1 ? null : saved?.dueDate;
-    const tasks = version === 1 || version === 2 ? [] : saved?.tasks;
+    const dueDate = version === versionWithoutDueDate ? null : saved?.dueDate;
+    const tasks =
+      version === versionWithoutDueDate || version === versionWithoutTasks
+        ? []
+        : saved?.tasks;
     if (
-      ![1, 2, projectVersion].includes(version) ||
+      ![versionWithoutDueDate, versionWithoutTasks, projectVersion].includes(
+        version,
+      ) ||
       typeof saved.title !== "string" ||
       !hasTitle(saved.title) ||
       typeof saved.notes !== "string" ||
