@@ -1040,7 +1040,8 @@ body:has(.dashboard) {
 }
 
 /* An opened project's tasks, below its notes. Each task's buttons and drag
-   handle show while the pointer is over it or it has focus. */
+   handle show while the pointer is over it or it has keyboard focus, so a
+   moved task does not stay highlighted after a click. */
 .task-section {
   display: flex;
   flex-direction: column;
@@ -1071,7 +1072,7 @@ body:has(.dashboard) {
 }
 
 .task:hover,
-.task:focus-within {
+.task:has(:focus-visible) {
   background: #f6f3ec;
 }
 
@@ -1165,7 +1166,7 @@ body:has(.dashboard) {
   gap: 0.125rem;
 }
 
-.task:not(:hover, :focus-within) :is(.task-drag, .task-controls) {
+.task:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
   opacity: 0;
 }
 
