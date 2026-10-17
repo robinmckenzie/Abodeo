@@ -42,9 +42,9 @@ export const newProjectFields: ProjectFields = {
 // version of the app counts as unreadable, so that it is never overwritten
 // with fields this version does not know about. Version 1 had no due date,
 // and versions 1 and 2 had no tasks.
-export const projectVersion = 3;
 const versionWithoutDueDate = 1;
 const versionWithoutTasks = 2;
+export const projectVersion = 3;
 
 export function hasTitle(title: string) {
   return title.trim() !== "";
