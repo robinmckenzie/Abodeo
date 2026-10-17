@@ -1071,8 +1071,9 @@ body:has(.dashboard) {
   border-radius: 8px;
 }
 
-.task:hover,
-.task:has(:focus-visible) {
+/* Not the task being edited, so that only one row is highlighted while the
+   pointer is elsewhere. */
+.task:is(:hover, :has(:focus-visible)):not(:has(.task-title-input)) {
   background: #f6f3ec;
 }
 
