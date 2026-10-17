@@ -4,10 +4,12 @@
 // saving fails.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { canAnimate } from "./project-bar";
 import {
   addTasks,
   createTasks,
   deleteTask,
+  isReordered,
   moveTask,
   readTaskEntries,
   renameTask,
@@ -29,6 +31,14 @@ const unsubmittedText = new Map<string, string>();
 // Identifies a task being dragged, so that only tasks can be dropped here,
 // and a task dropped into a text field does not type its title there.
 const dragType = "application/x-abodeo-task";
+
+// A reordered task's slide to its new place, and the wait before the next
+// one starts.
+const slideTiming = {
+  duration: 250,
+  easing: "cubic-bezier(0.33, 1, 0.68, 1)",
+};
+const slideStagger = 60;
 
 export function TaskList({
   projectId,
@@ -52,6 +62,10 @@ export function TaskList({
   const entryRef = useRef<HTMLTextAreaElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // Each task's place in the list as last shown, from which a reordered
+  // task slides to its new place.
+  const rowTopsRef = useRef(new Map<string, number>());
   const [text, setText] = useState(() => unsubmittedText.get(projectId) ?? "");
   const [failure, setFailure] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(
@@ -100,6 +114,42 @@ export function TaskList({
     const frame = requestAnimationFrame(fitText);
     return () => cancelAnimationFrame(frame);
   }, [text]);
+
+  // When the tasks are reordered, each one that moved slides from its old
+  // place to its new one, in turn as a wave: those moving down from the
+  // bottom up, and those moving up from the top down, so that the wave
+  // starts where the moved task was.
+  useLayoutEffect(() => {
+    const before = rowTopsRef.current;
+    const rows = [
+      ...(listRef.current?.querySelectorAll<HTMLElement>(":scope > .task") ??
+        []),
+    ];
+    rowTopsRef.current = new Map(
+      rows.map((row) => [row.dataset.taskId ?? "", row.offsetTop]),
+    );
+    if (!isReordered([...before.keys()], tasks)) return;
+    const slides = rows
+      .filter(canAnimate)
+      .map((row) => {
+        const top = before.get(row.dataset.taskId ?? "") ?? row.offsetTop;
+        return { row, top, shift: top - row.offsetTop + findShift(row) };
+      })
+      .filter(({ shift }) => shift !== 0);
+    const rank = (shift: number, top: number) => (shift < 0 ? -top : top);
+    for (const direction of [-1, 1]) {
+      slides
+        .filter(({ shift }) => Math.sign(shift) === direction)
+        .sort((a, b) => rank(a.shift, a.top) - rank(b.shift, b.top))
+        .forEach(({ row, shift }, index) => {
+          for (const animation of row.getAnimations()) animation.cancel();
+          row.animate(
+            [{ transform: `translateY(${shift}px)` }, { transform: "none" }],
+            { ...slideTiming, delay: index * slideStagger, fill: "backwards" },
+          );
+        });
+    }
+  });
 
   // A title being edited wraps, and its box grows or shrinks to fit it.
   useLayoutEffect(() => {
@@ -233,6 +283,7 @@ export function TaskList({
       </h3>
       {tasks.length > 0 && (
         <ul
+          ref={listRef}
           className="task-list"
           aria-labelledby={`${id}-heading`}
           onDragOver={(event) => {
@@ -259,6 +310,7 @@ export function TaskList({
               <li
                 key={task.id}
                 className={classes.join(" ")}
+                data-task-id={task.id}
                 onDragOver={(event) => {
                   if (!draggedId) return;
                   const box = event.currentTarget.getBoundingClientRect();
@@ -404,6 +456,12 @@ export function TaskList({
       </p>
     </section>
   );
+}
+
+// How far a task is drawn from its place, part way through a slide.
+function findShift(row: HTMLElement) {
+  const transform = getComputedStyle(row).transform;
+  return !transform || transform === "none" ? 0 : new DOMMatrix(transform).m42;
 }
 
 function fitHeightToText(box: HTMLTextAreaElement) {

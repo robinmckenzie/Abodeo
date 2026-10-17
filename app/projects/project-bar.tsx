@@ -288,7 +288,7 @@ export function ExpandedProjectBar({
   );
 }
 
-function canAnimate(element: HTMLElement) {
+export function canAnimate(element: HTMLElement) {
   return (
     typeof element.animate === "function" &&
     !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches

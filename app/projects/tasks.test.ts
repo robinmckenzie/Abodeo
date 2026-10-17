@@ -4,6 +4,7 @@ import {
   addTasks,
   createTasks,
   deleteTask,
+  isReordered,
   isTask,
   moveTask,
   readTaskEntries,
@@ -122,5 +123,17 @@ describe("changing tasks", () => {
     expect(ids(moveTask(tasks, "b", -1))).toBe("bac");
     expect(ids(moveTask(tasks, "b", 9))).toBe("acb");
     expect(moveTask(tasks, "x", 0)).toBe(tasks);
+  });
+
+  it("tells a reorder from other changes", () => {
+    const tasks = createTasks([
+      { title: "A", isDone: false },
+      { title: "B", isDone: false },
+    ]);
+    const [a, b] = tasks.map((task) => task.id);
+    expect(isReordered([b, a], tasks)).toBe(true);
+    expect(isReordered([a, b], tasks)).toBe(false);
+    expect(isReordered([a], tasks)).toBe(false);
+    expect(isReordered([a, "x"], tasks)).toBe(false);
   });
 });

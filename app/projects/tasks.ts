@@ -88,3 +88,13 @@ export function moveTask(tasks: Task[], id: string, toIndex: number) {
   next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, task);
   return next;
 }
+
+// Whether the same tasks are now in a different order, given their ids
+// before.
+export function isReordered(before: string[], tasks: Task[]) {
+  return (
+    before.length === tasks.length &&
+    tasks.some((task, index) => task.id !== before[index]) &&
+    tasks.every((task) => before.includes(task.id))
+  );
+}
