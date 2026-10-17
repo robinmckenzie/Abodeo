@@ -80,6 +80,9 @@ export function TaskList({
   // Mirrors editing, so that an edit finished by Enter is not finished again
   // by the blur that follows.
   const editingRef = useRef(editing);
+  // Where in the title an edit starts typing: where it was clicked, or, if
+  // not known, the end.
+  const caretRef = useRef<number | null>(null);
   const [deleted, setDeleted] = useState<{ task: Task; index: number } | null>(
     null,
   );
@@ -370,8 +373,9 @@ export function TaskList({
                     autoComplete="off"
                     autoFocus
                     onFocus={(event) => {
-                      const end = event.target.value.length;
-                      event.target.setSelectionRange(end, end);
+                      const at = caretRef.current ?? event.target.value.length;
+                      caretRef.current = null;
+                      event.target.setSelectionRange(at, at);
                     }}
                     onChange={(event) => changeDraft(event.target.value)}
                     onKeyDown={(event) => {
@@ -393,7 +397,10 @@ export function TaskList({
                     className="task-title"
                     data-task-title={task.id}
                     aria-label={`Edit ${task.title}`}
-                    onClick={() => startEdit(task)}
+                    onClick={(event) => {
+                      caretRef.current = findClickedCharacter(event);
+                      startEdit(task);
+                    }}
                     onKeyDown={(event) => {
                       const step = titleSteps[event.key];
                       if (!step) return;
@@ -474,6 +481,23 @@ export function TaskList({
       </p>
     </section>
   );
+}
+
+// The position in an element's text that a click landed on, or null when
+// it came from the keyboard or the browser cannot tell.
+function findClickedCharacter(event: React.MouseEvent<HTMLElement>) {
+  if (event.detail === 0) return null;
+  const { clientX: x, clientY: y, currentTarget } = event;
+  if (document.caretPositionFromPoint) {
+    const position = document.caretPositionFromPoint(x, y);
+    return position && currentTarget.contains(position.offsetNode)
+      ? position.offset
+      : null;
+  }
+  const range = document.caretRangeFromPoint?.(x, y);
+  return range && currentTarget.contains(range.startContainer)
+    ? range.startOffset
+    : null;
 }
 
 // How far a task is drawn from its place, part way through a slide.
