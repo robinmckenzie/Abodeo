@@ -400,13 +400,13 @@ body:has(.dashboard) {
 }
 
 /* A collapsed bar is one button. An expanded bar's buttons are styled on
-   their own. The title and notes are on two rows beside the assignee and
-   due date, so that the notes can fill the height those set. */
+   their own. The title, notes and task count are on three rows beside the
+   assignee and due date, so that the notes can fill the height those set. */
 .project-bar:not(.is-expanded) > button {
   width: 100%;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   align-items: baseline;
   column-gap: 1rem;
   padding: 1rem 1.25rem;
@@ -440,7 +440,7 @@ body:has(.dashboard) {
 /* A fixed width, so that the titles line up. The due date's calendar page
    goes below the assignee. */
 .project-bar-side {
-  grid-row: span 2;
+  grid-row: span 3;
   width: 6.5rem;
   display: flex;
   flex-direction: column;
@@ -531,13 +531,25 @@ body:has(.dashboard) {
 }
 
 /* With a due date, which makes the bar taller, the notes run down to its
-   foot instead, with the last line fading out. Their size is contained, so
+   foot, or to the task count, instead, with the last line fading out by
+   half a line above it. Their size is contained, so
    that they do not make the bar taller still. */
 .project-bar:has(.due-date-icon) .project-bar-notes {
   align-self: stretch;
   max-height: none;
   contain: size;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 1lh), transparent);
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 1.5lh),
+    transparent calc(100% - 0.5lh)
+  );
+}
+
+.project-bar-tasks {
+  grid-area: 3 / 2;
+  margin-top: 0.25rem;
+  color: #6b665c;
+  font-size: 0.85rem;
 }
 
 .project-bar-unsaved {

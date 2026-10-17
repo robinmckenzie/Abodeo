@@ -98,3 +98,12 @@ export function isReordered(before: string[], tasks: Task[]) {
     tasks.every((task) => before.includes(task.id))
   );
 }
+
+// How many tasks there are and, if any, how many are done, such as
+// "9 tasks, 1 completed", or nothing if there are no tasks.
+export function describeTaskCount(tasks: Task[]) {
+  if (tasks.length === 0) return "";
+  const count = tasks.length === 1 ? "1 task" : `${tasks.length} tasks`;
+  const done = tasks.filter((task) => task.isDone).length;
+  return done > 0 ? `${count}, ${done} completed` : count;
+}

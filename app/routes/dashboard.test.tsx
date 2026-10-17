@@ -959,9 +959,14 @@ describe("tasks", () => {
       ["**Grout**", true],
       ["Seal", false],
     ]);
-    // Not on the dashboard's bar.
+    // Counted on the dashboard's bar.
     await closeForm();
-    expect(bars()[0].textContent).toBe("UnassignedKitchen");
+    expect(bars()[0].textContent).toBe(
+      "UnassignedKitchen3 tasks, 1 completed",
+    );
+    expect(bars()[0].getAttribute("aria-label")).toBe(
+      "Kitchen, Unassigned, 3 tasks, 1 completed",
+    );
     cleanup();
     refreshProjects();
     renderDashboard();

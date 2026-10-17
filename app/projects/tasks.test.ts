@@ -4,6 +4,7 @@ import {
   addTasks,
   createTasks,
   deleteTask,
+  describeTaskCount,
   isReordered,
   isTask,
   moveTask,
@@ -135,5 +136,16 @@ describe("changing tasks", () => {
     expect(isReordered([a, b], tasks)).toBe(false);
     expect(isReordered([a], tasks)).toBe(false);
     expect(isReordered([a, "x"], tasks)).toBe(false);
+  });
+
+  it("describes how many tasks there are and how many are completed", () => {
+    const tasks = createTasks([
+      { title: "A", isDone: true },
+      { title: "B", isDone: false },
+    ]);
+    expect(describeTaskCount([])).toBe("");
+    expect(describeTaskCount(tasks.slice(1))).toBe("1 task");
+    expect(describeTaskCount(tasks.slice(0, 1))).toBe("1 task, 1 completed");
+    expect(describeTaskCount(tasks)).toBe("2 tasks, 1 completed");
   });
 });

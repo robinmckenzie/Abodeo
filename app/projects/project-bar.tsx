@@ -5,6 +5,7 @@ import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { describeDueDate } from "./due-date";
 import { DueDateIcon } from "./due-date-icon";
 import { findAssigneeName, type Project } from "./projects";
+import { describeTaskCount } from "./tasks";
 
 // Expanding starts at about the speed of a plain 0.3-second ease-out, then
 // slows gradually to a gentle stop, on a stronger ease-out curve. Squashing
@@ -50,12 +51,14 @@ export function ProjectBar({
   onOpen: (barHeight: number) => void;
 }) {
   const assigneeName = findAssigneeName(project.assignee);
+  const taskCount = describeTaskCount(project.tasks);
   // Screen readers hear the title first, and not the notes preview, whose
   // notes they read once the project is opened.
   const label = [
     project.title,
     assigneeName,
     project.dueDate && `due ${describeDueDate(project.dueDate)}`,
+    taskCount,
     hasUnsavedChanges && "last changes not saved",
   ]
     .filter(Boolean)
@@ -78,6 +81,7 @@ export function ProjectBar({
           {project.notes.trim() && (
             <span className="project-bar-notes">{project.notes}</span>
           )}
+          {taskCount && <span className="project-bar-tasks">{taskCount}</span>}
         </span>
         {hasUnsavedChanges && (
           <span className="project-bar-unsaved">Last changes not saved</span>
