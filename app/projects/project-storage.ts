@@ -14,6 +14,7 @@ import {
   type Project,
   type ProjectFields,
 } from "./projects";
+import type { Task } from "./tasks";
 
 const keyPrefix = "abodeo-project:";
 
@@ -67,18 +68,43 @@ export async function saveProjectChanges(
   if (changes.title !== undefined && !hasTitle(changes.title)) {
     return { ok: false, reason: "no-title" };
   }
-  let saved: Project | null;
-  try {
-    saved = parseProject(id, localStorage.getItem(keyPrefix + id));
-  } catch {
-    return { ok: false, reason: "unavailable" };
-  }
-  if (!saved) return { ok: false, reason: "unreadable" };
+  const saved = readProject(id);
+  if (!saved.ok) return saved;
   return writeProject({
-    ...saved,
+    ...saved.project,
     ...changes,
     updatedAt: new Date().toISOString(),
   });
+}
+
+// Applies one change to the tasks as they are saved now, such as adding or
+// moving one, so that tasks changed elsewhere, such as in another tab, are
+// kept. Gives the tasks as saved.
+export async function saveProjectTasks(
+  id: string,
+  change: (tasks: Task[]) => Task[],
+): Promise<{ ok: true; tasks: Task[] } | { ok: false; reason: SaveFailure }> {
+  const saved = readProject(id);
+  if (!saved.ok) return saved;
+  const tasks = change(saved.project.tasks);
+  const result = writeProject({
+    ...saved.project,
+    tasks,
+    updatedAt: new Date().toISOString(),
+  });
+  return result.ok ? { ok: true, tasks } : result;
+}
+
+function readProject(
+  id: string,
+): { ok: true; project: Project } | { ok: false; reason: SaveFailure } {
+  let project: Project | null;
+  try {
+    project = parseProject(id, localStorage.getItem(keyPrefix + id));
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+  return project ? { ok: true, project } : { ok: false, reason: "unreadable" };
 }
 
 // Writing replaces the entry in one step, so a failed write leaves the saved

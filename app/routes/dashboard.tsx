@@ -17,6 +17,7 @@ import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
   saveProjectChanges,
+  saveProjectTasks,
   type SaveFailure,
 } from "../projects/project-storage";
 import {
@@ -29,6 +30,7 @@ import {
   usePresentation,
   useSwitchPresentationKey,
 } from "../projects/presentation";
+import { TaskList, type TaskChange } from "../projects/task-list";
 import { refreshProjects, useProjects } from "../projects/use-projects";
 
 export const meta: Route.MetaFunction = () => [
@@ -76,6 +78,8 @@ export default function Dashboard() {
   const calendarDateRef = useRef<string | null>(null);
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
+  // Saves a task title being edited when the project closes.
+  const finishTaskEditRef = useRef<(() => void) | null>(null);
 
   useSwitchPresentationKey();
   // T and E do not work while typing in a field, so they are not listed
@@ -114,6 +118,7 @@ export default function Dashboard() {
 
   const closeProject = () => {
     if (!open) return;
+    finishTaskEditRef.current?.();
     saverRef.current?.saveNow();
     saverRef.current = null;
     focusAfterCloseRef.current = open.id
@@ -168,11 +173,11 @@ export default function Dashboard() {
     // it, while Tab does.
     focusFieldRef.current = "start";
     calendarDateRef.current = null;
-    const { title, notes, assignee, dueDate } = project;
+    const { title, notes, assignee, dueDate, tasks } = project;
     setOpen({
       key: createOpeningKey(),
       id,
-      values: { title, notes, assignee, dueDate },
+      values: { title, notes, assignee, dueDate, tasks },
       message: null,
       barHeight,
     });
@@ -216,6 +221,31 @@ export default function Dashboard() {
     }
   };
 
+  // Shows a change to the opened project's tasks at once and saves it
+  // straight away, going back to the tasks as they were if saving fails.
+  const changeOpenTasks = async (change: TaskChange) => {
+    if (!open?.id) return null;
+    const { id } = open;
+    const before = open.values.tasks;
+    const showTasks = (update: TaskChange) =>
+      setOpen((current) =>
+        current?.id === id
+          ? {
+              ...current,
+              values: {
+                ...current.values,
+                tasks: update(current.values.tasks),
+              },
+            }
+          : current,
+      );
+    showTasks(change);
+    const result = await saveProjectTasks(id, change);
+    refreshProjects();
+    showTasks(() => (result.ok ? result.tasks : before));
+    return result.ok ? null : describeFailure(result.reason).text;
+  };
+
   const createOpenProject = async () => {
     if (!open || open.id !== null) return;
     if (!hasTitle(open.values.title)) {
@@ -247,6 +277,27 @@ export default function Dashboard() {
   const closeOpenProject = () =>
     expandedBarRef.current ? expandedBarRef.current.squash() : closeProject();
 
+  // In place, Esc closes the project wherever focus is, such as on the page
+  // after a click on its background or on text in the form. The floating
+  // window's dialog hears Esc wherever focus is already. Not when something
+  // has used Esc itself, as a task's title does to cancel its edit.
+  const closeOpenProjectRef = useRef(closeOpenProject);
+  useEffect(() => {
+    closeOpenProjectRef.current = closeOpenProject;
+  });
+  const isOpenInPlace = isInPlace && open !== null;
+  useEffect(() => {
+    if (!isOpenInPlace) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.repeat || event.isComposing) return;
+      event.preventDefault();
+      closeOpenProjectRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpenInPlace]);
+
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -261,6 +312,18 @@ export default function Dashboard() {
       onCreate={createOpenProject}
       onClose={closeOpenProject}
       hasCloseButton={!isInPlace}
+      tasks={
+        open.id !== null && (
+          <TaskList
+            className="arrives-in-turn"
+            style={{ "--arrival": 4 } as React.CSSProperties}
+            projectId={open.id}
+            tasks={open.values.tasks}
+            onChange={changeOpenTasks}
+            finishEditRef={finishTaskEditRef}
+          />
+        )
+      }
     />
   );
 
@@ -287,6 +350,15 @@ export default function Dashboard() {
         onCreate={() => {}}
         onClose={() => {}}
         hasCloseButton={false}
+        tasks={
+          bar.id !== null && (
+            <TaskList
+              projectId={bar.id}
+              tasks={bar.values.tasks}
+              onChange={async () => null}
+            />
+          )
+        }
       />
     </ExpandedProjectBar>
   );
@@ -421,7 +493,7 @@ function toggleId(ids: ReadonlySet<string>, id: string, isIncluded: boolean) {
   return next;
 }
 
-function describeFailure(reason: SaveFailure): FormMessage {
+function describeFailure(reason: SaveFailure) {
   const text = {
     "no-title": "A project needs a title.",
     full: "Not saved: this browser's storage for Abodeo is full.",
@@ -429,5 +501,5 @@ function describeFailure(reason: SaveFailure): FormMessage {
     unreadable:
       "Not saved: the saved copy of this project cannot be read, so it has been left as it is.",
   }[reason];
-  return { text, isError: true };
+  return { text, isError: true } satisfies FormMessage;
 }

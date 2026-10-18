@@ -7,13 +7,16 @@ import {
   loadProjects,
   projectKeyPrefix,
   saveProjectChanges,
+  saveProjectTasks,
 } from "./project-storage";
+import { addTasks, deleteTask, setTaskDone } from "./tasks";
 
 const fields = {
   title: "Kitchen",
   notes: "Tiles\nGrout",
   assignee: "andy" as const,
   dueDate: null,
+  tasks: [],
 };
 
 afterEach(() => {
@@ -47,6 +50,29 @@ describe("project storage", () => {
     expect(loadDueDate()).toBe("2027-02-28");
     await saveProjectChanges(created.project.id, { dueDate: null });
     expect(loadDueDate()).toBeNull();
+  });
+
+  it("keeps tasks, applying each change to the tasks as saved", async () => {
+    const created = await createProject(fields);
+    if (!created.ok) throw new Error("not created");
+    const { id } = created.project;
+    const tiles = { id: "t1", title: "Tiles", isDone: false };
+    const grout = { id: "t2", title: "Grout", isDone: false };
+    expect(
+      await saveProjectTasks(id, (tasks) => addTasks(tasks, [tiles])),
+    ).toEqual({ ok: true, tasks: [tiles] });
+    // Another tab adds a task, which this tab has not seen.
+    await saveProjectTasks(id, (tasks) => addTasks(tasks, [grout]));
+    await saveProjectTasks(id, (tasks) => setTaskDone(tasks, "t1", true));
+    const loadTasks = () => {
+      const loaded = loadProjects();
+      return loaded.ok && loaded.projects[0].tasks;
+    };
+    expect(loadTasks()).toEqual([{ ...tiles, isDone: true }, grout]);
+    // A change to another field keeps the tasks.
+    await saveProjectChanges(id, { notes: "More" });
+    await saveProjectTasks(id, (tasks) => deleteTask(tasks, "t2"));
+    expect(loadTasks()).toEqual([{ ...tiles, isDone: true }]);
   });
 
   it("does not create a project without a title", async () => {
@@ -99,6 +125,9 @@ describe("project storage", () => {
     expect(
       await saveProjectChanges(created.project.id, { notes: "More" }),
     ).toEqual({ ok: false, reason: "full" });
+    expect(
+      await saveProjectTasks(created.project.id, (tasks) => tasks),
+    ).toEqual({ ok: false, reason: "full" });
     expect({ ...localStorage }).toEqual(before);
   });
 
@@ -126,6 +155,10 @@ describe("project storage", () => {
     expect(loaded.ok && loaded.projects).toHaveLength(1);
     expect(loaded.ok && loaded.unreadableCount).toBe(1);
     expect(await saveProjectChanges("bad", { title: "Fixed" })).toEqual({
+      ok: false,
+      reason: "unreadable",
+    });
+    expect(await saveProjectTasks("bad", (tasks) => tasks)).toEqual({
       ok: false,
       reason: "unreadable",
     });

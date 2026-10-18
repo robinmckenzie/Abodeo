@@ -36,6 +36,18 @@ requirements, commitments, or scheduled work.
   `data-has-projects`. With a database, the server would set the attribute
   when it renders the page instead.
 
+## Tasks
+
+- Undo for task changes other than deletion: AD #33 Add Tasks To Projects
+  offers Undo only after a deletion. Each task action is a pure function from
+  one task list to another (`app/projects/tasks.ts`), applied to the tasks as
+  saved (`saveProjectTasks`), so reversing most actions is simple (un-tick,
+  move back, rename back, delete the added tasks). A reversal must still be
+  written to cope with a list changed elsewhere, such as in another tab,
+  rather than restore a snapshot, which would lose that work. A general Undo
+  and Redo also needs decisions on what counts as one step (a pasted block of
+  tasks) and when the history ends.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
