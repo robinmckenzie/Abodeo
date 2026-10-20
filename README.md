@@ -107,8 +107,11 @@ output. The production address is https://abodeo-kappa.vercel.app.
        `http://localhost:5173/api/auth/callback/google`. Its secret is shown in full only once.
 2. **Neon, through Vercel** (Storage, under the project's Infrastructure): create two Neon
    databases on the free plan.
-    - `abodeo`: connect it to the Production environment only, which sets `DATABASE_URL`. Turn
-      off any branch per deployment. Then click "← All Databases", at the top left, to go back.
+    - `abodeo`: on Connect a Project, choose the Abodeo project and the Production environment
+      only, with no database branch for deployment. In the database's Settings, set Allowed
+      Environments to "Production environment only" and save. The project's Settings,
+      Environment Variables, should then list `DATABASE_URL` for Production only. Then click
+      "← All Databases", at the top left, to go back.
     - `abodeo-local`: connect it to no environment (or Development only, if Vercel insists). Its
       connection string goes in `.env.local`. Do not use a branch of production instead, as a
       branch starts as a copy of production's accounts.
