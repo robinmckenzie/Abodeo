@@ -1,4 +1,5 @@
-import { rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { reactRouter } from "@react-router/dev/vite";
@@ -20,7 +21,9 @@ export default defineConfig({
 // the deployed app. It accepts only JSON sent by a page from the server's own
 // address, so that another site open in the browser cannot write the file.
 function saveDefaultProjects(): Plugin {
-  const maxLength = 5 * 1024 * 1024;
+  const maxBytes = 5 * 1024 * 1024;
+  // Saves take turns, as two at once can fail to replace the same file.
+  let queue: Promise<unknown> = Promise.resolve();
   return {
     name: "abodeo-save-default-projects",
     apply: "serve",
@@ -38,37 +41,58 @@ function saveDefaultProjects(): Plugin {
         if (!isSameOrigin(req.headers.origin, req.headers.host)) {
           return reply(403, "Only this server's pages can save defaults.");
         }
-        let body = "";
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > maxLength) return reply(413, "Too large.");
-        }
-        // Loaded through the development server, like the app's code.
-        const {
-          buildDefaultProjectsFile,
-          defaultProjectsPath,
-          readDefaultProjects,
-        } = (await server.ssrLoadModule(
-          "/app/projects/default-projects.ts",
-        )) as typeof import("./app/projects/default-projects");
-        let defaults;
         try {
-          defaults = readDefaultProjects(JSON.parse(body));
-        } catch {
-          defaults = null;
+          // Decoded once it has all arrived, as a chunk can end part way
+          // through a character.
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > maxBytes) return reply(413, "Too large.");
+            chunks.push(chunk);
+          }
+          const body = Buffer.concat(chunks).toString("utf8");
+          // Loaded through the development server, like the app's code.
+          const {
+            buildDefaultProjectsFile,
+            defaultProjectsPath,
+            readDefaultProjects,
+          } = (await server.ssrLoadModule(
+            "/app/projects/default-projects.ts",
+          )) as typeof import("./app/projects/default-projects");
+          let defaults;
+          try {
+            defaults = readDefaultProjects(JSON.parse(body));
+          } catch {
+            defaults = null;
+          }
+          if (!defaults) return reply(400, "The projects could not be read.");
+          const target = path.resolve(server.config.root, defaultProjectsPath);
+          const file = buildDefaultProjectsFile(defaults.projects);
+          const text = `${JSON.stringify(file, null, 2)}\n`;
+          const write = queue.then(() => replaceFile(target, text));
+          queue = write.catch(() => {});
+          await write;
+          reply(200, "Saved.");
+        } catch (error) {
+          if (!res.headersSent) reply(500, `Not saved: ${error}`);
         }
-        if (!defaults) return reply(400, "The projects could not be read.");
-        // Written in full to a temporary file first, so that an interrupted
-        // save cannot leave the defaults half written.
-        const target = path.resolve(server.config.root, defaultProjectsPath);
-        const temporary = `${target}.tmp`;
-        const file = buildDefaultProjectsFile(defaults.projects);
-        await writeFile(temporary, `${JSON.stringify(file, null, 2)}\n`);
-        await rename(temporary, target);
-        reply(200, "Saved.");
       });
     },
   };
+}
+
+// Writes the file in full under a name of its own first, so that an
+// interrupted save cannot leave it half written.
+async function replaceFile(target: string, text: string) {
+  const temporary = `${target}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, text);
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 function isSameOrigin(origin: string | undefined, host: string | undefined) {
