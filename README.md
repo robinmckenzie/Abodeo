@@ -98,7 +98,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
     2. Google Auth Platform, Get started: app name Abodeo, a support email (everyone signing in
        sees it), audience External, a contact email.
     3. Branding: no logo, as a logo needs Google's verification.
-    4. Data Access: only `.../auth/userinfo.email`, `.../auth/userinfo.profile` and `openid`.
+    4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
+       `.../auth/userinfo.profile` and `openid`, then Update, then Save.
     5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
        allows 100 test users over the app's lifetime.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs
