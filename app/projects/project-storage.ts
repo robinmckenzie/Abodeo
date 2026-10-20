@@ -7,6 +7,10 @@
 // local storage before they first wait, so that a save started as the page is
 // left is complete before it goes.
 import {
+  bundledDefaultProjects,
+  type DefaultProjects,
+} from "./default-projects";
+import {
   hasTitle,
   parseProject,
   serialiseProject,
@@ -17,6 +21,10 @@ import {
 import type { Task } from "./tasks";
 
 const keyPrefix = "abodeo-project:";
+
+// Which default projects this browser last received: their hash and ids. Its
+// name does not start with keyPrefix, so it is not counted as a project.
+const defaultsKey = "abodeo-default-projects";
 
 export type SaveFailure = "unavailable" | "full" | "unreadable" | "no-title";
 
@@ -114,8 +122,113 @@ function writeProject(project: Project): SaveResult {
     localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
     return { ok: true };
   } catch (error) {
-    return { ok: false, reason: isQuotaError(error) ? "full" : "unavailable" };
+    return toFailure(error);
   }
+}
+
+// Brings this browser's default projects up to date with the app's, when
+// they differ from those it last received: adds new ones, replaces existing
+// ones, overwriting any edits, and removes those the app no longer has. The
+// visitor's own projects are never touched, nor is an entry this version
+// cannot read, such as one saved by a later version. The record is written
+// last, so that if storage fails part way, the next load tries again.
+//
+// Unlike the saving functions, this is not async, as it runs before projects
+// are first read, which React needs straight away.
+export function receiveDefaultProjects(
+  defaults = bundledDefaultProjects,
+): SaveResult {
+  // A damaged defaults file changes nothing.
+  if (!defaults) return { ok: true };
+  try {
+    const record = readDefaultsRecord();
+    if (record?.hash === defaults.hash) return { ok: true };
+    // Nothing received yet and nothing to receive.
+    if (!record && defaults.projects.length === 0) return { ok: true };
+    const ids = new Set(defaults.projects.map(({ id }) => id));
+    for (const project of defaults.projects) {
+      if (!isUnreadableEntry(project.id)) {
+        localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
+      }
+    }
+    // An unreadable default that is kept still counts as a default.
+    const keptIds: string[] = [];
+    for (const id of record?.ids ?? []) {
+      if (ids.has(id)) continue;
+      if (isUnreadableEntry(id)) keptIds.push(id);
+      else localStorage.removeItem(keyPrefix + id);
+    }
+    writeDefaultsRecord(defaults.hash, [...ids, ...keptIds]);
+    return { ok: true };
+  } catch (error) {
+    return toFailure(error);
+  }
+}
+
+// Records the projects just saved as the defaults, in development, as the
+// defaults this browser has received, so that they count as default
+// projects here rather than being added again as copies.
+export function markProjectsAsDefaults(defaults: DefaultProjects): SaveResult {
+  try {
+    writeDefaultsRecord(
+      defaults.hash,
+      defaults.projects.map(({ id }) => id),
+    );
+    return { ok: true };
+  } catch (error) {
+    return toFailure(error);
+  }
+}
+
+// Leaves exactly the default projects, in development: writes them, then
+// removes every other project, readable or not. Writing first means a
+// failure removes nothing.
+export function resetToDefaultProjects(
+  defaults = bundledDefaultProjects,
+): SaveResult {
+  if (!defaults) return { ok: false, reason: "unreadable" };
+  try {
+    const ids = new Set(defaults.projects.map(({ id }) => id));
+    for (const project of defaults.projects) {
+      localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
+    }
+    for (const key of listProjectKeys()) {
+      if (!ids.has(key.slice(keyPrefix.length))) localStorage.removeItem(key);
+    }
+    writeDefaultsRecord(defaults.hash, [...ids]);
+    return { ok: true };
+  } catch (error) {
+    return toFailure(error);
+  }
+}
+
+function isUnreadableEntry(id: string) {
+  const json = localStorage.getItem(keyPrefix + id);
+  return json !== null && parseProject(id, json) === null;
+}
+
+function readDefaultsRecord(): { hash: string; ids: string[] } | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(defaultsKey) ?? "null");
+    if (
+      typeof saved?.hash === "string" &&
+      Array.isArray(saved.ids) &&
+      saved.ids.every((id: unknown) => typeof id === "string")
+    ) {
+      return { hash: saved.hash, ids: saved.ids };
+    }
+  } catch {
+    // An unreadable record counts as no defaults received.
+  }
+  return null;
+}
+
+function writeDefaultsRecord(hash: string, ids: string[]) {
+  localStorage.setItem(defaultsKey, JSON.stringify({ hash, ids }));
+}
+
+function toFailure(error: unknown): SaveResult {
+  return { ok: false, reason: isQuotaError(error) ? "full" : "unavailable" };
 }
 
 function isQuotaError(error: unknown) {
@@ -135,12 +248,16 @@ export function isProjectKey(key: string | null) {
   return key === null || key.startsWith(keyPrefix);
 }
 
-// Any saved project counts, including one that cannot be read, so that a
-// returning visitor whose projects are damaged is told so on the dashboard
-// rather than being welcomed as new. Tuning settings do not count.
-export function hasSavedProjects() {
+// A visitor's own projects are those that are not default projects. Any
+// counts, including one that cannot be read, so that a returning visitor
+// whose projects are damaged is told so on the dashboard rather than being
+// welcomed as new. Default projects and tuning settings do not count.
+export function hasOwnProjects() {
   try {
-    return listProjectKeys().length > 0;
+    const defaultIds = new Set(readDefaultsRecord()?.ids);
+    return listProjectKeys().some(
+      (key) => !defaultIds.has(key.slice(keyPrefix.length)),
+    );
   } catch {
     return false;
   }
@@ -155,13 +272,16 @@ export function isWelcomeRequested(search: string) {
 export const hasProjectsAttribute = "data-has-projects";
 
 // Runs in the page's head, before the page first appears, and marks the page
-// when projects are saved, so that the welcome screen's CSS can hide the Get
-// Started button from the first frame. It checks as hasSavedProjects and
-// isWelcomeRequested do.
+// when the visitor has projects of their own, so that the welcome screen's
+// CSS can hide the Get Started button from the first frame. It checks as
+// hasOwnProjects and isWelcomeRequested do.
 export const hasProjectsScript = `try{
 if(!new URLSearchParams(location.search).has("welcome")){
-for(var i=0;i<localStorage.length;i++){
-if((localStorage.key(i)||"").indexOf(${JSON.stringify(keyPrefix)})===0){
+var d=[];try{var r=JSON.parse(localStorage.getItem(${JSON.stringify(defaultsKey)}));
+if(r&&typeof r.hash==="string"&&Array.isArray(r.ids))d=r.ids}catch(e){}
+var p=${JSON.stringify(keyPrefix)};
+for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i)||"";
+if(k.indexOf(p)===0&&d.indexOf(k.slice(p.length))<0){
 document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"");break}}}
 }catch(e){}`;
 

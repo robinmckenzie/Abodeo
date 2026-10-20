@@ -1,14 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildDefaultProjectsFile,
+  readDefaultProjects,
+  type DefaultProjects,
+} from "./default-projects";
+import {
   createProject,
   hasProjectsScript,
-  hasSavedProjects,
+  hasOwnProjects,
   loadProjects,
+  markProjectsAsDefaults,
   projectKeyPrefix,
+  receiveDefaultProjects,
+  resetToDefaultProjects,
   saveProjectChanges,
   saveProjectTasks,
 } from "./project-storage";
+import type { Project } from "./projects";
 import { addTasks, deleteTask, setTaskDone } from "./tasks";
 
 const fields = {
@@ -144,7 +153,7 @@ describe("project storage", () => {
       throw new DOMException("Blocked", "SecurityError");
     });
     expect(loadProjects()).toEqual({ ok: false });
-    expect(hasSavedProjects()).toBe(false);
+    expect(hasOwnProjects()).toBe(false);
   });
 
   it("counts unreadable projects and never saves over them", async () => {
@@ -168,9 +177,9 @@ describe("project storage", () => {
   it("counts only projects as saved, not tuning settings", () => {
     localStorage.setItem("abodeo-fade-tuning", "{}");
     localStorage.setItem("abodeo-project-presentation", "in-place");
-    expect(hasSavedProjects()).toBe(false);
+    expect(hasOwnProjects()).toBe(false);
     localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
-    expect(hasSavedProjects()).toBe(true);
+    expect(hasOwnProjects()).toBe(true);
   });
 });
 
@@ -207,5 +216,185 @@ describe("hasProjectsScript", () => {
     localStorage.setItem(`${projectKeyPrefix}a`, "{}");
     expect(runScript).not.toThrow();
     expect(isMarked()).toBe(false);
+  });
+});
+
+function makeDefault(id: string, title: string): Project {
+  return {
+    ...fields,
+    id,
+    title,
+    createdAt: `2026-01-0${id.length}T00:00:00.000Z`,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function makeDefaults(...projects: Project[]): DefaultProjects {
+  return readDefaultProjects(buildDefaultProjectsFile(projects))!;
+}
+
+function loadTitles() {
+  const loaded = loadProjects();
+  return loaded.ok ? loaded.projects.map((p) => p.title) : null;
+}
+
+const hall = makeDefault("d1", "Hall");
+const loft = makeDefault("d22", "Loft");
+const shed = makeDefault("d333", "Shed");
+
+describe("default projects", () => {
+  it("adds the defaults alongside the visitor's own projects", async () => {
+    await createProject({ ...fields, title: "Mine" });
+    expect(receiveDefaultProjects(makeDefaults(hall, loft))).toEqual({
+      ok: true,
+    });
+    expect(loadTitles()?.sort()).toEqual(["Hall", "Loft", "Mine"]);
+  });
+
+  it("keeps edits to defaults when the defaults have not changed", async () => {
+    const defaults = makeDefaults(hall);
+    receiveDefaultProjects(defaults);
+    await saveProjectChanges("d1", { notes: "Edited" });
+    receiveDefaultProjects(makeDefaults(hall));
+    const loaded = loadProjects();
+    expect(loaded.ok && loaded.projects[0].notes).toBe("Edited");
+    expect(loadTitles()).toEqual(["Hall"]);
+  });
+
+  it("replaces, adds and removes defaults when they change, keeping own projects", async () => {
+    receiveDefaultProjects(makeDefaults(hall, loft));
+    await saveProjectChanges("d1", { notes: "Edited" });
+    const mine = await createProject({ ...fields, title: "Mine" });
+    if (!mine.ok) throw new Error("not created");
+    const newHall = { ...hall, title: "Hallway" };
+    receiveDefaultProjects(makeDefaults(newHall, shed));
+    const loaded = loadProjects();
+    if (!loaded.ok) throw new Error("not loaded");
+    expect(loaded.projects.map((p) => p.title).sort()).toEqual([
+      "Hallway",
+      "Mine",
+      "Shed",
+    ]);
+    expect(loaded.projects.find((p) => p.id === "d1")?.notes).toBe(hall.notes);
+    expect(loaded.projects.find((p) => p.id === mine.project.id)).toEqual(
+      mine.project,
+    );
+  });
+
+  it("does not duplicate defaults on later loads or changes", () => {
+    receiveDefaultProjects(makeDefaults(hall));
+    receiveDefaultProjects(makeDefaults(hall));
+    receiveDefaultProjects(makeDefaults({ ...hall, notes: "New" }));
+    expect(loadTitles()).toEqual(["Hall"]);
+  });
+
+  it("writes nothing when there are no defaults and none were received", () => {
+    receiveDefaultProjects(makeDefaults());
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("changes nothing for a damaged defaults file", async () => {
+    receiveDefaultProjects(makeDefaults(hall));
+    receiveDefaultProjects(null);
+    expect(loadTitles()).toEqual(["Hall"]);
+  });
+
+  it("never writes over or removes a default it cannot read", () => {
+    receiveDefaultProjects(makeDefaults(hall, loft));
+    localStorage.setItem(`${projectKeyPrefix}d1`, '{"version":99}');
+    localStorage.setItem(`${projectKeyPrefix}d22`, '{"version":99}');
+    receiveDefaultProjects(makeDefaults({ ...hall, notes: "New" }));
+    expect(localStorage.getItem(`${projectKeyPrefix}d1`)).toBe(
+      '{"version":99}',
+    );
+    expect(localStorage.getItem(`${projectKeyPrefix}d22`)).toBe(
+      '{"version":99}',
+    );
+    // Still defaults, so not the visitor's own.
+    expect(hasOwnProjects()).toBe(false);
+  });
+
+  it("tries again on the next load if storage fails part way", () => {
+    const defaults = makeDefaults(hall, loft);
+    const setItem = Storage.prototype.setItem;
+    let writes = 0;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      writes += 1;
+      if (writes === 2) {
+        throw new DOMException("Full", "QuotaExceededError");
+      }
+      setItem.call(this, key, value);
+    });
+    expect(receiveDefaultProjects(defaults)).toEqual({
+      ok: false,
+      reason: "full",
+    });
+    vi.restoreAllMocks();
+    receiveDefaultProjects(defaults);
+    expect(loadTitles()).toEqual(["Hall", "Loft"]);
+  });
+
+  it("counts projects saved as defaults as defaults, without copying them", async () => {
+    const created = await createProject({ ...fields, title: "Saved" });
+    if (!created.ok) throw new Error("not created");
+    expect(hasOwnProjects()).toBe(true);
+    const defaults = makeDefaults(created.project);
+    markProjectsAsDefaults(defaults);
+    expect(hasOwnProjects()).toBe(false);
+    await saveProjectChanges(created.project.id, { notes: "Edited" });
+    receiveDefaultProjects(defaults);
+    const loaded = loadProjects();
+    expect(loaded.ok && loaded.projects.map((p) => p.notes)).toEqual([
+      "Edited",
+    ]);
+  });
+
+  it("resets to exactly the defaults, readable projects or not", async () => {
+    receiveDefaultProjects(makeDefaults(hall));
+    await saveProjectChanges("d1", { notes: "Edited" });
+    await createProject({ ...fields, title: "Mine" });
+    localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
+    localStorage.setItem("abodeo-fade-tuning", "{}");
+    expect(resetToDefaultProjects(makeDefaults(hall, loft))).toEqual({
+      ok: true,
+    });
+    const loaded = loadProjects();
+    expect(loaded).toEqual({
+      ok: true,
+      projects: [hall, loft],
+      unreadableCount: 0,
+    });
+    expect(localStorage.getItem("abodeo-fade-tuning")).toBe("{}");
+    expect(hasOwnProjects()).toBe(false);
+  });
+
+  it("removes nothing when a reset cannot write the defaults", async () => {
+    await createProject({ ...fields, title: "Mine" });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    expect(resetToDefaultProjects(makeDefaults(hall))).toEqual({
+      ok: false,
+      reason: "full",
+    });
+    expect(loadTitles()).toEqual(["Mine"]);
+  });
+
+  it("does not count defaults as the visitor's own projects", async () => {
+    const runScript = () => new Function(hasProjectsScript)();
+    const isMarked = () =>
+      document.documentElement.hasAttribute("data-has-projects");
+    receiveDefaultProjects(makeDefaults(hall));
+    expect(hasOwnProjects()).toBe(false);
+    runScript();
+    expect(isMarked()).toBe(false);
+    await createProject({ ...fields, title: "Mine" });
+    expect(hasOwnProjects()).toBe(true);
+    runScript();
+    expect(isMarked()).toBe(true);
   });
 });

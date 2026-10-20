@@ -34,7 +34,9 @@ requirements, commitments, or scheduled work.
   visitor also depends on local storage: `hasProjectsScript`, in the same
   file, looks there for projects before the page first appears and sets
   `data-has-projects`. With a database, the server would set the attribute
-  when it renders the page instead.
+  when it renders the page instead. The default projects (AD #36 Save Default
+  Projects) are written into the same storage, and the browser's record of
+  which it received, which that script also reads, would move with them.
 
 ## Tasks
 

@@ -108,6 +108,21 @@ describe("Home", () => {
     expect(screen.getByText("Arrived by REPLACE")).toBeTruthy();
   });
 
+  it("shows the welcome screen to a visitor with only default projects", async () => {
+    vi.useFakeTimers();
+    saveProject();
+    localStorage.setItem(
+      "abodeo-default-projects",
+      JSON.stringify({ hash: "h", ids: ["a"] }),
+    );
+    renderHome("/", NavigationProbe);
+    expect(document.documentElement.hasAttribute("data-has-projects")).toBe(
+      false,
+    );
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByRole("link", { name: "Get Started" })).toBeTruthy();
+  });
+
   it("shows the welcome screen at /?welcome even with projects saved", async () => {
     vi.useFakeTimers();
     saveProject();
