@@ -49,6 +49,19 @@ describe("autosave", () => {
     expect(saved).toEqual([{ notes: "Straight away" }]);
   });
 
+  it("tells whether everything is saved once a save asked for is done", async () => {
+    const saver = createTestSaver();
+    expect(await saver.saveNow()).toBe(true);
+    saver.change({ notes: "Lost" });
+    nextResult = { ok: false, reason: "full" };
+    expect(await saver.saveNow()).toBe(false);
+    // Nothing new to send, but the failed change is still unsaved.
+    expect(await saver.saveNow()).toBe(false);
+    nextResult = { ok: true };
+    saver.change({ notes: "Kept" });
+    expect(await saver.saveNow()).toBe(true);
+  });
+
   it("does not save a title that is empty or only spaces", () => {
     const saver = createTestSaver();
     saver.change({ title: "  ", notes: "Kept" });

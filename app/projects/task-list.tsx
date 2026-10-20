@@ -30,6 +30,11 @@ export const undoDuration = 8000;
 // reloads, so that closing the project does not lose it.
 const unsubmittedText = new Map<string, string>();
 
+// Whether any project has such text, which leaving the page would lose.
+export function hasUnsubmittedTaskText() {
+  return [...unsubmittedText.values()].some((text) => text.trim() !== "");
+}
+
 // Identifies a task being dragged, so that only tasks can be dropped here,
 // and a task dropped into a text field does not type its title there.
 const dragType = "application/x-abodeo-task";
@@ -59,8 +64,8 @@ export function TaskList({
   // Saves a change, giving the reason it failed, or null once saved.
   onChange: (change: TaskChange) => Promise<string | null>;
   // Set while a title is being edited, so that closing the project can save
-  // the edit.
-  finishEditRef?: React.RefObject<(() => void) | null>;
+  // the edit. Gives the reason saving failed, or null once saved.
+  finishEditRef?: React.RefObject<(() => Promise<string | null>) | null>;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -249,16 +254,17 @@ export function TaskList({
 
   // Saves the edit unless it is cancelled. An empty title, or one only
   // trimmed, leaves the title as it was.
-  const finishEdit = (isSaved: boolean) => {
+  const finishEdit = async (isSaved: boolean) => {
     const edit = editingRef.current;
-    if (!edit) return;
+    if (!edit) return null;
     editingRef.current = null;
     setEditing(null);
     const task = tasks.find((current) => current.id === edit.id);
     const title = edit.draft.trim();
     if (isSaved && task && title && title !== task.title) {
-      void save((current) => renameTask(current, edit.id, title));
+      return save((current) => renameTask(current, edit.id, title));
     }
+    return null;
   };
 
   useEffect(() => {

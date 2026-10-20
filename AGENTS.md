@@ -65,6 +65,7 @@
 ## Codex review rounds
 
 - For review rounds, run Codex non-interactively and read-only using `codex exec` on the relevant material. Use one round by default. Run a second round only when substantial findings were fixed and verification is warranted. Never exceed two rounds. Fix findings within the ticket's scope. Record each round's findings and fixes, the overall change, any findings left open, and whether an optional review was skipped. Tell Robin the outcome and what remains to decide. If Codex cannot be run, say so and provide Robin with the prompt instead.
+- Run one Codex round on the plan before implementing, when the change is complex or high-risk.
 
 ## Validation
 

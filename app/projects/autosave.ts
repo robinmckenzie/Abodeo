@@ -14,7 +14,8 @@ export type AutosaveStatus =
 
 export type Autosaver = {
   change(changes: Partial<ProjectFields>): void;
-  saveNow(): void;
+  // Settles once this save is done: true if every change is then saved.
+  saveNow(): Promise<boolean>;
 };
 
 export const autosaveDelay = 500;
@@ -41,14 +42,18 @@ export function createAutosaver({
     else onStatus({ state: "saved" });
   };
 
+  // Saves still running when this one started count too.
+  let latestSave: Promise<unknown> = Promise.resolve();
+  const isAllSaved = () => !failure && !hasUnsaved() && saving === 0;
+
   function saveNow() {
     clearTimeout(timer);
     timer = undefined;
-    if (!hasUnsaved()) return;
+    if (!hasUnsaved()) return latestSave.then(isAllSaved);
     const sending = unsaved;
     unsaved = {};
     saving++;
-    save(sending).then((result) => {
+    latestSave = save(sending).then((result) => {
       saving--;
       if (result.ok) {
         failure = null;
@@ -60,6 +65,7 @@ export function createAutosaver({
       }
       reportStatus();
     });
+    return latestSave.then(isAllSaved);
   }
 
   return {
