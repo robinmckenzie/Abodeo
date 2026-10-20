@@ -201,6 +201,9 @@ export function buildAccountAuthOptions(
         // Sign-in only through Google's redirect, never by posting an ID
         // token.
         disableIdTokenSignIn: true,
+        // Google always asks which account to use, rather than signing in
+        // again with the last one.
+        prompt: "select_account",
       },
     },
     user: tableNames.user,

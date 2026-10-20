@@ -179,6 +179,21 @@ describe("createAccountRequestHandler", () => {
     expect(openRuntime).not.toHaveBeenCalled();
   });
 
+  it("asks Google which account to use every time", async () => {
+    const { handle } = createTestHandler();
+
+    const response = await handle(
+      request("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "google" }),
+      }),
+    );
+
+    const { url } = (await response.json()) as { url: string };
+    expect(new URL(url).searchParams.get("prompt")).toBe("select_account");
+  });
+
   it("asks Google only for basic permissions and returns to the dashboard, whatever the page asks", async () => {
     const { handle, rows } = createTestHandler();
 

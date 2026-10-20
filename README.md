@@ -71,9 +71,10 @@ are not linked to the account.
   database in `DATABASE_URL`. `npm run dev` uses a separate database, `abodeo-local`, through
   `AUTH_DATABASE_URL`, and never reads `DATABASE_URL`, so local accounts never reach production.
 - Starting sign-in always asks Google only for the account's identity, name and email, and always
-  returns to `/dashboard`, whatever the browser sends. Sign-out ends Abodeo's session, not the
-  Google one, and loads the dashboard afresh. Before either leaves the page, anything open is
-  saved, and the person is asked first if something cannot be saved.
+  returns to `/dashboard`, whatever the browser sends. Google always asks which account to use.
+  Sign-out ends Abodeo's session, not the Google one, and loads the dashboard afresh. Before
+  either leaves the page, anything open is saved, and the person is asked first if something
+  cannot be saved.
 - The dashboard looks up the account after the page has loaded, with an 8-second limit, so a slow
   or missing database never holds it up. It looks again when the window is next used, when the
   session is due to end, and when another tab signs out.
