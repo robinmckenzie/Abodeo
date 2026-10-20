@@ -10,10 +10,7 @@ import {
   authBasePath,
 } from "./account-api";
 import { createAccountAuth, isEnabledAuthPath } from "./account-auth.server";
-import {
-  readAccountConfig,
-  type AccountConfig,
-} from "./account-config.server";
+import { readAccountConfig, type AccountConfig } from "./account-config.server";
 import {
   accountStoreTimeout,
   createProfileStore,
@@ -108,7 +105,8 @@ export function createAccountRequestHandler(
           )
         : respondWithError(503, "unavailable");
     const isSignInStart =
-      pathname === `${authBasePath}/sign-in/social` && request.method === "POST";
+      pathname === `${authBasePath}/sign-in/social` &&
+      request.method === "POST";
     // Better Auth relies on this endpoint accepting only JSON, which a form
     // on another site cannot send, so that check is kept before the body is
     // replaced.
@@ -130,10 +128,20 @@ export function createAccountRequestHandler(
       const authRequest = isSignInStart
         ? await fixSignInRequest(request)
         : request;
-      return await withTimeout(
+      const response = await withTimeout(
         runtime.handleAuthRequest(authRequest),
         accountStoreTimeout * 2,
       );
+      // Better Auth answers some failures, such as a database error while
+      // making the session, with an error page rather than a redirect.
+      if (
+        pathname === `${authBasePath}/callback/google` &&
+        response.status >= 400
+      ) {
+        reportFailure(`callback_${response.status}`);
+        return fail();
+      }
+      return response;
     } catch (error) {
       reportFailure(readErrorCode(error));
       return fail();

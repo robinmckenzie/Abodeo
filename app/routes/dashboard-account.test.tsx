@@ -158,11 +158,16 @@ describe("the dashboard's account control", () => {
 
     expect(screen.getByText("Sign-in is unavailable")).toBeTruthy();
     await addProject("Paint the fence");
-    expect(screen.getByRole("button", { name: /Paint the fence/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Paint the fence/ }),
+    ).toBeTruthy();
   });
 
   it("says sign-in is unavailable when the server cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError())));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError())),
+    );
     await renderDashboard();
 
     expect(screen.getByText("Sign-in is unavailable")).toBeTruthy();
@@ -173,7 +178,9 @@ describe("the dashboard's account control", () => {
     await renderDashboard();
 
     await addProject("Paint the fence");
-    expect(screen.getByRole("button", { name: /Paint the fence/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Paint the fence/ }),
+    ).toBeTruthy();
     expect(screen.queryByText(/Signed in as/)).toBeNull();
   });
 
@@ -288,7 +295,8 @@ describe("leaving to sign in or out", () => {
     expect(confirm.mock.calls[0][0]).toMatch(/the new project/);
     expect(signInStarted(server)).toBe(false);
     expect(
-      (screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement).value,
+      (screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement)
+        .value,
     ).toBe("Paint the fence");
   });
 

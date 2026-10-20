@@ -45,7 +45,12 @@ function sendRequest(fetchFn: Fetch, path: string, init: RequestInit = {}) {
   });
 }
 
-function sendJson(fetchFn: Fetch, path: string, body: unknown, method = "POST") {
+function sendJson(
+  fetchFn: Fetch,
+  path: string,
+  body: unknown,
+  method = "POST",
+) {
   return sendRequest(fetchFn, path, {
     method,
     headers: { "Content-Type": "application/json" },

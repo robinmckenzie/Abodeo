@@ -27,10 +27,7 @@ export function removeSignInError(search: string) {
 
 // When to check the session again: as it is due to end, and at least once a
 // day, as a browser timer cannot wait much longer than 24 days.
-export function calculateRecheckDelay(
-  expiresAt: number | null,
-  now: number,
-) {
+export function calculateRecheckDelay(expiresAt: number | null, now: number) {
   const day = 24 * 60 * 60 * 1000;
   if (expiresAt === null) return day;
   return Math.min(Math.max(expiresAt - now + 1000, 0), day);

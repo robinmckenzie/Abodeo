@@ -15,7 +15,8 @@ import {
 const saveMessages: Record<ProfileSaveResult, string> = {
   saved: "Saved.",
   invalid: `Enter 1 to ${preferredNameMaxLength} characters.`,
-  unavailable: "Your preferred name could not be saved. Please try again later.",
+  unavailable:
+    "Your preferred name could not be saved. Please try again later.",
   "signed-out": "You have been signed out.",
 };
 
@@ -168,8 +169,8 @@ function AccountPanel({
       <ul>
         <li>The permanent ID that Google gives your account.</li>
         <li>
-          Your name and email address as Google gave them when you first
-          signed in: {view.name}, {view.email}.
+          Your name and email address as Google gave them when you first signed
+          in: {view.name}, {view.email}.
         </li>
         <li>Your preferred name, if you set one.</li>
         <li>

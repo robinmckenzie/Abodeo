@@ -48,7 +48,8 @@ export type Account = {
   savePreferredName(preferredName: string | null): Promise<ProfileSaveResult>;
 };
 
-export const signInFailedMessage = "Sign-in did not complete. Please try again.";
+export const signInFailedMessage =
+  "Sign-in did not complete. Please try again.";
 export const signInUnavailableMessage =
   "Sign-in is unavailable at the moment. Please try again later.";
 export const signOutFailedMessage =
@@ -87,7 +88,10 @@ export function useAccount({
   useEffect(() => {
     if (!isErrorInAddress) return;
     navigate(
-      { pathname: location.pathname, search: removeSignInError(location.search) },
+      {
+        pathname: location.pathname,
+        search: removeSignInError(location.search),
+      },
       { replace: true, state: location.state },
     );
   }, [isErrorInAddress, location, navigate]);
@@ -131,13 +135,21 @@ export function useAccount({
       try {
         const preferredName = await loadPreferredName();
         if (!isCurrent || thisCheck !== checks) return;
-        setView({ ...shownAs(id, name, email), preferredName, profile: "ready" });
+        setView({
+          ...shownAs(id, name, email),
+          preferredName,
+          profile: "ready",
+        });
       } catch (error) {
         if (!isCurrent || thisCheck !== checks) return;
         setView(
           error instanceof ProfileError && error.failure === "signed-out"
             ? { kind: "signed-out" }
-            : { ...shownAs(id, name, email), preferredName: null, profile: "unavailable" },
+            : {
+                ...shownAs(id, name, email),
+                preferredName: null,
+                profile: "unavailable",
+              },
         );
       }
     };

@@ -5,7 +5,10 @@ import {
   createAccountRequestHandler,
   type AccountRuntime,
 } from "./account-handler.server";
-import { handleProfileRequest, type ProfileStore } from "./account-profile.server";
+import {
+  handleProfileRequest,
+  type ProfileStore,
+} from "./account-profile.server";
 import {
   createTestAuth,
   signInTestAccount,
@@ -121,6 +124,26 @@ describe("createAccountRequestHandler", () => {
     }
   });
 
+  it("returns the browser to the dashboard when Better Auth answers Google's return with an error", async () => {
+    const handle = createAccountRequestHandler(
+      () => ({
+        handleAuthRequest: async () => new Response(null, { status: 500 }),
+        readSessionUserId: async () => undefined,
+        profiles: createMemoryProfileStore().store,
+        close: async () => {},
+      }),
+      () => true,
+      () => {},
+    );
+
+    const response = await handle(request("/api/auth/callback/google"));
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(
+      `${testBaseUrl}/dashboard?error=unavailable`,
+    );
+  });
+
   it("refuses to start sign-in from a request that is not JSON, as a form on another site sends", async () => {
     const { handle, rows } = createTestHandler();
 
@@ -149,7 +172,9 @@ describe("createAccountRequestHandler", () => {
       "/api/auth/sign-in/email",
       "/api/other",
     ]) {
-      expect((await handle(request(path, { method: "POST" }))).status).toBe(404);
+      expect((await handle(request(path, { method: "POST" }))).status).toBe(
+        404,
+      );
     }
     expect(openRuntime).not.toHaveBeenCalled();
   });

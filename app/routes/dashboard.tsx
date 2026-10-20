@@ -85,9 +85,7 @@ export default function Dashboard() {
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
   // Saves a task title being edited when the project closes.
-  const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(
-    null,
-  );
+  const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
 
   useSwitchPresentationKey();
   // T and E do not work while typing in a field, so they are not listed
@@ -542,7 +540,8 @@ function toggleId(ids: ReadonlySet<string>, id: string, isIncluded: boolean) {
 // Whether anything has been entered in the Add project form.
 function isChanged(values: ProjectFields) {
   return (Object.keys(values) as (keyof ProjectFields)[]).some(
-    (key) => JSON.stringify(values[key]) !== JSON.stringify(newProjectFields[key]),
+    (key) =>
+      JSON.stringify(values[key]) !== JSON.stringify(newProjectFields[key]),
   );
 }
 

@@ -18,10 +18,7 @@ export type AccountStatusResponse = { configured: boolean };
 export type AccountProfileResponse = { preferredName: string | null };
 
 export type AccountErrorCode =
-  | "not_signed_in"
-  | "invalid_request"
-  | "method_not_allowed"
-  | "unavailable";
+  "not_signed_in" | "invalid_request" | "method_not_allowed" | "unavailable";
 
 export type AccountErrorResponse = { error: AccountErrorCode };
 
