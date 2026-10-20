@@ -98,8 +98,28 @@ export function createAccountRequestHandler(
         headers: { "Cache-Control": "no-store" },
       });
     }
+    // Google sends the browser itself back here, so a failure returns it to
+    // the dashboard, which says that sign-in did not complete.
+    const fail = () =>
+      pathname === `${authBasePath}/callback/google`
+        ? Response.redirect(
+            new URL(`${accountReturnPath}?error=unavailable`, request.url),
+            302,
+          )
+        : respondWithError(503, "unavailable");
+    const isSignInStart =
+      pathname === `${authBasePath}/sign-in/social` && request.method === "POST";
+    // Better Auth relies on this endpoint accepting only JSON, which a form
+    // on another site cannot send, so that check is kept before the body is
+    // replaced.
+    if (
+      isSignInStart &&
+      !request.headers.get("Content-Type")?.startsWith("application/json")
+    ) {
+      return respondWithError(400, "invalid_request");
+    }
     const runtime = openRuntime();
-    if (!runtime) return respondWithError(503, "unavailable");
+    if (!runtime) return fail();
     try {
       if (isProfile) {
         return await handleProfileRequest(request, {
@@ -107,18 +127,16 @@ export function createAccountRequestHandler(
           store: runtime.profiles,
         });
       }
-      const authRequest =
-        pathname === `${authBasePath}/sign-in/social` &&
-        request.method === "POST"
-          ? await fixSignInRequest(request)
-          : request;
+      const authRequest = isSignInStart
+        ? await fixSignInRequest(request)
+        : request;
       return await withTimeout(
         runtime.handleAuthRequest(authRequest),
         accountStoreTimeout * 2,
       );
     } catch (error) {
       reportFailure(readErrorCode(error));
-      return respondWithError(503, "unavailable");
+      return fail();
     } finally {
       // Closing waits for running queries, so a stalled query must not hold
       // the request open.

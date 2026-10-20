@@ -86,15 +86,57 @@ describe("createAccountRequestHandler", () => {
       () => false,
     );
 
-    for (const path of [
-      "/api/auth/get-session",
-      "/api/auth/callback/google",
-      "/api/account/profile",
-    ]) {
+    for (const path of ["/api/auth/get-session", "/api/account/profile"]) {
       const response = await handle(request(path));
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: "unavailable" });
     }
+  });
+
+  it("returns the browser to the dashboard when Google's return cannot be completed", async () => {
+    vi.useFakeTimers();
+    try {
+      const handle = createAccountRequestHandler(
+        () => ({
+          handleAuthRequest: () => new Promise(() => {}),
+          readSessionUserId: async () => undefined,
+          profiles: createMemoryProfileStore().store,
+          close: async () => {},
+        }),
+        () => true,
+        () => {},
+      );
+
+      const response = handle(
+        request("/api/auth/callback/google?code=c&state=s"),
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect((await response).status).toBe(302);
+      expect((await response).headers.get("Location")).toBe(
+        `${testBaseUrl}/dashboard?error=unavailable`,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses to start sign-in from a request that is not JSON, as a form on another site sends", async () => {
+    const { handle, rows } = createTestHandler();
+
+    const response = await handle(
+      request("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: {
+          Origin: "https://elsewhere.example",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: "provider=google",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(rows.auth_verification).toEqual([]);
   });
 
   it("refuses addresses the app does not use, before opening the database", async () => {
