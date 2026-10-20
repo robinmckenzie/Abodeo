@@ -28,7 +28,7 @@
 
 ## Ticket writing
 
-- From DRAFT onwards, the ticket's body has the sections User problem, Requirements and Acceptance criteria, in that order.
+- From DRAFT onwards, the ticket's body has the sections User story, Requirements and Acceptance criteria, in that order.
 - Findings and discussion go in comments. Do not wrap lines, because GitHub shows every line break in an issue.
 - Describe the problem and the behaviour wanted, not how to build it. Put a constraint in Requirements only when it is genuinely required, such as one imposed by an external API, security or saved-data compatibility.
 - When asked to stub or draft a ticket, write only that ticket. Do not modify files or other tickets unless explicitly authorised.
