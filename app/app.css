@@ -314,6 +314,122 @@ body:has(.dashboard) {
   height: auto;
 }
 
+/* Who is signed in, below the logo. Plain small text with no picture or
+   chip, so that it does not look like an assignee or project data. */
+.account {
+  position: relative;
+  width: 11.25rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #3a3833;
+}
+
+.account p {
+  margin: 0;
+}
+
+.account-button {
+  display: block;
+  max-width: 100%;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #8a857a;
+  border-radius: 999px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-button:hover:not(:disabled) {
+  background: #ece9e1;
+}
+
+.account-label {
+  color: #6b675e;
+}
+
+.account-name {
+  overflow-wrap: anywhere;
+}
+
+.account-unavailable {
+  color: #6b675e;
+}
+
+.account .account-message {
+  margin-top: 0.5rem;
+  color: #8c2a1e;
+}
+
+/* Opens over the page beside the column, which is too narrow for it. */
+.account-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  background: #fdfcf8;
+  box-shadow: 0 6px 24px rgb(26 26 26 / 0.14);
+  color: #1a1a1a;
+  line-height: 1.45;
+}
+
+.account-panel h2 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.account-panel ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.account-profile label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 500;
+}
+
+.account-profile-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.account-profile-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #8a857a;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.account-panel button:not(.account-button) {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.account-panel button:hover:not(:disabled) {
+  background: #ece9e1;
+}
+
+.account .account-hint {
+  margin-top: 0.4rem;
+  color: #6b675e;
+}
+
+.account-save-message:empty {
+  display: none;
+}
+
+.account-sign-out {
+  margin-top: 1rem;
+}
+
 /* Centred on the whole screen, as before the left-hand column, but never
    reaching into it. 100% here is the width to the right of the column.
    The left padding is small so that the list can come close to the logo.

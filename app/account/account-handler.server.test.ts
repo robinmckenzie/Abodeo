@@ -1,0 +1,334 @@
+// @vitest-environment node
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  createAccountRequestHandler,
+  type AccountRuntime,
+} from "./account-handler.server";
+import { handleProfileRequest, type ProfileStore } from "./account-profile.server";
+import {
+  createTestAuth,
+  signInTestAccount,
+  testBaseUrl,
+} from "./test-account.server";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function createMemoryProfileStore() {
+  const names = new Map<string, string>();
+  const store: ProfileStore = {
+    read: async (userId) => names.get(userId) ?? null,
+    write: async (userId, name) => {
+      if (name === null) names.delete(userId);
+      else names.set(userId, name);
+    },
+  };
+  return { names, store };
+}
+
+function createTestHandler() {
+  const { auth, rows } = createTestAuth();
+  const { names, store } = createMemoryProfileStore();
+  const close = vi.fn(async () => {});
+  const runtime: AccountRuntime = {
+    handleAuthRequest: (request) => auth.handler(request),
+    readSessionUserId: async (headers) =>
+      (await auth.api.getSession({ headers }))?.user.id,
+    profiles: store,
+    close,
+  };
+  const handle = createAccountRequestHandler(
+    () => runtime,
+    () => true,
+    () => {},
+  );
+  return { auth, rows, names, handle, close };
+}
+
+function request(path: string, init: RequestInit = {}) {
+  return new Request(`${testBaseUrl}${path}`, {
+    ...init,
+    headers: { Origin: testBaseUrl, ...init.headers },
+  });
+}
+
+function putProfile(cookie: string, body: unknown, query = "") {
+  return request(`/api/account/profile${query}`, {
+    method: "PUT",
+    headers: { cookie, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("createAccountRequestHandler", () => {
+  it("reports whether sign-in is configured", async () => {
+    const configured = createAccountRequestHandler(
+      () => undefined,
+      () => true,
+    );
+    const notConfigured = createAccountRequestHandler(
+      () => undefined,
+      () => false,
+    );
+
+    const yes = await configured(request("/api/account/status"));
+    const no = await notConfigured(request("/api/account/status"));
+
+    expect(await yes.json()).toEqual({ configured: true });
+    expect(await no.json()).toEqual({ configured: false });
+  });
+
+  it("reports sign-in and the profile as unavailable when not configured", async () => {
+    const handle = createAccountRequestHandler(
+      () => undefined,
+      () => false,
+    );
+
+    for (const path of [
+      "/api/auth/get-session",
+      "/api/auth/callback/google",
+      "/api/account/profile",
+    ]) {
+      const response = await handle(request(path));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: "unavailable" });
+    }
+  });
+
+  it("refuses addresses the app does not use, before opening the database", async () => {
+    const openRuntime = vi.fn(() => undefined);
+    const handle = createAccountRequestHandler(openRuntime, () => true);
+
+    for (const path of [
+      "/api/auth/update-user",
+      "/api/auth/list-accounts",
+      "/api/auth/sign-in/email",
+      "/api/other",
+    ]) {
+      expect((await handle(request(path, { method: "POST" }))).status).toBe(404);
+    }
+    expect(openRuntime).not.toHaveBeenCalled();
+  });
+
+  it("asks Google only for basic permissions and returns to the dashboard, whatever the page asks", async () => {
+    const { handle, rows } = createTestHandler();
+
+    const response = await handle(
+      request("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "google",
+          scopes: ["https://www.googleapis.com/auth/calendar"],
+          callbackURL: "https://elsewhere.example/",
+          errorCallbackURL: "https://elsewhere.example/",
+          requestSignUp: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const { url } = (await response.json()) as { url: string };
+    const google = new URL(url);
+    expect(google.origin).toBe("https://accounts.google.com");
+    expect(google.searchParams.get("scope")?.split(" ").sort()).toEqual([
+      "email",
+      "openid",
+      "profile",
+    ]);
+    expect(google.searchParams.get("redirect_uri")).toBe(
+      `${testBaseUrl}/api/auth/callback/google`,
+    );
+    const saved = JSON.stringify(rows.auth_verification);
+    expect(saved).toContain('\\"callbackURL\\":\\"/dashboard\\"');
+    expect(saved).toContain('\\"errorURL\\":\\"/dashboard\\"');
+    expect(saved).not.toContain("elsewhere");
+  });
+
+  it("reads and changes only the signed-in account's profile", async () => {
+    const { auth, handle, names } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const grace = await signInTestAccount(auth, {
+      name: "Grace Hopper",
+      email: "grace@example.com",
+      sub: "google-sub-2",
+    });
+    names.set(grace.user.id, "Grace");
+
+    const read = await handle(
+      request(`/api/account/profile?userId=${grace.user.id}`, {
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    expect(await read.json()).toEqual({ preferredName: null });
+
+    const write = await handle(
+      putProfile(
+        ada.cookie,
+        { preferredName: "  Ada  ", userId: grace.user.id },
+        `?userId=${grace.user.id}`,
+      ),
+    );
+    expect(await write.json()).toEqual({ preferredName: "Ada" });
+    expect(names.get(ada.user.id)).toBe("Ada");
+    expect(names.get(grace.user.id)).toBe("Grace");
+
+    const cleared = await handle(
+      putProfile(ada.cookie, { preferredName: null }),
+    );
+    expect(await cleared.json()).toEqual({ preferredName: null });
+    expect(names.has(ada.user.id)).toBe(false);
+  });
+
+  it("refuses profile requests without a valid sign-in", async () => {
+    const { auth, handle, names } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+
+    const withNoCookie = await handle(request("/api/account/profile"));
+    const withForgedCookie = await handle(
+      request("/api/account/profile", {
+        headers: { cookie: ada.cookie.replace(/.{6}$/, "AAAAAA") },
+      }),
+    );
+    const writeWithNoCookie = await handle(
+      putProfile("", { preferredName: "Mallory", userId: ada.user.id }),
+    );
+
+    expect(withNoCookie.status).toBe(401);
+    expect(withForgedCookie.status).toBe(401);
+    expect(writeWithNoCookie.status).toBe(401);
+    expect(names.size).toBe(0);
+  });
+
+  it("refuses a profile request that uses a session after signing out", async () => {
+    const { auth, handle } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+
+    const signOut = await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    expect(signOut.status).toBe(200);
+
+    const after = await handle(
+      request("/api/account/profile", { headers: { cookie: ada.cookie } }),
+    );
+    expect(after.status).toBe(401);
+  });
+
+  it("refuses a profile change that is not JSON or not a valid name", async () => {
+    const { auth, handle } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+
+    const asForm = await handle(
+      request("/api/account/profile", {
+        method: "PUT",
+        headers: {
+          cookie: ada.cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: "preferredName=Ada",
+      }),
+    );
+    const tooLong = await handle(
+      putProfile(ada.cookie, { preferredName: "x".repeat(51) }),
+    );
+    const blank = await handle(putProfile(ada.cookie, { preferredName: "  " }));
+
+    expect([asForm.status, tooLong.status, blank.status]).toEqual([
+      400, 400, 400,
+    ]);
+  });
+
+  it("closes the database after each request", async () => {
+    const { handle, close } = createTestHandler();
+
+    await handle(request("/api/auth/get-session"));
+
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("reports sign-in as unavailable when the account store fails", async () => {
+    const reportFailure = vi.fn();
+    const handle = createAccountRequestHandler(
+      () => ({
+        handleAuthRequest: async () => {
+          throw Object.assign(new Error("postgres://secret refused"), {
+            code: "ECONNREFUSED",
+          });
+        },
+        readSessionUserId: async () => undefined,
+        profiles: createMemoryProfileStore().store,
+        close: async () => {},
+      }),
+      () => true,
+      reportFailure,
+    );
+
+    const response = await handle(request("/api/auth/get-session"));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "unavailable" });
+    expect(reportFailure).toHaveBeenCalledWith("ECONNREFUSED");
+  });
+
+  it("answers without waiting for a database that does not close", async () => {
+    vi.useFakeTimers();
+    try {
+      const handle = createAccountRequestHandler(
+        () => ({
+          handleAuthRequest: async () => Response.json(null),
+          readSessionUserId: async () => undefined,
+          profiles: createMemoryProfileStore().store,
+          close: () => new Promise(() => {}),
+        }),
+        () => true,
+      );
+
+      const response = handle(request("/api/auth/get-session"));
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect((await response).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("handleProfileRequest", () => {
+  it("reports the profile as unavailable when the store does not answer", async () => {
+    const reportFailure = vi.fn();
+
+    const response = await handleProfileRequest(
+      request("/api/account/profile"),
+      {
+        readSessionUserId: async () => "ada",
+        store: { read: () => new Promise(() => {}), write: async () => {} },
+        timeout: 10,
+        reportFailure,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "unavailable" });
+    expect(reportFailure).toHaveBeenCalledWith(undefined);
+  });
+
+  it("reports the profile as unavailable when the session lookup does not answer", async () => {
+    const response = await handleProfileRequest(
+      request("/api/account/profile"),
+      {
+        readSessionUserId: () => new Promise(() => {}),
+        store: createMemoryProfileStore().store,
+        timeout: 10,
+        reportFailure: () => {},
+      },
+    );
+
+    expect(response.status).toBe(503);
+  });
+});

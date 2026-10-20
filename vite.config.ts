@@ -3,18 +3,47 @@ import { rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { reactRouter } from "@react-router/dev/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 // As in app/projects/default-projects.ts, which this file does not import,
 // as Vite's config is loaded on its own.
 const defaultProjectsEndpoint = "/__abodeo/default-projects";
 
+// The settings sign-in reads in development, from .env.local. DATABASE_URL,
+// production's account store, is never loaded.
+const localAccountVariables = [
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "AUTH_DATABASE_URL",
+];
+
 export default defineConfig({
-  plugins: [reactRouter(), saveDefaultProjects()],
+  plugins: [reactRouter(), saveDefaultProjects(), loadLocalAccountSettings()],
   resolve: {
     tsconfigPaths: true,
   },
 });
+
+// Gives the development server's sign-in code its settings from the .env
+// files, which Vite otherwise passes only to browser code, and only with its
+// VITE_ prefix. A variable already set in the shell is kept.
+function loadLocalAccountSettings(): Plugin {
+  return {
+    name: "abodeo-local-account-settings",
+    apply: "serve",
+    configResolved(config) {
+      if (config.envDir === false) return;
+      const env = loadEnv(config.mode, config.envDir, localAccountVariables);
+      for (const name of localAccountVariables) {
+        if (env[name] !== undefined && process.env[name] === undefined) {
+          process.env[name] = env[name];
+        }
+      }
+    },
+  };
+}
 
 // Lets the dashboard's development panel save the projects as the defaults,
 // by writing default-projects.json. Only the development server has it, not

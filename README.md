@@ -54,6 +54,115 @@ When the app runs with `npm run dev`, the dashboard shows a Development panel:
 The panel is not in the deployed app. Switching to a branch with a different defaults file applies
 that branch's defaults in local development too.
 
+## Sign-in
+
+Anyone with a Google account can sign in, from the dashboard, and set a preferred name that only
+they see. Sign-in is optional: projects, tasks and settings stay in the browser either way, and
+are not linked to the account.
+
+### How it works
+
+- [Better Auth](https://www.better-auth.com/) 1.7.7 runs in the app's own server code
+  (`app/account/*.server.ts`). Every address under `/api` goes to the resource route
+  `app/routes/api.ts`, which serves Better Auth's Google endpoints, `/api/account/status`
+  (whether sign-in is configured) and `/api/account/profile` (the preferred name). Any other
+  Better Auth endpoint gets a 404.
+- Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
+  database in `DATABASE_URL`. `npm run dev` uses a separate database, `abodeo-local`, through
+  `AUTH_DATABASE_URL`, and never reads `DATABASE_URL`, so local accounts never reach production.
+- Starting sign-in always asks Google only for the account's identity, name and email, and always
+  returns to `/dashboard`, whatever the browser sends. Sign-out ends Abodeo's session, not the
+  Google one, and loads the dashboard afresh. Before either leaves the page, anything open is
+  saved, and the person is asked first if something cannot be saved.
+- The dashboard looks up the account after the page has loaded, with an 8-second limit, so a slow
+  or missing database never holds it up. It looks again when the window is next used, when the
+  session is due to end, and when another tab signs out.
+- `public/privacy.html` is the public privacy page that Google's sign-in screen links to.
+
+### What is stored
+
+From Google, only the account's permanent ID (`auth_account.account_id`) and the name and email
+received at the first sign-in, which later sign-ins do not refresh. Then the preferred name, if
+set (`user_profile`), and one session row per signed-in browser, deleted on sign-out. Google's
+tokens, the profile photo, and the IP address and browser details of a sign-in are never stored:
+their columns exist because Better Auth expects them, and are always empty. Tests in
+`app/account/` check this.
+
+### Setting it up from scratch
+
+Robin enters every secret value directly. None is committed, put in browser code or shown in
+output. The production address is https://abodeo-kappa.vercel.app.
+
+1. **Google Cloud Console** (no billing is needed; ignore any Upgrade prompt):
+    1. Create a project named Abodeo.
+    2. Google Auth Platform, Get started: app name Abodeo, a support email (everyone signing in
+       sees it), audience External, a contact email.
+    3. Branding: no logo, as a logo needs Google's verification.
+    4. Data Access: only `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`.
+    5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
+       allows 100 test users over the app's lifetime.
+    6. Clients: create an OAuth client of type Web application, with the redirect URIs
+       `https://abodeo-kappa.vercel.app/api/auth/callback/google` and
+       `http://localhost:5173/api/auth/callback/google`. Its secret is shown in full only once.
+2. **Neon, through Vercel** (Storage, under the project's Infrastructure): create two Neon
+   databases on the free plan.
+    - `abodeo`: connect it to the Production environment only, which sets `DATABASE_URL`. Turn
+      off any branch per deployment.
+    - `abodeo-local`: connect it to no environment (or Development only, if Vercel insists). Its
+      connection string goes in `.env.local`. Do not use a branch of production instead, as a
+      branch starts as a copy of production's accounts.
+3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
+   of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
+   `auth_user`, `auth_session`, `auth_account`, `auth_verification` and `user_profile`.
+4. **Variables**:
+
+    | Variable | Production (Vercel) | `.env.local` |
+    | --- | --- | --- |
+    | `GOOGLE_CLIENT_ID` | from the OAuth client | the same |
+    | `GOOGLE_CLIENT_SECRET` | from the OAuth client | the same |
+    | `BETTER_AUTH_SECRET` | its own random value | a different random value |
+    | `BETTER_AUTH_URL` | `https://abodeo-kappa.vercel.app` | `http://localhost:5173` |
+    | `DATABASE_URL` | set by the Neon connection | never set |
+    | `AUTH_DATABASE_URL` | not set | `abodeo-local`'s connection string |
+
+    In PowerShell, `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64'))" | Set-Clipboard`
+    puts a new secret on the clipboard without showing it. Restart
+    `npm run dev` after changing `.env.local`. Sign-in works locally only at
+    http://localhost:5173, the address registered with Google.
+5. **Publishing the Google app**, once production has deployed with the variables: in Branding,
+   set the home page to the production address, the privacy policy link to
+   https://abodeo-kappa.vercel.app/privacy.html and the authorised domain to
+   `abodeo-kappa.vercel.app` (Vercel's `vercel.app` is a public suffix, so the full address is
+   the domain). Then publish the app in Audience. With only these basic permissions and no logo,
+   Google needs no verification.
+
+Vercel previews have no sign-in, and report it as unavailable.
+
+### Inspecting and removing an account
+
+In the Neon SQL Editor for the right database:
+
+```sql
+-- Every account, with what is kept about it.
+select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name
+from auth_user u
+left join auth_account a on a.user_id = u.id
+left join user_profile p on p.user_id = u.id;
+
+-- Removes an account, with its sessions, Google link and profile.
+delete from auth_user where email = 'someone@example.com';
+```
+
+To check that nothing extra is stored, `auth_account`'s token and scope columns, `auth_user.image`
+and `auth_session`'s `ip_address` and `user_agent` should all be empty.
+
+### Costs
+
+Everything is on free tiers: Google sign-in costs nothing, the Neon free plan allows each
+database 0.5 GB and a limited number of compute hours a month (it sleeps when unused, so a demo
+stays well within it), and the Vercel Hobby plan covers the function. Nothing needs a paid plan
+or an upgrade.
+
 ## Deployment
 
 Abodeo is hosted on [Vercel](https://vercel.com/) at
@@ -68,7 +177,9 @@ for a Vercel login, because the project uses Vercel's Standard Protection.
   serves the server rendering as a Vercel Function on Node.js 24.x.
 - No Vercel package is installed, so the build warns that Vercel's React Router
   preset was not detected. That is expected.
-- There are no environment variables.
+- The Production environment has the sign-in variables listed under
+  [Sign-in](#sign-in). Without them the app still works, with sign-in
+  reported as unavailable.
 - `main` is the production branch. `vercel.json` turns off deployment for every
   other branch, so pushing a branch or opening a pull request deploys nothing.
 

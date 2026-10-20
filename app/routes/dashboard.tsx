@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
+import { AccountControl } from "../account/account-control";
 import logo from "../images/abodeo-home-logo.jpeg";
 import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
@@ -31,7 +32,11 @@ import {
   usePresentation,
   useSwitchPresentationKey,
 } from "../projects/presentation";
-import { TaskList, type TaskChange } from "../projects/task-list";
+import {
+  hasUnsubmittedTaskText,
+  TaskList,
+  type TaskChange,
+} from "../projects/task-list";
 import { refreshProjects, useProjects } from "../projects/use-projects";
 
 export const meta: Route.MetaFunction = () => [
@@ -80,7 +85,9 @@ export default function Dashboard() {
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
   // Saves a task title being edited when the project closes.
-  const finishTaskEditRef = useRef<(() => void) | null>(null);
+  const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(
+    null,
+  );
 
   useSwitchPresentationKey();
   // T and E do not work while typing in a field, so they are not listed
@@ -117,9 +124,41 @@ export default function Dashboard() {
     focusAfterCloseRef.current = null;
   }, [open]);
 
+  // Before signing in or out, which leave the page: saves what is open and
+  // asks before anything that cannot be saved is lost. False if the person
+  // chooses to stay. The project stays open, as the page is about to go.
+  const prepareToLeave = async () => {
+    const losses: string[] = [];
+    const current = openRef.current;
+    if (current) {
+      const taskFailure = await finishTaskEditRef.current?.();
+      if (taskFailure) losses.push("a change to a task's title");
+      if (current.id === null) {
+        if (isChanged(current.values)) {
+          losses.push("the new project, which has not been added yet");
+        }
+      } else {
+        if (!hasTitle(current.values.title)) {
+          losses.push("the project's title, which is blank");
+        }
+        const isSaved = (await saverRef.current?.saveNow()) ?? true;
+        if (!isSaved) losses.push("changes to the project that were not saved");
+      }
+    }
+    if (hasUnsubmittedTaskText()) losses.push("tasks typed but not yet added");
+    if (losses.length === 0) return true;
+    return window.confirm(
+      `Leaving now will lose ${joinList(losses)}.\n\nOK continues without them. Cancel stays here.`,
+    );
+  };
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
+
   const closeProject = () => {
     if (!open) return;
-    finishTaskEditRef.current?.();
+    void finishTaskEditRef.current?.();
     saverRef.current?.saveNow();
     saverRef.current = null;
     focusAfterCloseRef.current = open.id
@@ -376,6 +415,7 @@ export default function Dashboard() {
             height={868}
           />
         </h1>
+        <AccountControl onBeforeLeave={prepareToLeave} />
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
@@ -497,6 +537,18 @@ function toggleId(ids: ReadonlySet<string>, id: string, isIncluded: boolean) {
   if (isIncluded) next.add(id);
   else next.delete(id);
   return next;
+}
+
+// Whether anything has been entered in the Add project form.
+function isChanged(values: ProjectFields) {
+  return (Object.keys(values) as (keyof ProjectFields)[]).some(
+    (key) => JSON.stringify(values[key]) !== JSON.stringify(newProjectFields[key]),
+  );
+}
+
+function joinList(items: string[]) {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
 function describeFailure(reason: SaveFailure) {
