@@ -350,8 +350,56 @@ body:has(.dashboard) {
 
 .dashboard-toolbar {
   display: flex;
+  align-items: flex-start;
+  gap: 1rem;
   justify-content: flex-end;
   margin-bottom: 1.25rem;
+}
+
+/* Development only. */
+.default-projects-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+  padding: 0.4rem 0.75rem;
+  border: 1px dashed #8a857a;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.default-projects-label {
+  color: #6b675e;
+  font-weight: 500;
+}
+
+.default-projects-panel button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.default-projects-panel button:hover:not(:disabled) {
+  background: #ece9e1;
+}
+
+.default-projects-panel p {
+  flex-basis: 100%;
+  max-width: 32rem;
+  margin: 0;
+  color: #3a3833;
+}
+
+.default-projects-panel p:empty {
+  display: none;
+}
+
+.dashboard-toolbar .add-project {
+  flex-shrink: 0;
 }
 
 .add-project,

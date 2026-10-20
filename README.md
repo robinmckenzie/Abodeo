@@ -33,6 +33,27 @@ Run these from the repository root.
 | `npm run lint` | Checks the code with ESLint. |
 | `npm test` | Runs the tests once with Vitest. |
 
+## Default projects
+
+Every visitor receives the default projects in `app/projects/default-projects.json`, which each
+deployment includes. When a visitor loads a version whose defaults differ from those their browser
+last received, the defaults are added or replaced, overwriting any edits to them, and defaults the
+file no longer has are removed. Projects the visitor created are left alone, and default projects
+alone do not skip the welcome screen. The deployed site is public, so keep anything private out of
+the default projects.
+
+When the app runs with `npm run dev`, the dashboard shows a Development panel:
+
+- **Save as defaults** writes every project in this browser to `app/projects/default-projects.json`.
+  Commit that file to include them in the next deployment. In this browser, they then count as the
+  default projects, so later edits to them are replaced by the next change to the file unless they
+  are saved again first.
+- **Reset to defaults** leaves exactly the saved default projects in this browser, removing any
+  others and discarding edits.
+
+The panel is not in the deployed app. Switching to a branch with a different defaults file applies
+that branch's defaults in local development too.
+
 ## Deployment
 
 Abodeo is hosted on [Vercel](https://vercel.com/) at

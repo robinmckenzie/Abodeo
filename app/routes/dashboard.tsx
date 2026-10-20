@@ -7,6 +7,7 @@ import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { createAutosaver, type Autosaver } from "../projects/autosave";
+import { DefaultProjectsPanel } from "../projects/default-projects-panel";
 import {
   ExpandedProjectBar,
   ProjectBar,
@@ -378,6 +379,11 @@ export default function Dashboard() {
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
+          {/* Replaced by false when the app is built for deployment, which
+              leaves the panel out. */}
+          {import.meta.env.DEV && (
+            <DefaultProjectsPanel onBeforeChange={closeProject} />
+          )}
           <button
             type="button"
             className="add-project"

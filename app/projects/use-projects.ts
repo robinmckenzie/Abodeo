@@ -1,13 +1,28 @@
 // The saved projects, read from storage when first needed in the browser and
 // again after each save, or when another tab saves. The server cannot see
 // local storage, so it renders without projects, and the dashboard fills them
-// in once the page has loaded, without a hydration mismatch.
+// in once the page has loaded, without a hydration mismatch. The app's default
+// projects are received once per page load, before projects are first read.
 import { useSyncExternalStore } from "react";
 
-import { isProjectKey, loadProjects, type LoadResult } from "./project-storage";
+import {
+  isProjectKey,
+  loadProjects as loadSavedProjects,
+  receiveDefaultProjects,
+  type LoadResult,
+} from "./project-storage";
 
 let current: LoadResult | null = null;
 const listeners = new Set<() => void>();
+let hasReceivedDefaults = false;
+
+function loadProjects() {
+  if (!hasReceivedDefaults) {
+    hasReceivedDefaults = true;
+    receiveDefaultProjects();
+  }
+  return loadSavedProjects();
+}
 
 function readProjects() {
   current ??= loadProjects();

@@ -6,7 +6,7 @@ import { FadeTuningPanel } from "../fade-tuning-panel";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import {
   hasProjectsAttribute,
-  hasSavedProjects,
+  hasOwnProjects,
   isWelcomeRequested,
 } from "../projects/project-storage";
 import { TuningPanel } from "../tuning-panel";
@@ -24,7 +24,7 @@ export default function Home() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // With projects saved, the page shows only the logo, which fades in and
+  // With projects of their own saved, the page shows only the logo, which fades in and
   // holds, then crossfades to the dashboard. The page is marked before it
   // first appears by hasProjectsScript, and again here for a visit to this
   // screen from within the app, before the browser paints. The timing comes
@@ -34,7 +34,7 @@ export default function Home() {
   // the dashboard does not return to it only to be moved on again.
   useLayoutEffect(() => {
     const isReturning =
-      hasSavedProjects() && !isWelcomeRequested(location.search);
+      hasOwnProjects() && !isWelcomeRequested(location.search);
     document.documentElement.toggleAttribute(hasProjectsAttribute, isReturning);
     if (!isReturning) return;
     let isCancelled = false;
