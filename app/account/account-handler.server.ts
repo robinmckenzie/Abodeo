@@ -68,7 +68,8 @@ async function fixSignInRequest(request: Request) {
   const headers = new Headers(request.headers);
   headers.set("Content-Type", "application/json");
   headers.delete("Content-Length");
-  // Read and discarded, so that the original body is not left unread.
+  // The browser's body is replaced above, but is still read to the end and
+  // thrown away, so it is not left waiting on the connection.
   await request.arrayBuffer().catch(() => undefined);
   return new Request(request.url, { method: "POST", headers, body });
 }
