@@ -102,7 +102,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
     4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
        `.../auth/userinfo.profile` and `openid`, then Update, then Save.
     5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
-       allows 100 test users over the app's lifetime.
+       allows 100 test users over the app's lifetime. With only these basic permissions, it does
+       not stop other Google accounts signing in.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs
        `https://abodeo-kappa.vercel.app/api/auth/callback/google` and
        `http://localhost:5173/api/auth/callback/google`. Its secret is shown in full only once.
