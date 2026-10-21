@@ -56,12 +56,27 @@ requirements, commitments, or scheduled work.
   uses Google's Calendar token once and never stores it, as AD #6 Sign In With
   Google decided. Project appointments built the same way would send the user
   through Google for each appointment. Google skips its permission screen after
-  the first grant, but the account chooser still shows unless the request names
-  the account. Background work, such as keeping appointments in sync, would not
+  the first grant, and AD #10 names the account, so there is no account
+  chooser either: the redirect is a quick round trip. Background work, such as keeping appointments in sync, would not
   be possible. The options are storing an encrypted refresh token, which
   reverses the AD #6 decision, or keeping the short-lived token for about an
   hour, so one redirect covers a sitting. Decide when appointment features are
   drafted.
+- Deleted Abodeo calendar: with `calendar.app.created`, a calendar the user
+  deletes in Google Calendar is still returned by Google and still accepts
+  events, which are then not shown (found in AD #10 testing, accepted by Robin
+  as a limitation). Appointment features may need a way for the user to start
+  a new Abodeo calendar, or `calendar.calendarlist.readonly`, which shows every
+  calendar the user has.
+- Opening the right Google account: the "Open Google Calendar" link opens the
+  browser's default Google account, which may not be the one signed in to
+  Abodeo. Adding `?authuser=<email>` (as in
+  `https://calendar.google.com/calendar/u/?authuser=...`) would open the
+  signed-in account's calendar.
+- The comment above the granted-scope check in
+  `app/calendar/calendar-handler.server.ts` says Google's consent screen lets
+  the user untick the permission. Google shows tick boxes only when several
+  permissions are asked for at once; reword it when that code is next changed.
 
 ## Ruled out
 
