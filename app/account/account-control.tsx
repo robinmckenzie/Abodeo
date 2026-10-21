@@ -79,13 +79,12 @@ export function AccountControl({
           role={calendar.result === "created" ? "status" : "alert"}
         >
           {calendarMessages[calendar.result]}
-          {calendar.result === "created" && (
+          {/* The link waits for the account, so that it opens the right one. */}
+          {calendar.result === "created" && view.kind === "signed-in" && (
             <>
               {" "}
               <a
-                href={buildGoogleCalendarAddress(
-                  view.kind === "signed-in" ? view.email : undefined,
-                )}
+                href={buildGoogleCalendarAddress(view.email)}
                 target="_blank"
                 rel="noreferrer"
               >

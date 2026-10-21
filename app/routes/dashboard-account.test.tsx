@@ -486,6 +486,18 @@ describe("the Calendar test", () => {
     );
   });
 
+  it("holds back the link until the signed-in account is known", async () => {
+    fakeServer({ hang: true });
+    await renderDashboard("?calendar=created");
+
+    expect(
+      screen.getByText(/^Test appointment created in your Abodeo calendar\./),
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open Google Calendar" })).toBe(
+      null,
+    );
+  });
+
   it("says when access was not given or another account was chosen, and ignores unknown results", async () => {
     fakeServer({ session: ada });
     await renderDashboard("?calendar=denied");

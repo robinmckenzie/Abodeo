@@ -22,10 +22,8 @@ export const calendarMessages: Record<CalendarResult, string> = {
 };
 
 // Google Calendar in the given account, rather than the browser's default
-// Google account (AD #44 Open Signed-In Calendar). Without an email address it
-// opens the default account.
-export function buildGoogleCalendarAddress(email?: string) {
-  if (!email) return "https://calendar.google.com/";
+// Google account (AD #44 Open Signed-In Calendar).
+export function buildGoogleCalendarAddress(email: string) {
   const query = new URLSearchParams({ authuser: email });
   return `https://calendar.google.com/calendar/u/?${query}`;
 }
