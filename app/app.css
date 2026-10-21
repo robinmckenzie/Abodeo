@@ -361,6 +361,14 @@ body:has(.dashboard) {
 }
 
 /* Opens over the page beside the column, which is too narrow for it. */
+.account .calendar-message-created {
+  color: inherit;
+}
+
+.account-calendar-test {
+  margin-top: 0.5rem;
+}
+
 .account-panel {
   position: absolute;
   z-index: 5;

@@ -1,7 +1,17 @@
 // Answers every request under /api: sign-in through Better Auth, whether
-// sign-in is configured, and the profile. The resource route in
+// sign-in is configured, the profile, and the Calendar test. The resource route in
 // app/routes/api.ts sends requests here, in development and on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
+
+import { createCalendarGoogle } from "../calendar/calendar-grant.server";
+import {
+  handleCalendarRequest,
+  isCalendarPath,
+  respondCalendarUnavailable,
+  type CalendarDependencies,
+} from "../calendar/calendar-handler.server";
+import { createCalendarStore } from "../calendar/calendar-store.server";
+import { createGoogleCalendar } from "../calendar/google-calendar.server";
 
 import {
   accountProfilePath,
@@ -23,12 +33,13 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 
-// What one request needs: Better Auth, the profile store, and a way to let go
-// of both.
+// What one request needs: Better Auth, the profile store, the Calendar test,
+// and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
+  calendar: CalendarDependencies;
   // Closes the database connections, once the response is ready.
   close(): Promise<void>;
 };
@@ -44,6 +55,13 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
+    calendar: {
+      secret: config.secret,
+      isSecure: config.baseUrl.startsWith("https:"),
+      google: createCalendarGoogle(config),
+      calendar: createGoogleCalendar(),
+      store: createCalendarStore(pool),
+    },
     close: () => pool.end(),
   };
 }
@@ -90,7 +108,8 @@ export function createAccountRequestHandler(
         : respondWithError(405, "method_not_allowed");
     }
     const isProfile = pathname === accountProfilePath;
-    if (!isProfile && !isEnabledAuthPath(pathname)) {
+    const isCalendar = isCalendarPath(pathname);
+    if (!isProfile && !isCalendar && !isEnabledAuthPath(pathname)) {
       return new Response(null, {
         status: 404,
         headers: { "Cache-Control": "no-store" },
@@ -118,8 +137,16 @@ export function createAccountRequestHandler(
       return respondWithError(400, "invalid_request");
     }
     const runtime = openRuntime();
-    if (!runtime) return fail();
+    if (!runtime) {
+      return isCalendar ? respondCalendarUnavailable(request) : fail();
+    }
     try {
+      if (isCalendar) {
+        return await handleCalendarRequest(request, {
+          ...runtime.calendar,
+          readSessionUserId: runtime.readSessionUserId,
+        });
+      }
       if (isProfile) {
         return await handleProfileRequest(request, {
           readSessionUserId: runtime.readSessionUserId,
