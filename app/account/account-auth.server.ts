@@ -204,6 +204,9 @@ export function buildAccountAuthOptions(
         // Google always asks which account to use, rather than signing in
         // again with the last one.
         prompt: "select_account",
+        // Sign-in asks only for its own permissions, never adding the
+        // Calendar permission given earlier for the Calendar test.
+        includeGrantedScopes: false,
       },
     },
     user: tableNames.user,

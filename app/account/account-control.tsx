@@ -1,8 +1,14 @@
 // The account area below the dashboard's logo: who is signed in, the
-// preferred name, what is kept, and signing in and out. It is plain text with
+// preferred name, the Calendar test, what is kept, and signing in and out. It is plain text with
 // no picture, so that it cannot be mistaken for an assignee or a project.
 import { useId, useState } from "react";
 
+import {
+  calendarMessages,
+  googleCalendarAddress,
+  useCalendarTest,
+  type CalendarTest,
+} from "../calendar/use-calendar-test";
 import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import {
@@ -28,6 +34,7 @@ export function AccountControl({
   onBeforeLeave: () => Promise<boolean>;
 }) {
   const account = useAccount({ onBeforeLeave });
+  const calendar = useCalendarTest({ onBeforeLeave });
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
   const { view, message } = account;
@@ -66,9 +73,26 @@ export function AccountControl({
           {message}
         </p>
       )}
+      {calendar.result && (
+        <p
+          className={`account-message calendar-message-${calendar.result}`}
+          role={calendar.result === "created" ? "status" : "alert"}
+        >
+          {calendarMessages[calendar.result]}
+          {calendar.result === "created" && (
+            <>
+              {" "}
+              <a href={googleCalendarAddress} target="_blank" rel="noreferrer">
+                Open Google Calendar
+              </a>
+            </>
+          )}
+        </p>
+      )}
       {view.kind === "signed-in" && isOpen && view.profile !== "loading" && (
         <AccountPanel
           account={account}
+          calendar={calendar}
           view={view}
           panelId={panelId}
           onClose={() => setIsOpen(false)}
@@ -80,11 +104,13 @@ export function AccountControl({
 
 function AccountPanel({
   account,
+  calendar,
   view,
   panelId,
   onClose,
 }: {
   account: Account;
+  calendar: CalendarTest;
   view: SignedIn;
   panelId: string;
   onClose: () => void;
@@ -165,6 +191,19 @@ function AccountPanel({
           Your preferred name is unavailable at the moment.
         </p>
       )}
+      <h2>Google Calendar</h2>
+      <p className="account-hint">
+        Checks that Abodeo can add appointments to a separate Abodeo calendar in
+        your Google account. Google asks for your permission first.
+      </p>
+      <button
+        type="button"
+        className="account-calendar-test"
+        disabled={account.isLeaving || calendar.isLeaving}
+        onClick={calendar.createTestAppointment}
+      >
+        Create test appointment
+      </button>
       <h2>What Abodeo keeps about you</h2>
       <ul>
         <li>The permanent ID that Google gives your account.</li>
@@ -173,6 +212,9 @@ function AccountPanel({
           in: {view.name}, {view.email}.
         </li>
         <li>Your preferred name, if you set one.</li>
+        <li>
+          The ID of your Abodeo calendar in Google Calendar, if one was made.
+        </li>
         <li>
           A sign-in record for each browser you use, which ends when you sign
           out.
@@ -185,7 +227,7 @@ function AccountPanel({
       <button
         type="button"
         className="account-sign-out"
-        disabled={account.isLeaving}
+        disabled={account.isLeaving || calendar.isLeaving}
         onClick={account.signOut}
       >
         Sign out

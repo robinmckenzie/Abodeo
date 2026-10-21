@@ -57,21 +57,24 @@ that branch's defaults in local development too.
 ## Sign-in
 
 Anyone with a Google account can sign in, from the dashboard, and set a preferred name that only
-they see. Sign-in is optional: projects, tasks and settings stay in the browser either way, and
-are not linked to the account.
+they see. A signed-in account can also create a test appointment in Google Calendar (see
+[Calendar test](#calendar-test)). Sign-in is optional: projects, tasks and settings stay in the
+browser either way, and are not linked to the account.
 
 ### How it works
 
 - [Better Auth](https://www.better-auth.com/) 1.7.7 runs in the app's own server code
   (`app/account/*.server.ts`). Every address under `/api` goes to the resource route
   `app/routes/api.ts`, which serves Better Auth's Google endpoints, `/api/account/status`
-  (whether sign-in is configured) and `/api/account/profile` (the preferred name). Any other
-  Better Auth endpoint gets a 404.
+  (whether sign-in is configured), `/api/account/profile` (the preferred name) and the Calendar
+  test's `/api/calendar/test-appointment` and `/api/calendar/callback`. Any other Better Auth
+  endpoint gets a 404.
 - Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
   database in `DATABASE_URL`. `npm run dev` uses a separate database, `abodeo-local`, through
   `AUTH_DATABASE_URL`, and never reads `DATABASE_URL`, so local accounts never reach production.
-- Starting sign-in always asks Google only for the account's identity, name and email, and always
-  returns to `/dashboard`, whatever the browser sends. Google always asks which account to use.
+- Starting sign-in always asks Google only for the account's identity, name and email, never
+  adding a Calendar permission given earlier, and always returns to `/dashboard`, whatever the
+  browser sends. Google always asks which account to use.
   Sign-out ends Abodeo's session, not the Google one, and loads the dashboard afresh. Before
   either leaves the page, anything open is saved, and the person is asked first if something
   cannot be saved.
@@ -87,7 +90,36 @@ received at the first sign-in, which later sign-ins do not refresh. Then the pre
 set (`user_profile`), and one session row per signed-in browser, deleted on sign-out. Google's
 tokens, the profile photo, and the IP address and browser details of a sign-in are never stored:
 their columns exist because Better Auth expects them, and are always empty. Tests in
-`app/account/` check this.
+`app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
+(`calendar_link`), once one has been made.
+
+### Calendar test
+
+The account panel's "Create test appointment" proves that Abodeo can add appointments to Google
+Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
+
+- Signing in never asks for Calendar access. The button posts to `/api/calendar/test-appointment`,
+  which answers with Google's address. Abodeo asks only for `openid` and `calendar.app.created`,
+  which lets it make its own calendars and manage their events, and nothing else in the person's
+  Google Calendar. Google classes it as non-sensitive. It suggests the signed-in Google account
+  and asks for an online token, so Google issues no refresh token.
+- The state and PKCE verifier are kept for 10 minutes in an `HttpOnly` cookie for `/api/calendar`
+  only, encrypted with `BETTER_AUTH_SECRET`. Better Auth's tables and endpoints are not used.
+- Google returns to `/api/calendar/callback`, which checks the cookie, the session and that the
+  permission was ticked, refuses a Google account other than the signed-in one, and exchanges the
+  code for a token. The token is used for this one test and then dropped: it is never saved or
+  logged, so each test may go through Google again.
+- The appointment, "Abodeo test appointment", is at the next whole hour for 30 minutes, in a
+  calendar named Abodeo. The first test makes the calendar and saves its ID in `calendar_link`.
+  Later tests reuse it, or make a new one if Google answers that it cannot be found. If two tests
+  run at once, only one calendar is kept.
+- The callback returns to `/dashboard?calendar=` with `created`, `denied`, `wrong-account` or
+  `failed`, which the dashboard shows once and removes from the address.
+- The calendar cannot be found through the person's calendar list, as the permission does not
+  cover it, which is why its ID is saved. Abodeo cannot tell whether the person has deleted or
+  hidden it: in testing, a calendar permanently deleted in Google Calendar was still returned by
+  Google and still accepted appointments, which were then not shown. Abodeo reports them as
+  created.
 
 ### Setting it up from scratch
 
@@ -100,13 +132,18 @@ output. The production address is https://abodeo-kappa.vercel.app.
        sees it), audience External, a contact email.
     3. Branding: no logo, as a logo needs Google's verification.
     4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
-       `.../auth/userinfo.profile` and `openid`, then Update, then Save.
+       `.../auth/userinfo.profile`, `openid` and `.../auth/calendar.app.created`, then Update,
+       then Save. All four are non-sensitive.
     5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
        allows 100 test users over the app's lifetime. Google says only test users can sign in, but
        an account not on the list did so during testing, so do not rely on it.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs
-       `https://abodeo-kappa.vercel.app/api/auth/callback/google` and
-       `http://localhost:5173/api/auth/callback/google`. Its secret is shown in full only once.
+       `https://abodeo-kappa.vercel.app/api/auth/callback/google`,
+       `http://localhost:5173/api/auth/callback/google`,
+       `https://abodeo-kappa.vercel.app/api/calendar/callback` and
+       `http://localhost:5173/api/calendar/callback`. Its secret is shown in full only once.
+    7. APIs & Services, Library: enable the Google Calendar API. Without it, every Calendar call
+       fails.
 2. **Neon, through Vercel** (Storage, under the project's Infrastructure): create two Neon
    databases on the free plan.
     - `abodeo`: on Connect a Project, choose the Abodeo project and the Production environment
@@ -119,7 +156,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
       branch starts as a copy of production's accounts.
 3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
-   `auth_user`, `auth_session`, `auth_account`, `auth_verification` and `user_profile`.
+   `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile` and
+   `calendar_link`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |
@@ -150,12 +188,14 @@ In the Neon SQL Editor for the right database:
 
 ```sql
 -- Every account, with what is kept about it.
-select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name
+select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name,
+    c.calendar_id
 from auth_user u
 left join auth_account a on a.user_id = u.id
-left join user_profile p on p.user_id = u.id;
+left join user_profile p on p.user_id = u.id
+left join calendar_link c on c.user_id = u.id;
 
--- Removes an account, with its sessions, Google link and profile.
+-- Removes an account, with its sessions, Google link, profile and calendar link.
 delete from auth_user where email = 'someone@example.com';
 ```
 

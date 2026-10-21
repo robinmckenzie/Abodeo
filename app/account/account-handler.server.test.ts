@@ -14,6 +14,7 @@ import {
   signInTestAccount,
   testBaseUrl,
 } from "./test-account.server";
+import { createFakeCalendarDependencies } from "../calendar/test-calendar.server";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -35,11 +36,13 @@ function createTestHandler() {
   const { auth, rows } = createTestAuth();
   const { names, store } = createMemoryProfileStore();
   const close = vi.fn(async () => {});
+  const calendar = createFakeCalendarDependencies();
   const runtime: AccountRuntime = {
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: store,
+    calendar: calendar.dependencies,
     close,
   };
   const handle = createAccountRequestHandler(
@@ -47,7 +50,7 @@ function createTestHandler() {
     () => true,
     () => {},
   );
-  return { auth, rows, names, handle, close };
+  return { auth, rows, names, handle, close, calendar };
 }
 
 function request(path: string, init: RequestInit = {}) {
@@ -104,6 +107,7 @@ describe("createAccountRequestHandler", () => {
           handleAuthRequest: () => new Promise(() => {}),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
+          calendar: createFakeCalendarDependencies().dependencies,
           close: async () => {},
         }),
         () => true,
@@ -130,6 +134,7 @@ describe("createAccountRequestHandler", () => {
         handleAuthRequest: async () => new Response(null, { status: 500 }),
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
+        calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
       () => true,
@@ -192,6 +197,70 @@ describe("createAccountRequestHandler", () => {
 
     const { url } = (await response.json()) as { url: string };
     expect(new URL(url).searchParams.get("prompt")).toBe("select_account");
+  });
+
+  it("does not add permissions given earlier, such as the Calendar one, to sign-in", async () => {
+    const { handle } = createTestHandler();
+
+    const response = await handle(
+      request("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "google" }),
+      }),
+    );
+
+    const { url } = (await response.json()) as { url: string };
+    expect(new URL(url).searchParams.has("include_granted_scopes")).toBe(false);
+  });
+
+  it("starts the Calendar test for the signed-in account", async () => {
+    const { auth, handle, calendar } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    calendar.store.googleAccounts.set(ada.user.id, "google-sub-1");
+
+    const signedIn = await handle(
+      request("/api/calendar/test-appointment", {
+        method: "POST",
+        headers: { cookie: ada.cookie, "Content-Type": "application/json" },
+        body: "{}",
+      }),
+    );
+    const signedOut = await handle(
+      request("/api/calendar/test-appointment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      }),
+    );
+
+    expect(signedIn.status).toBe(200);
+    const { url } = (await signedIn.json()) as { url: string };
+    expect(new URL(url).searchParams.get("login_hint")).toBe("google-sub-1");
+    expect(signedIn.headers.get("Set-Cookie")).toContain(
+      "abodeo_calendar_grant=",
+    );
+    expect(signedOut.status).toBe(401);
+  });
+
+  it("reports the Calendar test as unavailable when sign-in is not configured", async () => {
+    const handle = createAccountRequestHandler(
+      () => undefined,
+      () => false,
+    );
+
+    const start = await handle(
+      request("/api/calendar/test-appointment", { method: "POST" }),
+    );
+    const callback = await handle(request("/api/calendar/callback?code=c"));
+    const other = await handle(request("/api/calendar/other"));
+
+    expect(start.status).toBe(503);
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("Location")).toBe(
+      `${testBaseUrl}/dashboard?calendar=failed`,
+    );
+    expect(other.status).toBe(404);
   });
 
   it("asks Google only for basic permissions and returns to the dashboard, whatever the page asks", async () => {
@@ -345,6 +414,7 @@ describe("createAccountRequestHandler", () => {
         },
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
+        calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
       () => true,
@@ -366,6 +436,7 @@ describe("createAccountRequestHandler", () => {
           handleAuthRequest: async () => Response.json(null),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
+          calendar: createFakeCalendarDependencies().dependencies,
           close: () => new Promise(() => {}),
         }),
         () => true,

@@ -50,6 +50,8 @@ type Server = {
   preferredName: string | null;
   signOutStatus: number;
   signInStatus: number;
+  calendarStatus: number;
+  calendarBodies: unknown[];
   calls: string[];
   hang: boolean;
 };
@@ -62,6 +64,8 @@ function fakeServer(overrides: Partial<Server> = {}) {
     preferredName: null,
     signOutStatus: 200,
     signInStatus: 500,
+    calendarStatus: 503,
+    calendarBodies: [],
     calls: [],
     hang: false,
     ...overrides,
@@ -93,6 +97,9 @@ function fakeServer(overrides: Partial<Server> = {}) {
           return new Response("{}", { status: server.signOutStatus });
         case "/api/auth/sign-in/social":
           return new Response("{}", { status: server.signInStatus });
+        case "/api/calendar/test-appointment":
+          server.calendarBodies.push(JSON.parse(String(init.body)));
+          return new Response("{}", { status: server.calendarStatus });
       }
       return new Response(null, { status: 404 });
     }),
@@ -408,5 +415,90 @@ describe("leaving to sign in or out", () => {
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(server.calls).not.toContain("POST /api/auth/sign-out");
+  });
+});
+
+describe("the Calendar test", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const testButton = () =>
+    screen.getByRole("button", { name: "Create test appointment" });
+
+  it("is offered in the account panel when signed in", async () => {
+    fakeServer({ session: ada });
+    await renderDashboard();
+
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+
+    expect(testButton()).toBeTruthy();
+    expect(screen.getByText(/ID of your Abodeo calendar/)).toBeTruthy();
+  });
+
+  it("sends the browser's time zone, and says so when the test cannot start", async () => {
+    const server = fakeServer({ session: ada });
+    // Earlier tests can leave typed tasks behind, which the check before
+    // leaving asks about.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderDashboard();
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+
+    await click(testButton());
+
+    expect(server.calls).toContain("POST /api/calendar/test-appointment");
+    expect(server.calendarBodies).toEqual([
+      { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    ]);
+    expect(screen.getByRole("alert").textContent).toBe(
+      "The test appointment could not be created. Please try again.",
+    );
+  });
+
+  it("asks before losing unsaved work, and stays if asked to", async () => {
+    const server = fakeServer({ session: ada });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderDashboard();
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
+      target: { value: "Paint the fence" },
+    });
+
+    await click(testButton());
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(server.calls).not.toContain("POST /api/calendar/test-appointment");
+  });
+
+  it("shows the result Google's return brought, with a link once created", async () => {
+    fakeServer({ session: ada });
+    await renderDashboard("?calendar=created");
+
+    expect(
+      screen
+        .getByText(/^Test appointment created in your Abodeo calendar\./)
+        .getAttribute("role"),
+    ).toBe("status");
+    expect(
+      screen
+        .getByRole("link", { name: "Open Google Calendar" })
+        .getAttribute("href"),
+    ).toBe("https://calendar.google.com/");
+  });
+
+  it("says when access was not given or another account was chosen, and ignores unknown results", async () => {
+    fakeServer({ session: ada });
+    await renderDashboard("?calendar=denied");
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Calendar access was not given, so no appointment was created.",
+    );
+    cleanup();
+
+    await renderDashboard("?calendar=wrong-account");
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Choose the Google account you signed in with. No appointment was created.",
+    );
+    cleanup();
+
+    await renderDashboard("?calendar=nonsense");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

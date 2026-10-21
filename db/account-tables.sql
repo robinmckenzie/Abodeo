@@ -6,13 +6,18 @@
 --
 -- The auth_ tables are Better Auth's user, session, account and verification
 -- tables, renamed and with snake_case columns, as "user" is a reserved word.
--- user_profile is Abodeo's own. Deleting a row from auth_user deletes that
--- account's sessions, Google link and profile.
+-- user_profile and calendar_link are Abodeo's own. Deleting a row from
+-- auth_user deletes that account's sessions, Google link, profile and
+-- calendar link.
 --
 -- What is kept: Google's permanent account ID (auth_account.account_id), and
 -- the name and email from the first sign-in. The token, scope, image,
 -- IP address and user agent columns exist because Better Auth expects them,
 -- but the app always leaves them empty.
+--
+-- calendar_link (AD #10 Prove Calendar Access) keeps the ID of the account's
+-- Abodeo calendar in Google Calendar, so that the Calendar test reuses it.
+-- No Calendar token is ever kept.
 
 create table if not exists auth_user (
     id text primary key,
@@ -73,5 +78,11 @@ create index if not exists auth_verification_identifier_idx
 create table if not exists user_profile (
     user_id text primary key references auth_user (id) on delete cascade,
     preferred_name text not null check (char_length(preferred_name) between 1 and 50),
+    updated_at timestamptz not null default now()
+);
+
+create table if not exists calendar_link (
+    user_id text primary key references auth_user (id) on delete cascade,
+    calendar_id text not null,
     updated_at timestamptz not null default now()
 );
