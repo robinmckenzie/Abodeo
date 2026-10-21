@@ -468,7 +468,7 @@ describe("the Calendar test", () => {
     expect(server.calls).not.toContain("POST /api/calendar/test-appointment");
   });
 
-  it("shows the result Google's return brought, with a link once created", async () => {
+  it("shows the result Google's return brought, with a link to the signed-in account's calendar once created", async () => {
     fakeServer({ session: ada });
     await renderDashboard("?calendar=created");
 
@@ -481,7 +481,9 @@ describe("the Calendar test", () => {
       screen
         .getByRole("link", { name: "Open Google Calendar" })
         .getAttribute("href"),
-    ).toBe("https://calendar.google.com/");
+    ).toBe(
+      "https://calendar.google.com/calendar/u/?authuser=ada%40example.com",
+    );
   });
 
   it("says when access was not given or another account was chosen, and ignores unknown results", async () => {
