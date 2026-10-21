@@ -25,7 +25,7 @@ export const calendarMessages: Record<CalendarResult, string> = {
 // Google account (AD #44 Open Signed-In Calendar).
 export function buildGoogleCalendarAddress(email: string) {
   const query = new URLSearchParams({ authuser: email });
-  return `https://calendar.google.com/calendar/u/?${query}`;
+  return `https://calendar.google.com/calendar/r?${query}`;
 }
 
 const requestTimeout = 8000;

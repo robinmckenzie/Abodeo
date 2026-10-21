@@ -5,7 +5,7 @@ import { buildGoogleCalendarAddress } from "./use-calendar-test";
 describe("buildGoogleCalendarAddress", () => {
   it("names the account to open", () => {
     expect(buildGoogleCalendarAddress("ada+home@example.com")).toBe(
-      "https://calendar.google.com/calendar/u/?authuser=ada%2Bhome%40example.com",
+      "https://calendar.google.com/calendar/r?authuser=ada%2Bhome%40example.com",
     );
   });
 });

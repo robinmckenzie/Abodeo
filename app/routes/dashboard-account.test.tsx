@@ -481,9 +481,7 @@ describe("the Calendar test", () => {
       screen
         .getByRole("link", { name: "Open Google Calendar" })
         .getAttribute("href"),
-    ).toBe(
-      "https://calendar.google.com/calendar/u/?authuser=ada%40example.com",
-    );
+    ).toBe("https://calendar.google.com/calendar/r?authuser=ada%40example.com");
   });
 
   it("holds back the link until the signed-in account is known", async () => {
