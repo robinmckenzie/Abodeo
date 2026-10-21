@@ -2,6 +2,7 @@
 // requestTimeout, so a server or database that does not answer leaves
 // sign-in reported as unavailable instead of waiting for ever.
 import {
+  accountActivityPath,
   accountProfilePath,
   accountStatusPath,
   authBasePath,
@@ -156,4 +157,12 @@ export async function requestSignInAddress(fetchFn: Fetch = fetch) {
 export async function signOut(fetchFn: Fetch = fetch) {
   const response = await sendJson(fetchFn, `${authBasePath}/sign-out`, {});
   if (!response.ok) throw new Error("Sign-out did not complete.");
+}
+
+// Tells the server that the signed-in person clicked or typed, for the visit
+// history. The server takes the time and the account from its own clock and
+// the session.
+export async function reportActivity(fetchFn: Fetch = fetch) {
+  const response = await sendJson(fetchFn, accountActivityPath, {});
+  if (!response.ok) throw new Error("Activity was not recorded.");
 }

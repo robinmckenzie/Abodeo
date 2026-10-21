@@ -88,6 +88,29 @@ describe("createAccountAuth", () => {
     }
   });
 
+  it("lets sign-in complete when its history entry cannot be written", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { auth, rows } = createTestAuth({
+      recordSignIn: async () => {
+        throw new Error("history is down");
+      },
+      recordActivity: async () => {},
+    });
+    const { cookie } = await signInTestAccount(auth);
+
+    expect(rows.auth_session).toHaveLength(1);
+    const session = await auth.handler(
+      authRequest("/get-session", { headers: { cookie } }),
+    );
+    expect(await session.json()).toEqual(
+      expect.objectContaining({
+        user: expect.objectContaining({ name: "Ada Lovelace" }),
+      }),
+    );
+    expect(errorLog).toHaveBeenCalledOnce();
+    errorLog.mockRestore();
+  });
+
   it("keeps the photo empty when an account is updated", async () => {
     const { auth, rows } = createTestAuth();
     const context = await auth.$context;

@@ -1,11 +1,16 @@
 // Better Auth, set up for Google sign-in only, with the tables in
 // db/account-tables.sql. Database hooks make sure that nothing beyond
 // Google's account ID, name and email is ever saved: no tokens, photo, IP
-// address or browser details. Ported from TaskManager's TM #45.
+// address or browser details. Ported from TaskManager's TM #45. Each new
+// session, which only a sign-in makes, is added to the sign-in history.
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 
 import { accountReturnPath, authBasePath } from "./account-api";
 import type { AccountConfig } from "./account-config.server";
+import {
+  recordSignInQuietly,
+  type HistoryStore,
+} from "./account-history.server";
 
 // The only Better Auth endpoints served. Requests for any other path are
 // refused before they reach Better Auth, which also covers endpoints a later
@@ -181,9 +186,26 @@ export function logAccountAuthMessage(level: string) {
 // adapter.
 export type AccountDatabase = BetterAuthOptions["database"];
 
+// The hooks above, plus recording each sign-in once its session is saved.
+function buildDatabaseHooks(history: HistoryStore | undefined) {
+  return {
+    ...accountDatabaseHooks,
+    session: {
+      ...accountDatabaseHooks.session,
+      create: {
+        ...accountDatabaseHooks.session.create,
+        after: async (session: { userId: string }) => {
+          if (history) await recordSignInQuietly(history, session.userId);
+        },
+      },
+    },
+  } satisfies BetterAuthOptions["databaseHooks"];
+}
+
 export function buildAccountAuthOptions(
   config: AccountConfig,
   database: AccountDatabase,
+  history?: HistoryStore,
 ) {
   return {
     appName: "Abodeo",
@@ -224,7 +246,7 @@ export function buildAccountAuthOptions(
       accountLinking: { enabled: false },
     },
     verification: tableNames.verification,
-    databaseHooks: accountDatabaseHooks,
+    databaseHooks: buildDatabaseHooks(history),
     rateLimit: { enabled: true, customStorage: rateLimitStorage },
     onAPIError: { errorURL: accountReturnPath },
   } satisfies BetterAuthOptions;
@@ -233,8 +255,9 @@ export function buildAccountAuthOptions(
 export function createAccountAuth(
   config: AccountConfig,
   database: AccountDatabase,
+  history?: HistoryStore,
 ) {
-  return betterAuth(buildAccountAuthOptions(config, database));
+  return betterAuth(buildAccountAuthOptions(config, database, history));
 }
 
 export type AccountAuth = ReturnType<typeof createAccountAuth>;

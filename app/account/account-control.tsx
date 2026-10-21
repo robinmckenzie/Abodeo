@@ -11,6 +11,7 @@ import {
 } from "../calendar/use-calendar-test";
 import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
 import { chooseDisplayName } from "./account-display";
+import { useActivityReport } from "./use-activity-report";
 import {
   useAccount,
   type Account,
@@ -38,6 +39,7 @@ export function AccountControl({
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
   const { view, message } = account;
+  useActivityReport(view.kind === "signed-in");
 
   return (
     <div className="account">
@@ -220,10 +222,7 @@ function AccountPanel({
         <li>
           The ID of your Abodeo calendar in Google Calendar, if one was made.
         </li>
-        <li>
-          A sign-in record for each browser you use, which ends when you sign
-          out.
-        </li>
+        <li>A sign-in record for each browser you use.</li>
       </ul>
       <p className="account-hint">
         Your projects stay in this browser and are not linked to your account.{" "}

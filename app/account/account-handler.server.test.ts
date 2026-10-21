@@ -5,6 +5,7 @@ import {
   createAccountRequestHandler,
   type AccountRuntime,
 } from "./account-handler.server";
+import type { HistoryStore } from "./account-history.server";
 import {
   handleProfileRequest,
   type ProfileStore,
@@ -32,8 +33,20 @@ function createMemoryProfileStore() {
   return { names, store };
 }
 
+// The account ids of each recorded sign-in and activity, in order.
+function createMemoryHistory() {
+  const signIns: string[] = [];
+  const activity: string[] = [];
+  const history: HistoryStore = {
+    recordSignIn: async (userId) => void signIns.push(userId),
+    recordActivity: async (userId) => void activity.push(userId),
+  };
+  return { signIns, activity, history };
+}
+
 function createTestHandler() {
-  const { auth, rows } = createTestAuth();
+  const { signIns, activity, history } = createMemoryHistory();
+  const { auth, rows } = createTestAuth(history);
   const { names, store } = createMemoryProfileStore();
   const close = vi.fn(async () => {});
   const calendar = createFakeCalendarDependencies();
@@ -42,6 +55,7 @@ function createTestHandler() {
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: store,
+    history,
     calendar: calendar.dependencies,
     close,
   };
@@ -50,7 +64,7 @@ function createTestHandler() {
     () => true,
     () => {},
   );
-  return { auth, rows, names, handle, close, calendar };
+  return { auth, rows, names, handle, close, calendar, signIns, activity };
 }
 
 function request(path: string, init: RequestInit = {}) {
@@ -107,6 +121,7 @@ describe("createAccountRequestHandler", () => {
           handleAuthRequest: () => new Promise(() => {}),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
+          history: createMemoryHistory().history,
           calendar: createFakeCalendarDependencies().dependencies,
           close: async () => {},
         }),
@@ -134,6 +149,7 @@ describe("createAccountRequestHandler", () => {
         handleAuthRequest: async () => new Response(null, { status: 500 }),
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
+        history: createMemoryHistory().history,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -395,6 +411,49 @@ describe("createAccountRequestHandler", () => {
     ]);
   });
 
+  it("records each sign-in, and keeps it after signing out", async () => {
+    const { auth, handle, signIns } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const grace = await signInTestAccount(auth, {
+      name: "Grace Hopper",
+      email: "grace@example.com",
+      sub: "google-sub-2",
+    });
+
+    await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+
+    expect(signIns).toEqual([ada.user.id, grace.user.id]);
+  });
+
+  it("records activity for the signed-in account, and none after signing out", async () => {
+    const { auth, handle, activity } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const postActivity = () =>
+      handle(
+        request("/api/account/activity", {
+          method: "POST",
+          headers: { cookie: ada.cookie, "Content-Type": "application/json" },
+          body: "{}",
+        }),
+      );
+
+    expect((await postActivity()).status).toBe(204);
+    await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    expect((await postActivity()).status).toBe(401);
+
+    expect(activity).toEqual([ada.user.id]);
+  });
+
   it("closes the database after each request", async () => {
     const { handle, close } = createTestHandler();
 
@@ -414,6 +473,7 @@ describe("createAccountRequestHandler", () => {
         },
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
+        history: createMemoryHistory().history,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -436,6 +496,7 @@ describe("createAccountRequestHandler", () => {
           handleAuthRequest: async () => Response.json(null),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
+          history: createMemoryHistory().history,
           calendar: createFakeCalendarDependencies().dependencies,
           close: () => new Promise(() => {}),
         }),

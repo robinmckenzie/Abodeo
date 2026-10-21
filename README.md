@@ -66,7 +66,8 @@ browser either way, and are not linked to the account.
 - [Better Auth](https://www.better-auth.com/) 1.7.7 runs in the app's own server code
   (`app/account/*.server.ts`). Every address under `/api` goes to the resource route
   `app/routes/api.ts`, which serves Better Auth's Google endpoints, `/api/account/status`
-  (whether sign-in is configured), `/api/account/profile` (the preferred name) and the Calendar
+  (whether sign-in is configured), `/api/account/profile` (the preferred name), `/api/account/activity` (see
+  [Sign-in history](#sign-in-history)) and the Calendar
   test's `/api/calendar/test-appointment` and `/api/calendar/callback`. Any other Better Auth
   endpoint gets a 404.
 - Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
@@ -91,7 +92,28 @@ set (`user_profile`), and one session row per signed-in browser, deleted on sign
 tokens, the profile photo, and the IP address and browser details of a sign-in are never stored:
 their columns exist because Better Auth expects them, and are always empty. Tests in
 `app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
-(`calendar_link`), once one has been made.
+(`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
+`account_visit`.
+
+### Sign-in history
+
+Abodeo keeps each account's sign-ins and visits, so that Robin can see when and for how long
+testers used it (AD #46 Sign-in History). There is no screen for it: Robin reads it with the query
+under [Inspecting and removing an account](#inspecting-and-removing-an-account).
+
+- Each new session, which only a sign-in makes, adds a row to `account_sign_in`, through a Better
+  Auth hook. Signing out leaves it. If the row cannot be written within 3 seconds, the sign-in
+  goes ahead without it and `account_history_failed` is logged.
+- While signed in, the page posts to `/api/account/activity` on a click (`pointerdown`) or
+  keypress, at most once a minute per tab. An idle tab sends nothing. The server extends the
+  account's latest visit in `account_visit`, or starts a new one if the last activity was 10 or
+  more minutes ago. Both limits are provisional defaults, in `app/account/activity-report.ts` and
+  `app/account/account-history.server.ts`.
+- Only the account and the server's times are kept, never the browser's clock, IP address or
+  details. The rows are deleted with the account.
+- Times are accurate to about a minute: a click within a minute of the last report is not sent, so
+  a visit's last-active time can be up to a minute early, and a visit can end after 9 to 10
+  minutes without activity. A visit with a single report has a length of 0.
 
 ### Calendar test
 
@@ -156,8 +178,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
       branch starts as a copy of production's accounts.
 3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
-   `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile` and
-   `calendar_link`.
+   `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile`,
+   `calendar_link`, `account_sign_in` and `account_visit`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |
@@ -195,7 +217,17 @@ left join auth_account a on a.user_id = u.id
 left join user_profile p on p.user_id = u.id
 left join calendar_link c on c.user_id = u.id;
 
--- Removes an account, with its sessions, Google link, profile and calendar link.
+-- Each account's sign-ins and visits, newest first, with each visit's length.
+select u.email, 'sign-in' as kind, s.signed_in_at as at, null::interval as length
+from account_sign_in s
+join auth_user u on u.id = s.user_id
+union all
+select u.email, 'visit', v.started_at, v.last_active_at - v.started_at
+from account_visit v
+join auth_user u on u.id = v.user_id
+order by email, at desc;
+
+-- Removes an account, with its sessions, Google link, profile, calendar link and history.
 delete from auth_user where email = 'someone@example.com';
 ```
 

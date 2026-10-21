@@ -1,5 +1,6 @@
 // Answers every request under /api: sign-in through Better Auth, whether
-// sign-in is configured, the profile, and the Calendar test. The resource route in
+// sign-in is configured, the profile, activity for the visit history, and the
+// Calendar test. The resource route in
 // app/routes/api.ts sends requests here, in development and on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
 
@@ -14,6 +15,7 @@ import { createCalendarStore } from "../calendar/calendar-store.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
 
 import {
+  accountActivityPath,
   accountProfilePath,
   accountReturnPath,
   accountStatusPath,
@@ -21,6 +23,11 @@ import {
 } from "./account-api";
 import { createAccountAuth, isEnabledAuthPath } from "./account-auth.server";
 import { readAccountConfig, type AccountConfig } from "./account-config.server";
+import {
+  createHistoryStore,
+  handleActivityRequest,
+  type HistoryStore,
+} from "./account-history.server";
 import {
   accountStoreTimeout,
   createProfileStore,
@@ -33,12 +40,13 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 
-// What one request needs: Better Auth, the profile store, the Calendar test,
-// and a way to let go of them.
+// What one request needs: Better Auth, the profile and history stores, the
+// Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
+  history: HistoryStore;
   calendar: CalendarDependencies;
   // Closes the database connections, once the response is ready.
   close(): Promise<void>;
@@ -49,12 +57,14 @@ export type AccountRuntime = {
 // connects until the first query.
 export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const pool = new Pool({ connectionString: config.databaseUrl });
-  const auth = createAccountAuth(config, pool);
+  const history = createHistoryStore(pool);
+  const auth = createAccountAuth(config, pool, history);
   return {
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
+    history,
     calendar: {
       secret: config.secret,
       isSecure: config.baseUrl.startsWith("https:"),
@@ -108,8 +118,14 @@ export function createAccountRequestHandler(
         : respondWithError(405, "method_not_allowed");
     }
     const isProfile = pathname === accountProfilePath;
+    const isActivity = pathname === accountActivityPath;
     const isCalendar = isCalendarPath(pathname);
-    if (!isProfile && !isCalendar && !isEnabledAuthPath(pathname)) {
+    if (
+      !isProfile &&
+      !isActivity &&
+      !isCalendar &&
+      !isEnabledAuthPath(pathname)
+    ) {
       return new Response(null, {
         status: 404,
         headers: { "Cache-Control": "no-store" },
@@ -151,6 +167,12 @@ export function createAccountRequestHandler(
         return await handleProfileRequest(request, {
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.profiles,
+        });
+      }
+      if (isActivity) {
+        return await handleActivityRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          history: runtime.history,
         });
       }
       const authRequest = isSignInStart

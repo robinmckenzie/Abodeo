@@ -5,6 +5,7 @@ import { makeSignature } from "better-auth/crypto";
 
 import { createAccountAuth } from "./account-auth.server";
 import type { AccountConfig } from "./account-config.server";
+import type { HistoryStore } from "./account-history.server";
 
 export const testBaseUrl = "http://localhost:5173";
 
@@ -16,14 +17,17 @@ export const testConfig: AccountConfig = {
   baseUrl: testBaseUrl,
 };
 
-export function createTestAuth() {
+export function createTestAuth(history?: HistoryStore) {
   const rows: Record<string, Record<string, unknown>[]> = {
     auth_user: [],
     auth_session: [],
     auth_account: [],
     auth_verification: [],
   };
-  return { auth: createAccountAuth(testConfig, memoryAdapter(rows)), rows };
+  return {
+    auth: createAccountAuth(testConfig, memoryAdapter(rows), history),
+    rows,
+  };
 }
 
 type TestAuth = ReturnType<typeof createTestAuth>["auth"];
