@@ -238,6 +238,52 @@ describe("returning from Google", () => {
     expect(test.google.exchanges).toHaveLength(0);
   });
 
+  it("believes a refusal only with the grant's cookie and state", async () => {
+    const test = setUp();
+    const { cookie, state } = await start(test);
+
+    const withoutCookie = await test.handle(
+      callback(`error=access_denied&state=${state}`),
+    );
+    const wrongState = await test.handle(
+      callback("error=access_denied&state=other", cookie),
+    );
+
+    expect(readResult(withoutCookie)).toBe("failed");
+    expect(readResult(wrongState)).toBe("failed");
+  });
+
+  it("logs no code or Google answer when the real token exchange fails", async () => {
+    const test = setUp();
+    test.dependencies.google = createCalendarGoogle(testConfig);
+    test.dependencies.reportFailure = undefined;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const googleFetch = vi.fn(async () =>
+      Response.json(
+        { error: "invalid_grant", error_description: "private-detail" },
+        { status: 400 },
+      ),
+    );
+    vi.stubGlobal("fetch", googleFetch);
+    try {
+      const { cookie, state } = await start(test);
+      const response = await test.handle(
+        callback(`state=${state}&code=google-code`, cookie),
+      );
+
+      expect(readResult(response)).toBe("failed");
+      expect(googleFetch).toHaveBeenCalled();
+      expect(logged).toHaveBeenCalled();
+      const output = JSON.stringify(logged.mock.calls);
+      expect(output).not.toContain("private-detail");
+      expect(output).not.toContain("google-code");
+      expect(output).not.toContain("invalid_grant");
+    } finally {
+      vi.unstubAllGlobals();
+      logged.mockRestore();
+    }
+  });
+
   it("reports an unticked Calendar permission as denied", async () => {
     const test = setUp();
     test.google.answer.tokens = {

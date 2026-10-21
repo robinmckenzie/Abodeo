@@ -305,14 +305,6 @@ async function handleCallback(
     return respondWithError(405, "method_not_allowed");
   }
   const parameters = new URL(request.url).searchParams;
-  const googleError = parameters.get("error");
-  if (googleError !== null) {
-    if (googleError === "access_denied") return finish("denied");
-    return failAt(
-      "google",
-      /^[\w-]{1,40}$/.test(googleError) ? googleError : "other",
-    );
-  }
   let stage = "grant";
   try {
     const read = await readCalendarGrant(
@@ -322,8 +314,18 @@ async function handleCallback(
     );
     if ("problem" in read) return failAt(stage, read.problem);
     const { grant } = read;
+    // Checked before Google's answer is believed, so that a link to the
+    // callback made elsewhere cannot report a refusal.
     if (parameters.get("state") !== grant.state) {
       return failAt(stage, "state_mismatch");
+    }
+    const googleError = parameters.get("error");
+    if (googleError !== null) {
+      if (googleError === "access_denied") return finish("denied");
+      return failAt(
+        "google",
+        /^[\w-]{1,40}$/.test(googleError) ? googleError : "other",
+      );
     }
     const code = parameters.get("code");
     if (!code) return failAt(stage, "code_missing");
