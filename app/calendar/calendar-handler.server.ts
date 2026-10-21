@@ -32,11 +32,27 @@ import {
 import type { CalendarStore } from "./calendar-store.server";
 import {
   GoogleCalendarError,
+  googleCalendarTimeout,
   type CalendarEvent,
   type GoogleCalendar,
 } from "./google-calendar.server";
 
 export const abodeoCalendarName = "Abodeo";
+
+// Google's error codes that are logged as they are. Any other value of the
+// callback's error parameter is logged as "other", as it could be any text.
+const knownGoogleErrors = [
+  "invalid_request",
+  "unauthorized_client",
+  "unsupported_response_type",
+  "invalid_scope",
+  "server_error",
+  "temporarily_unavailable",
+  "admin_policy_enforced",
+  "interaction_required",
+  "login_required",
+  "consent_required",
+];
 export const testAppointmentTitle = "Abodeo test appointment";
 const testAppointmentDescription =
   "Made by Abodeo's Calendar test, to check that Abodeo can add appointments to your Abodeo calendar. You can delete it.";
@@ -228,7 +244,10 @@ async function handleStart(
       timeout,
     );
     if (userId === undefined) return respondWithError(401, "not_signed_in");
-    const timeZone = await readStartTimeZone(request);
+    const timeZone = await withTimeout(
+      readStartTimeZone(request),
+      timeout,
+    ).catch(() => null);
     const googleAccountId = await withTimeout(
       store.readGoogleAccountId(userId),
       timeout,
@@ -320,7 +339,7 @@ async function handleCallback(
       if (googleError === "access_denied") return finish("denied");
       return failAt(
         "google",
-        /^[\w-]{1,40}$/.test(googleError) ? googleError : "other",
+        knownGoogleErrors.includes(googleError) ? googleError : "other",
       );
     }
     const code = parameters.get("code");
@@ -334,7 +353,7 @@ async function handleCallback(
     stage = "exchange";
     const tokens = await withTimeout(
       google.exchangeCode({ code, codeVerifier: grant.verifier }),
-      timeout,
+      googleCalendarTimeout,
     );
     // Google's consent screen lets the person untick the permission.
     if (!tokens.scopes.includes(calendarScope)) return finish("denied");
@@ -345,7 +364,10 @@ async function handleCallback(
     stage = "account";
     const [googleAccountId, subject] = await Promise.all([
       withTimeout(store.readGoogleAccountId(userId), timeout),
-      withTimeout(google.readIdTokenSubject(tokens.idToken), timeout),
+      withTimeout(
+        google.readIdTokenSubject(tokens.idToken),
+        googleCalendarTimeout,
+      ),
     ]);
     if (subject === undefined || googleAccountId === undefined) {
       return failAt(

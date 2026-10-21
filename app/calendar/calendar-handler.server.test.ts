@@ -284,6 +284,33 @@ describe("returning from Google", () => {
     }
   });
 
+  it("logs Google's other errors only by known code", async () => {
+    const test = setUp();
+    const { cookie, state } = await start(test);
+
+    await test.handle(callback(`error=server_error&state=${state}`, cookie));
+    await test.handle(
+      callback(`error=private-note-from-someone&state=${state}`, cookie),
+    );
+
+    expect(test.failures).toEqual([
+      ["google", "server_error"],
+      ["google", "other"],
+    ]);
+  });
+
+  it("waits for Google's token exchange longer than for the database", async () => {
+    const test = setUp();
+    test.dependencies.timeout = 20;
+    const exchange = test.google.google.exchangeCode;
+    test.google.google.exchangeCode = async (input) => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return exchange(input);
+    };
+
+    expect(await runTest(test)).toBe("created");
+  });
+
   it("reports an unticked Calendar permission as denied", async () => {
     const test = setUp();
     test.google.answer.tokens = {
