@@ -50,6 +50,19 @@ requirements, commitments, or scheduled work.
   and Redo also needs decisions on what counts as one step (a pasted block of
   tasks) and when the history ends.
 
+## Calendar
+
+- Calendar access without a redirect each time: AD #10 Prove Calendar Access
+  uses Google's Calendar token once and never stores it, as AD #6 Sign In With
+  Google decided. Project appointments built the same way would send the user
+  through Google for each appointment. Google skips its permission screen after
+  the first grant, but the account chooser still shows unless the request names
+  the account. Background work, such as keeping appointments in sync, would not
+  be possible. The options are storing an encrypted refresh token, which
+  reverses the AD #6 decision, or keeping the short-lived token for about an
+  hour, so one redirect covers a sitting. Decide when appointment features are
+  drafted.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
