@@ -468,7 +468,7 @@ describe("the Calendar test", () => {
     expect(server.calls).not.toContain("POST /api/calendar/test-appointment");
   });
 
-  it("shows the result Google's return brought, with a link once created", async () => {
+  it("shows the result Google's return brought, with a link to the signed-in account's calendar once created", async () => {
     fakeServer({ session: ada });
     await renderDashboard("?calendar=created");
 
@@ -481,7 +481,19 @@ describe("the Calendar test", () => {
       screen
         .getByRole("link", { name: "Open Google Calendar" })
         .getAttribute("href"),
-    ).toBe("https://calendar.google.com/");
+    ).toBe("https://calendar.google.com/calendar/r?authuser=ada%40example.com");
+  });
+
+  it("holds back the link until the signed-in account is known", async () => {
+    fakeServer({ hang: true });
+    await renderDashboard("?calendar=created");
+
+    expect(
+      screen.getByText(/^Test appointment created in your Abodeo calendar\./),
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open Google Calendar" })).toBe(
+      null,
+    );
   });
 
   it("says when access was not given or another account was chosen, and ignores unknown results", async () => {

@@ -21,7 +21,12 @@ export const calendarMessages: Record<CalendarResult, string> = {
   failed: "The test appointment could not be created. Please try again.",
 };
 
-export const googleCalendarAddress = "https://calendar.google.com/";
+// Google Calendar in the given account, rather than the browser's default
+// Google account (AD #44 Open Signed-In Calendar).
+export function buildGoogleCalendarAddress(email: string) {
+  const query = new URLSearchParams({ authuser: email });
+  return `https://calendar.google.com/calendar/r?${query}`;
+}
 
 const requestTimeout = 8000;
 

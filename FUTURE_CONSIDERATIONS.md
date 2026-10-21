@@ -68,11 +68,6 @@ requirements, commitments, or scheduled work.
   as a limitation). Appointment features may need a way for the user to start
   a new Abodeo calendar, or `calendar.calendarlist.readonly`, which shows every
   calendar the user has.
-- Opening the right Google account: the "Open Google Calendar" link opens the
-  browser's default Google account, which may not be the one signed in to
-  Abodeo. Adding `?authuser=<email>` (as in
-  `https://calendar.google.com/calendar/u/?authuser=...`) would open the
-  signed-in account's calendar.
 - The comment above the granted-scope check in
   `app/calendar/calendar-handler.server.ts` says Google's consent screen lets
   the user untick the permission. Google shows tick boxes only when several

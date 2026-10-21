@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 
 import {
   calendarMessages,
-  googleCalendarAddress,
+  buildGoogleCalendarAddress,
   useCalendarTest,
   type CalendarTest,
 } from "../calendar/use-calendar-test";
@@ -79,10 +79,15 @@ export function AccountControl({
           role={calendar.result === "created" ? "status" : "alert"}
         >
           {calendarMessages[calendar.result]}
-          {calendar.result === "created" && (
+          {/* The link waits for the account, so that it opens the right one. */}
+          {calendar.result === "created" && view.kind === "signed-in" && (
             <>
               {" "}
-              <a href={googleCalendarAddress} target="_blank" rel="noreferrer">
+              <a
+                href={buildGoogleCalendarAddress(view.email)}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open Google Calendar
               </a>
             </>
