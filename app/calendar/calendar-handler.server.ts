@@ -151,20 +151,20 @@ export async function createTestAppointment({
   timeout?: number;
   reportFailure?: ReportCalendarFailure;
 }) {
+  // Database calls are limited here. Google's calls limit themselves (see
+  // googleCalendarTimeout), as they can take longer.
   const call = <Result>(work: Promise<Result>) => withTimeout(work, timeout);
   const event = buildTestAppointment(now, timeZone);
   const makeCalendar = () =>
-    call(
-      calendar.insertCalendar(accessToken, {
-        summary: abodeoCalendarName,
-        timeZone,
-      }),
-    );
+    calendar.insertCalendar(accessToken, {
+      summary: abodeoCalendarName,
+      timeZone,
+    });
   // Another test saved its calendar first: use that one, and delete the spare.
   const adoptWinningCalendar = async (spareId: string) => {
     const winnerId = await call(store.readCalendarId(userId));
     try {
-      await call(calendar.deleteCalendar(accessToken, spareId));
+      await calendar.deleteCalendar(accessToken, spareId);
     } catch (error) {
       reportFailure("spare_calendar_left", readFailureCode(error));
     }
@@ -176,9 +176,7 @@ export async function createTestAppointment({
 
   let calendarId = await call(store.readCalendarId(userId));
   if (calendarId !== undefined) {
-    const result = await call(
-      calendar.insertEvent(accessToken, calendarId, event),
-    );
+    const result = await calendar.insertEvent(accessToken, calendarId, event);
     if (result === "created") return;
     const replacementId = await makeCalendar();
     calendarId = (await call(
@@ -192,9 +190,7 @@ export async function createTestAppointment({
       ? firstId
       : await adoptWinningCalendar(firstId);
   }
-  const result = await call(
-    calendar.insertEvent(accessToken, calendarId, event),
-  );
+  const result = await calendar.insertEvent(accessToken, calendarId, event);
   if (result !== "created") throw new GoogleCalendarError("calendar_missing");
 }
 

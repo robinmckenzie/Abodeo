@@ -4,8 +4,9 @@
 
 const calendarApi = "https://www.googleapis.com/calendar/v3";
 
-// How long each Calendar call may take.
-export const googleCalendarTimeout = 5000;
+// How long each Calendar call may take. Making a calendar took over 5
+// seconds in testing (AD #10), and Google still made it.
+export const googleCalendarTimeout = 20_000;
 
 export class GoogleCalendarError extends Error {
   readonly code: string;
@@ -41,6 +42,19 @@ export type GoogleCalendar = {
 
 type Fetch = typeof fetch;
 
+// Why a request got no answer, such as TimeoutError or ECONNRESET: the
+// network error's code, or the error's name. Never its message.
+function readFetchFailure(error: unknown) {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  const value =
+    typeof cause?.code === "string"
+      ? cause.code
+      : (error as { name?: unknown } | null)?.name;
+  return typeof value === "string" && /^[\w-]{1,40}$/.test(value)
+    ? value
+    : "unknown";
+}
+
 export function createGoogleCalendar(
   fetchFn: Fetch = fetch,
   timeout = googleCalendarTimeout,
@@ -62,8 +76,10 @@ export function createGoogleCalendar(
         redirect: "error",
         signal: AbortSignal.timeout(timeout),
       });
-    } catch {
-      throw new GoogleCalendarError("google_unreachable");
+    } catch (error) {
+      throw new GoogleCalendarError(
+        `google_unreachable_${readFetchFailure(error)}`,
+      );
     }
   };
   const fail = (response: Response) =>

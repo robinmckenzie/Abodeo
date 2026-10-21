@@ -374,6 +374,19 @@ describe("returning from Google", () => {
     expect(await runTest(exchange)).toBe("failed");
   });
 
+  it("waits for Google longer than for the database, as making a calendar can be slow", async () => {
+    const test = setUp();
+    test.dependencies.timeout = 20;
+    const insert = test.calendar.calendar.insertCalendar;
+    test.calendar.calendar.insertCalendar = async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return insert(...args);
+    };
+
+    expect(await runTest(test)).toBe("created");
+    expect(test.calendar.calendars.size).toBe(1);
+  });
+
   it("keeps one calendar when another test saves the first calendar at the same time", async () => {
     const test = setUp();
     const winner = await test.calendar.calendar.insertCalendar("other", {

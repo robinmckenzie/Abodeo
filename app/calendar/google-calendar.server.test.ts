@@ -95,6 +95,6 @@ describe("createGoogleCalendar", () => {
     expect(refused).toBeInstanceOf(GoogleCalendarError);
     expect((refused as GoogleCalendarError).code).toBe("google_403");
     expect((refused as Error).message).not.toContain("private");
-    expect((lost as GoogleCalendarError).code).toBe("google_unreachable");
+    expect((lost as GoogleCalendarError).code).toBe("google_unreachable_Error");
   });
 });
