@@ -30,8 +30,9 @@ export type GoogleCalendar = {
     accessToken: string,
     calendar: { summary: string; timeZone: string | null },
   ): Promise<string>;
-  // "not-found" when the calendar no longer exists, such as after the person
-  // deleted it.
+  // "not-found" when Google answers 404. A calendar the person deleted in
+  // Google Calendar still accepted events in testing (AD #10), so this does
+  // not catch that case.
   insertEvent(
     accessToken: string,
     calendarId: string,

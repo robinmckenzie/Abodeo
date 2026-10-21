@@ -111,13 +111,15 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   logged, so each test may go through Google again.
 - The appointment, "Abodeo test appointment", is at the next whole hour for 30 minutes, in a
   calendar named Abodeo. The first test makes the calendar and saves its ID in `calendar_link`.
-  Later tests reuse it, or make a new one if it was deleted in Google Calendar. If two tests run
-  at once, only one calendar is kept.
+  Later tests reuse it, or make a new one if Google answers that it cannot be found. If two tests
+  run at once, only one calendar is kept.
 - The callback returns to `/dashboard?calendar=` with `created`, `denied`, `wrong-account` or
   `failed`, which the dashboard shows once and removes from the address.
 - The calendar cannot be found through the person's calendar list, as the permission does not
-  cover it, which is why its ID is saved. If the person hides the calendar rather than deleting
-  it, appointments are still made but not shown.
+  cover it, which is why its ID is saved. Abodeo cannot tell whether the person has deleted or
+  hidden it: in testing, a calendar permanently deleted in Google Calendar was still returned by
+  Google and still accepted appointments, which were then not shown. Abodeo reports them as
+  created.
 
 ### Setting it up from scratch
 

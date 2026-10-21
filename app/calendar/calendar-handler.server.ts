@@ -128,7 +128,7 @@ export function buildTestAppointment(
 }
 
 // Adds the test appointment to the account's Abodeo calendar, making the
-// calendar first if there is none or it was deleted. Two tests at once (two
+// calendar first if there is none or Google no longer finds it. Two tests at once (two
 // tabs) save the calendar by compare-and-swap: the one that loses deletes the
 // calendar it made and uses the winner's, so only one calendar is ever in
 // use. Rejects if the appointment was not created.
