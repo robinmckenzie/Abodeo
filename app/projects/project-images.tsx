@@ -102,6 +102,7 @@ function SignedInImages({
   const inputRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [viewing, setViewing] = useState<{
+    imageId: string;
     url: string;
     label: string;
   } | null>(null);
@@ -142,7 +143,20 @@ function SignedInImages({
 
   const view = async (image: ImageInfo) => {
     const url = await images.openOriginal(image.id);
-    if (url) setViewing({ url, label: describeImage(image) });
+    if (url) {
+      setViewing({ imageId: image.id, url, label: describeImage(image) });
+    }
+  };
+
+  // With more than one image, the full-size view steps through them, oldest
+  // to newest, as the timeline reads from top to bottom. It stops at the
+  // ends of those loaded.
+  const viewingIndex = viewing
+    ? state.images.findIndex(({ id }) => id === viewing.imageId)
+    : -1;
+  const stepTo = (step: number) => {
+    const image = state.images[viewingIndex + step];
+    return image ? () => void view(image) : null;
   };
 
   return (
@@ -233,6 +247,11 @@ function SignedInImages({
           <ImageViewer
             url={viewing.url}
             label={viewing.label}
+            navigation={
+              state.images.length > 1 && viewingIndex >= 0
+                ? { onPrevious: stepTo(-1), onNext: stepTo(1) }
+                : undefined
+            }
             onClose={() => setViewing(null)}
           />,
           document.body,
@@ -408,10 +427,14 @@ function ImageEntry({
 export function ImageViewer({
   url,
   label,
+  navigation,
   onClose,
 }: {
   url: string;
   label: string;
+  // Left and right buttons, fixed to the window, to move between a project's
+  // images. A null step is at an end, and its button is off.
+  navigation?: { onPrevious: (() => void) | null; onNext: (() => void) | null };
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -439,6 +462,15 @@ export function ImageViewer({
       }}
     >
       <img src={url} alt={label} />
+      {navigation && (
+        <>
+          <ViewerStepButton
+            direction="previous"
+            onClick={navigation.onPrevious}
+          />
+          <ViewerStepButton direction="next" onClick={navigation.onNext} />
+        </>
+      )}
       <button
         type="button"
         className="image-viewer-close"
@@ -452,5 +484,31 @@ export function ImageViewer({
         </svg>
       </button>
     </dialog>
+  );
+}
+
+// The date picker's month arrow, twice the size.
+function ViewerStepButton({
+  direction,
+  onClick,
+}: {
+  direction: "previous" | "next";
+  onClick: (() => void) | null;
+}) {
+  const label = direction === "previous" ? "Previous image" : "Next image";
+  return (
+    <button
+      type="button"
+      className={`image-viewer-${direction}`}
+      aria-label={label}
+      title={label}
+      aria-disabled={onClick ? undefined : true}
+      onClick={() => onClick?.()}
+    >
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8.5" />
+        <path d="M5.5 10h9M11 6.5l3.5 3.5M11 13.5l3.5-3.5" />
+      </svg>
+    </button>
   );
 }

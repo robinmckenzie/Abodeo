@@ -434,6 +434,60 @@ describe("ProjectImages", () => {
     );
   });
 
+  describe("full-size view", () => {
+    const viewerImage = () =>
+      document.querySelector<HTMLImageElement>(".image-viewer img");
+    const step = (name: string) =>
+      document.querySelector<HTMLButtonElement>(
+        `.image-viewer [aria-label="${name}"]`,
+      );
+
+    it("steps through the images with previous and next buttons, stopping at the ends", async () => {
+      const server = fakeServer();
+      await seed(server, "ada", ["one", "two", "three"]);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
+      const views = await screen.findAllByRole("button", {
+        name: /View full size/,
+      });
+      fireEvent.click(views[1]);
+      await waitFor(() => expect(viewerImage()).not.toBeNull());
+      const middle = viewerImage()!.getAttribute("src");
+      expect(step("Previous image")!.hasAttribute("aria-disabled")).toBe(false);
+      expect(step("Next image")!.hasAttribute("aria-disabled")).toBe(false);
+
+      fireEvent.click(step("Next image")!);
+      await waitFor(() =>
+        expect(viewerImage()!.getAttribute("src")).not.toBe(middle),
+      );
+      expect(step("Next image")!.hasAttribute("aria-disabled")).toBe(true);
+      expect(step("Previous image")!.hasAttribute("aria-disabled")).toBe(false);
+
+      fireEvent.click(step("Previous image")!);
+      await waitFor(() =>
+        expect(viewerImage()!.getAttribute("src")).toBe(middle),
+      );
+      fireEvent.click(step("Previous image")!);
+      await waitFor(() =>
+        expect(step("Previous image")!.hasAttribute("aria-disabled")).toBe(
+          true,
+        ),
+      );
+      expect(viewerImage()).not.toBeNull();
+    });
+
+    it("has no step buttons when the project has one image", async () => {
+      const server = fakeServer();
+      await seed(server, "ada", ["one"]);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: /View full size/ }),
+      );
+      await waitFor(() => expect(viewerImage()).not.toBeNull());
+      expect(step("Previous image")).toBeNull();
+      expect(step("Next image")).toBeNull();
+    });
+  });
+
   it("removes an image after confirming", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);

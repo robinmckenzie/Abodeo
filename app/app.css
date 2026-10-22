@@ -1976,6 +1976,60 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   transform: rotate(45deg);
 }
 
+/* The step buttons are the date picker's month arrows at twice the size, fixed
+   to the window's sides and middle, so they stay put as the page scrolls. */
+.image-viewer-previous,
+.image-viewer-next {
+  position: fixed;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-top: -1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #6b665c;
+  cursor: pointer;
+}
+
+.image-viewer-previous {
+  left: 1rem;
+}
+
+.image-viewer-next {
+  right: 1rem;
+}
+
+.image-viewer-previous:hover:not([aria-disabled]),
+.image-viewer-next:hover:not([aria-disabled]) {
+  background: #ebe6da;
+  color: #1a1a1a;
+}
+
+.image-viewer-previous[aria-disabled],
+.image-viewer-next[aria-disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.image-viewer-previous svg,
+.image-viewer-next svg {
+  width: 2.75rem;
+  height: 2.75rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.image-viewer-previous svg {
+  transform: scaleX(-1);
+}
+
 /* Why a drop added nothing, over everything, as a popover in the top layer. */
 .drop-message {
   position: fixed;
