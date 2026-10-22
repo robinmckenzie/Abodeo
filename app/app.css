@@ -1795,6 +1795,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   gap: 0.625rem;
   max-height: 22rem;
   margin-top: 0.5rem;
+  /* Only up and down: with its scroll bar, the entries fit the width left. */
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
