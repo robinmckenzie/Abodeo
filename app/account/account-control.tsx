@@ -1,7 +1,7 @@
 // The account area below the dashboard's logo: who is signed in, the
 // preferred name, the Calendar test, what is kept, and signing in and out. It is plain text with
 // no picture, so that it cannot be mistaken for an assignee or a project.
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   calendarMessages,
@@ -38,8 +38,23 @@ export function AccountControl({
   const { view, message } = account;
   useActivityReport(view.kind === "signed-in");
 
+  // A press anywhere outside the account area closes the panel. The button
+  // is inside it and toggles the panel itself.
+  const accountRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [isOpen]);
+
   return (
-    <div className="account">
+    <div className="account" ref={accountRef}>
       {(view.kind === "unavailable" || view.kind === "not-configured") && (
         <p className="account-unavailable">Sign-in is unavailable</p>
       )}

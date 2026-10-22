@@ -326,6 +326,25 @@ describe("the dashboard's account control", () => {
     ).toBeTruthy();
   });
 
+  it("closes the account panel on a press outside it, not inside it", async () => {
+    fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
+    await renderDashboard();
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+    const panel = screen.getByRole("region", { name: "Your account" });
+
+    await act(async () => {
+      fireEvent.pointerDown(panel);
+    });
+    expect(
+      screen.queryByRole("region", { name: "Your account" }),
+    ).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+    });
+    expect(screen.queryByRole("region", { name: "Your account" })).toBeNull();
+  });
+
   it("reports no activity while signed out", async () => {
     const server = fakeServer();
     await renderDashboard();
