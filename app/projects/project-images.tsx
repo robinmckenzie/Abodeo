@@ -250,6 +250,7 @@ function ImageEntry({
   // What is typed, until it is saved. Null shows the saved caption.
   const [draft, setDraft] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const latestDraftRef = useRef<string | null>(null);
   const caption = draft ?? image.caption;
   const length = countCharacters(caption);
   const isTooLong = length > maxCaptionLength;
@@ -283,9 +284,12 @@ function ImageEntry({
       setMessage(captionTooLongMessage);
       return;
     }
-    const result = await onCaption(image, draft);
+    const saving = draft;
+    const result = await onCaption(image, saving);
+    // Text typed while saving stays as a draft, to be saved on its own blur.
+    const isUnchanged = latestDraftRef.current === saving;
     if (result.ok) {
-      setDraft(null);
+      if (isUnchanged) setDraft(null);
       setMessage(null);
     } else if (result.reason === "conflict") {
       setDraft(null);
@@ -318,6 +322,7 @@ function ImageEntry({
           rows={2}
           value={caption}
           onChange={(event) => {
+            latestDraftRef.current = event.target.value;
             setDraft(event.target.value);
             setMessage(null);
           }}
@@ -327,6 +332,7 @@ function ImageEntry({
             // project.
             if (event.key !== "Escape") return;
             event.preventDefault();
+            latestDraftRef.current = null;
             setDraft(null);
             setMessage(null);
           }}

@@ -348,6 +348,19 @@ describe("ProjectImages", () => {
       expect(box.value).toBe("Before painting");
     });
 
+    it("keeps text typed while a caption is saving", async () => {
+      const { server, box } = await renderOne();
+      fireEvent.change(box, { target: { value: "Before" } });
+      fireEvent.blur(box);
+      fireEvent.change(box, { target: { value: "Before painting" } });
+      await waitFor(() =>
+        expect(server.store.accounts.get("ada")![0].image.caption).toBe(
+          "Before",
+        ),
+      );
+      expect(box.value).toBe("Before painting");
+    });
+
     it("does not send a caption over 500 characters, and says why", async () => {
       const { server, box } = await renderOne();
       fireEvent.change(box, {

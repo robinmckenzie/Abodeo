@@ -249,16 +249,21 @@ export function useProjectImages({
     return keepUrl(session, `original:${imageId}`, result.blob);
   };
 
+  const isLoadingOlderRef = useRef(false);
+
   const loadOlder = async () => {
     const session = sessionRef.current;
     const first = stateRef.current.images[0];
-    if (!session || !first) return;
+    if (!session || !first || isLoadingOlderRef.current) return;
+    isLoadingOlderRef.current = true;
     const result = await loadImages(
       accountId,
       projectId,
       first,
       optionsRef.current.fetchFn,
-    );
+    ).finally(() => {
+      isLoadingOlderRef.current = false;
+    });
     if (!session.isCurrent) return;
     if (!result.ok) {
       fail(result.reason);
@@ -270,7 +275,12 @@ export function useProjectImages({
     }
     update(session, (current) => ({
       ...current,
-      images: [...result.page.images, ...current.images],
+      images: [
+        ...result.page.images.filter(
+          ({ id }) => !current.images.some((image) => image.id === id),
+        ),
+        ...current.images,
+      ],
       hasOlder: result.page.hasOlder,
       usedBytes: result.page.usedBytes,
     }));
@@ -320,7 +330,7 @@ export function useProjectImages({
     update(session, (current) => ({ ...current, isAdding: true, notices: [] }));
     const refused: RefusedImage[] = [];
     let usedBytes = stateRef.current.usedBytes;
-    for (const file of files) {
+    for (const [position, file] of files.entries()) {
       if (!session.isCurrent) return;
       const refuse = (reason: ImageFailure) => {
         refused.push({ name: file.name, reason });
@@ -368,6 +378,10 @@ export function useProjectImages({
           result.reason === "account-changed" ||
           result.reason === "unreachable"
         ) {
+          // Name the files that were not tried, rather than skip them.
+          for (const skipped of files.slice(position + 1)) {
+            refused.push({ name: skipped.name, reason: result.reason });
+          }
           break;
         }
         continue;
