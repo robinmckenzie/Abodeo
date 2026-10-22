@@ -52,7 +52,7 @@ export function ProjectImages({
   if (accountId === null) {
     return (
       <section className="project-images" aria-label="Images">
-        <h3>Images</h3>
+        <h3 className="task-heading">Images</h3>
         <p className="project-images-note">{signInToAddMessage}</p>
       </section>
     );
@@ -132,7 +132,7 @@ function SignedInImages({
   return (
     <section className="project-images" aria-label="Images">
       <div className="project-images-header">
-        <h3>Images</h3>
+        <h3 className="task-heading">Images</h3>
         <button
           type="button"
           className="project-images-add"

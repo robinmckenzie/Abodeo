@@ -1712,9 +1712,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   gap: 0.5rem;
 }
 
-.project-images h3 {
+.project-images .task-heading {
   margin: 0;
-  font-size: 1rem;
 }
 
 .project-images button {
