@@ -1969,6 +1969,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .image-viewer-caption {
   margin: 0;
   text-align: left;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
