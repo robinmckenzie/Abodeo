@@ -424,8 +424,17 @@ export function ImageViewer({
       }}
     >
       <img src={url} alt={label} />
-      <button type="button" onClick={onClose}>
-        Close
+      <button
+        type="button"
+        className="image-viewer-close"
+        aria-label="Close"
+        title="Close"
+        onClick={onClose}
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8.5" />
+          <path d="M5.5 10h9M10 5.5v9" />
+        </svg>
       </button>
     </dialog>
   );

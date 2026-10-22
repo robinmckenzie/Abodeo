@@ -1885,6 +1885,36 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   margin: 0 auto 0.5rem;
 }
 
+/* The close button is the Remove button's circled X, at the bottom centre. */
+.image-viewer-close {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.image-viewer-close:hover {
+  background: #f7f5ef;
+}
+
+.image-viewer-close svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(45deg);
+}
+
 /* Why a drop added nothing, over everything, as a popover in the top layer. */
 .drop-message {
   position: fixed;
