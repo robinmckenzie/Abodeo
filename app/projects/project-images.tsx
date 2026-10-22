@@ -137,9 +137,14 @@ function SignedInImages({
           type="button"
           className="project-images-add"
           disabled={state.status !== "ready" || state.isAdding}
+          aria-label={state.isAdding ? "Adding images" : "Add image"}
+          title="Add image"
           onClick={() => inputRef.current?.click()}
         >
-          {state.isAdding ? "Adding…" : "Add image"}
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="8.5" />
+            <path d="M5.5 10h9M10 5.5v9" />
+          </svg>
         </button>
         <input
           ref={inputRef}

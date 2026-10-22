@@ -1731,6 +1731,33 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   background: #f6f3ec;
 }
 
+/* The add button is the thin circle of the assignee icon, with a plus, and
+   the date picker's hover. */
+.project-images .project-images-add {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.project-images .project-images-add:hover:not(:disabled) {
+  background: #f7f5ef;
+}
+
+.project-images-add svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .project-images button:disabled {
   opacity: 0.5;
   cursor: default;
