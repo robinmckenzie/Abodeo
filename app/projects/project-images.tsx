@@ -353,9 +353,6 @@ function ImageEntry({
               ? `${length} / ${maxCaptionLength}`
               : ""}
           </span>
-          <button type="button" onClick={onRemove}>
-            Remove
-          </button>
         </div>
         {(message || isTooLong) && (
           <p className="project-images-note" role="alert">
@@ -363,6 +360,18 @@ function ImageEntry({
           </p>
         )}
       </div>
+      <button
+        type="button"
+        className="project-images-remove"
+        aria-label="Remove"
+        title="Remove"
+        onClick={onRemove}
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8.5" />
+          <path d="M5.5 10h9M10 5.5v9" />
+        </svg>
+      </button>
     </div>
   );
 }

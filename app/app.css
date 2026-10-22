@@ -1732,8 +1732,10 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* The add button is the thin circle of the assignee icon, with a plus, and
-   the date picker's hover. */
-.project-images .project-images-add {
+   the date picker's hover. The remove button is the same turned 45 degrees,
+   beside the caption box. */
+.project-images .project-images-add,
+.project-images .project-images-remove {
   display: grid;
   place-items: center;
   width: 1.5rem;
@@ -1744,11 +1746,13 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   background: none;
 }
 
-.project-images .project-images-add:hover:not(:disabled) {
+.project-images .project-images-add:hover:not(:disabled),
+.project-images .project-images-remove:hover:not(:disabled) {
   background: #f7f5ef;
 }
 
-.project-images-add svg {
+.project-images-add svg,
+.project-images-remove svg {
   width: 1.375rem;
   height: 1.375rem;
   fill: none;
@@ -1756,6 +1760,15 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.project-images-remove {
+  flex: none;
+  margin-top: 1.25rem;
+}
+
+.project-images-remove svg {
+  transform: rotate(45deg);
 }
 
 .project-images button:disabled {
