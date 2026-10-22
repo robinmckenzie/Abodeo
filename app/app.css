@@ -1939,6 +1939,16 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   text-align: center;
 }
 
+/* With step buttons, the box stays clear of them: each is 1rem from the window's
+   side and 3.5rem wide, and the box keeps 1rem beyond that. */
+.image-viewer.has-step-buttons {
+  max-width: calc(100vw - 11rem);
+}
+
+.image-viewer.has-step-buttons img {
+  max-width: calc(100vw - 12.5rem);
+}
+
 .image-viewer img {
   display: block;
   max-width: 88vw;

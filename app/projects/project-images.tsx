@@ -446,7 +446,7 @@ export function ImageViewer({
   return (
     <dialog
       ref={dialogRef}
-      className="image-viewer"
+      className={navigation ? "image-viewer has-step-buttons" : "image-viewer"}
       aria-label="Full-size image"
       // The close event comes after the dialog's cleanup in development, when
       // an effect runs twice, so it counts only if the dialog is still shut.
