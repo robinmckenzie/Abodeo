@@ -1698,3 +1698,164 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 [data-dragging-task] textarea {
   overflow: hidden;
 }
+
+/* An opened account project's images (AD #48): a timeline that scrolls, with
+   the newest at the bottom. */
+.project-images {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.project-images-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.project-images h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.project-images button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.project-images button:hover:not(:disabled) {
+  background: #f6f3ec;
+}
+
+.project-images button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.project-images-note {
+  margin: 0.375rem 0;
+  color: #5a5548;
+  font-size: 0.875rem;
+}
+
+.project-images-notices {
+  margin: 0.375rem 0;
+  padding-left: 1.125rem;
+  color: #8a1c1c;
+  font-size: 0.875rem;
+}
+
+.image-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  max-height: 22rem;
+  margin-top: 0.5rem;
+  overflow-y: auto;
+}
+
+.image-timeline[hidden] {
+  display: none;
+}
+
+.image-entry {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-start;
+}
+
+.image-entry-thumbnail {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  height: 5.25rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #d8d3c6;
+  border-radius: 8px;
+  background: #f6f3ec;
+  cursor: zoom-in;
+}
+
+.image-entry-thumbnail img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-entry-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.image-entry-details time {
+  display: block;
+  color: #5a5548;
+  font-size: 0.8125rem;
+}
+
+.image-entry-details textarea {
+  width: 100%;
+  margin-top: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid #d8d3c6;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.image-entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.5rem;
+}
+
+.image-entry-count {
+  color: #5a5548;
+  font-size: 0.75rem;
+}
+
+.image-entry-count.is-over {
+  color: #8a1c1c;
+}
+
+.image-viewer {
+  max-width: 92vw;
+  max-height: 92vh;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.image-viewer img {
+  display: block;
+  max-width: 88vw;
+  max-height: 80vh;
+  margin: 0 auto 0.5rem;
+}
+
+/* Why a drop added nothing, over everything, as a popover in the top layer. */
+.drop-message {
+  position: fixed;
+  inset: auto auto 1.5rem 50%;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  transform: translateX(-50%);
+}
+
+.drop-message:not(:popover-open) {
+  display: none;
+}

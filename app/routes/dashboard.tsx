@@ -23,11 +23,17 @@ import {
 } from "../projects/autosave";
 import { DefaultProjectsPanel } from "../projects/default-projects-panel";
 import {
+  noProjectOpenMessage,
+  signInToAddMessage,
+  unsavedProjectMessage,
+} from "../projects/image-messages";
+import {
   ExpandedProjectBar,
   ProjectBar,
   type ExpandedProjectBarHandle,
 } from "../projects/project-bar";
 import { ProjectForm, type FormMessage } from "../projects/project-form";
+import { ProjectImages, type AddFiles } from "../projects/project-images";
 import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
@@ -316,6 +322,40 @@ export default function Dashboard() {
       account.recheck();
     }
   };
+
+  // Pictures dropped on the page go to the open account project's images.
+  const addFilesRef = useRef<AddFiles | null>(null);
+  const [dropMessage, setDropMessage] = useState<string | null>(null);
+  const dropFilesRef = useRef<(files: File[]) => void>(() => {});
+  useEffect(() => {
+    dropFilesRef.current = (files) => {
+      if (view.kind !== "account") return setDropMessage(signInToAddMessage);
+      if (!open) return setDropMessage(noProjectOpenMessage);
+      if (open.id === null) return setDropMessage(unsavedProjectMessage);
+      if (!addFilesRef.current) return setDropMessage(noProjectOpenMessage);
+      addFilesRef.current(files);
+    };
+  });
+  useEffect(() => {
+    // Files only, so that dragging text or a task is left alone. Without
+    // this the browser would open a dropped file in place of the page.
+    const hasFiles = (event: DragEvent) =>
+      event.dataTransfer?.types.includes("Files") === true;
+    const onDragOver = (event: DragEvent) => {
+      if (hasFiles(event)) event.preventDefault();
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dropFilesRef.current([...(event.dataTransfer?.files ?? [])]);
+    };
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
 
   const closeProject = () => {
     if (!open) return;
@@ -773,6 +813,16 @@ export default function Dashboard() {
       onCreate={createOpenProject}
       onClose={closeOpenProject}
       hasCloseButton={!isInPlace}
+      images={
+        open.id !== null && (
+          <ProjectImages
+            accountId={view.kind === "account" ? view.accountId : null}
+            projectId={open.id}
+            onFailure={noteAccountFailure}
+            addFilesRef={addFilesRef}
+          />
+        )
+      }
       tasks={
         open.id !== null && (
           <TaskList
@@ -963,6 +1013,7 @@ export default function Dashboard() {
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </main>
+      <DropMessage message={dropMessage} onDone={() => setDropMessage(null)} />
       <KeyboardShortcuts
         shortcuts={[
           {
@@ -995,6 +1046,35 @@ export default function Dashboard() {
         ]}
       />
     </div>
+  );
+}
+
+// Says briefly why a drop added nothing. It is in the top layer, so that it
+// shows above a project's window as well.
+const dropMessageDuration = 5000;
+
+function DropMessage({
+  message,
+  onDone,
+}: {
+  message: string | null;
+  onDone: () => void;
+}) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const element = ref.current;
+    if (!message || !element) return;
+    element.showPopover?.();
+    const timer = setTimeout(onDone, dropMessageDuration);
+    return () => {
+      clearTimeout(timer);
+      element.hidePopover?.();
+    };
+  }, [message, onDone]);
+  return (
+    <p ref={ref} className="drop-message" popover="manual" role="status">
+      {message}
+    </p>
   );
 }
 

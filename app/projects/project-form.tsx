@@ -24,6 +24,7 @@ export function ProjectForm({
   onCalendarDateChange,
   hasCloseButton = true,
   tasks,
+  images,
 }: {
   values: ProjectFields;
   isNew: boolean;
@@ -50,6 +51,8 @@ export function ProjectForm({
   hasCloseButton?: boolean;
   // An opened project's tasks, shown below its notes.
   tasks?: React.ReactNode;
+  // An opened project's images, shown below its tasks.
+  images?: React.ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
@@ -222,6 +225,7 @@ export function ProjectForm({
             onChange={(event) => onChange({ notes: event.target.value })}
           />
           {tasks}
+          {images}
         </div>
       </div>
       <div className="project-form-footer">

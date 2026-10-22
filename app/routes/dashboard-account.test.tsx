@@ -22,11 +22,24 @@ import Dashboard from "./dashboard";
 import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
+import { handleImagesRequest } from "../projects/image-handler.server";
 import { handleProjectsRequest } from "../projects/project-handler.server";
+import { createMemoryImageStore } from "../projects/test-image-store.server";
+import { makeJpeg, makePng } from "../projects/test-images";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
 import { refreshProjects } from "../projects/use-projects";
 
+// The browser's own picture decoding is not available here.
+vi.mock("../projects/thumbnail", () => ({
+  browserThumbnailEnvironment: {},
+  makeThumbnail: vi.fn(
+    async () => new Blob([makeJpeg(500)], { type: "image/jpeg" }),
+  ),
+}));
+
 beforeAll(() => {
+  URL.createObjectURL = vi.fn(() => "blob:test");
+  URL.revokeObjectURL = vi.fn();
   HTMLDialogElement.prototype.showModal = function () {
     this.setAttribute("open", "");
   };
@@ -59,6 +72,8 @@ type Server = {
   hang: boolean;
   // The account's projects, behind the real projects endpoints.
   projects: ReturnType<typeof createMemoryProjectStore>;
+  // Its images, behind the real images endpoints.
+  images: ReturnType<typeof createMemoryImageStore>;
   // Answers every projects request with this status instead, when set.
   projectsStatus: number | null;
   // Handles this many projects requests, then answers 503, as if lost.
@@ -78,6 +93,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
     calls: [],
     hang: false,
     projects: createMemoryProjectStore(),
+    images: createMemoryImageStore(),
     projectsStatus: null,
     lostAnswers: 0,
     ...overrides,
@@ -87,6 +103,23 @@ function fakeServer(overrides: Partial<Server> = {}) {
     vi.fn(async (path: string, init: RequestInit = {}) => {
       server.calls.push(`${init.method ?? "GET"} ${path}`);
       if (server.hang) return new Promise(() => {});
+      if (/^\/api\/projects\/[^/]+\/images/.test(path)) {
+        const headers = new Headers(init.headers);
+        if (server.session) headers.set("cookie", "ada");
+        return handleImagesRequest(
+          new Request(`http://localhost${path}`, {
+            method: init.method,
+            headers,
+            body: init.body,
+          }),
+          {
+            readSessionUserId: async (given) =>
+              given.get("cookie") ?? undefined,
+            store: server.images.store,
+            reportFailure: () => {},
+          },
+        );
+      }
       if (path.startsWith("/api/projects")) {
         if (server.projectsStatus !== null) {
           return Response.json(
@@ -1077,5 +1110,108 @@ describe("a signed-in account's projects (AD #41)", () => {
 
     expect(accountProject(server, "a1")?.title).toBe("Shed");
     expect(screen.getByRole("button", { name: /Shed/ })).toBeTruthy();
+  });
+});
+
+describe("images on the dashboard (AD #48)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const fields = {
+    notes: "",
+    assignee: "andy" as const,
+    dueDate: null,
+    tasks: [],
+  };
+
+  async function settle() {
+    for (let i = 0; i < 5; i++) await act(async () => {});
+  }
+
+  const drop = async (files: File[]) => {
+    await act(async () => {
+      fireEvent.drop(document.body, {
+        dataTransfer: { types: ["Files"], files },
+      });
+    });
+    await settle();
+  };
+  const png = (name = "porch.png") =>
+    new File([makePng()], name, { type: "image/png" });
+
+  it("says to sign in on a drop while signed out, and in place of the button", async () => {
+    fakeServer();
+    await renderDashboard();
+    await drop([png()]);
+    expect(screen.getByText("Sign in to add images")).toBeTruthy();
+
+    await addProject("Shed");
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    expect(screen.getAllByText("Sign in to add images").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByRole("button", { name: "Add image" })).toBeNull();
+  });
+
+  it("says to open a project when none is open, and adds nothing", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await drop([png()]);
+    expect(
+      screen.getByText("Open a project to add an image to it."),
+    ).toBeTruthy();
+    expect(server.images.accounts.size).toBe(0);
+  });
+
+  it("says to save a new project first, and adds nothing", async () => {
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    await settle();
+    await drop([png()]);
+    expect(
+      screen.getByText("Save the project first to add an image."),
+    ).toBeTruthy();
+    expect(server.images.accounts.size).toBe(0);
+  });
+
+  it("adds every picture dropped on the open project, refusing what is not one", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    await drop([png("a.png"), png("b.png"), new File(["hello"], "notes.txt")]);
+    await settle();
+
+    expect(server.images.accounts.get("ada")).toHaveLength(2);
+    expect(document.querySelectorAll(".image-entry")).toHaveLength(2);
+    expect(
+      screen.getByText(
+        "notes.txt: Sorry, only JPEG and PNG images can be added.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("leaves a drag of something that is not a file alone", async () => {
+    fakeServer({ session: ada });
+    await renderDashboard();
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", {
+      value: { types: ["text/plain"], files: [] },
+    });
+    await act(async () => {
+      document.body.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
   });
 });
