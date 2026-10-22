@@ -1779,9 +1779,19 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   stroke-linejoin: round;
 }
 
-.project-images-remove {
+/* The remove button copies the task buttons: a lighter icon that darkens on
+   hover, and a hover circle larger than the icon's circle. */
+.project-images .project-images-remove {
   flex: none;
-  margin-top: 1.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 1.125rem;
+  color: #6b665c;
+}
+
+.project-images .project-images-remove:hover:not(:disabled) {
+  background: #ebe6da;
+  color: #1a1a1a;
 }
 
 .project-images-remove svg {
