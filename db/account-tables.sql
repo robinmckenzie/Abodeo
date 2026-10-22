@@ -6,9 +6,9 @@
 --
 -- The auth_ tables are Better Auth's user, session, account and verification
 -- tables, renamed and with snake_case columns, as "user" is a reserved word.
--- user_profile and calendar_link are Abodeo's own. Deleting a row from
--- auth_user deletes that account's sessions, Google link, profile and
--- calendar link.
+-- user_profile, calendar_link, account_sign_in and account_visit are
+-- Abodeo's own. Deleting a row from auth_user deletes that account's
+-- sessions, Google link, profile, calendar link and history.
 --
 -- What is kept: Google's permanent account ID (auth_account.account_id), and
 -- the name and email from the first sign-in. The token, scope, image,
@@ -18,6 +18,11 @@
 -- calendar_link (AD #10 Prove Calendar Access) keeps the ID of the account's
 -- Abodeo calendar in Google Calendar, so that the Calendar test reuses it.
 -- No Calendar token is ever kept.
+--
+-- account_sign_in and account_visit (AD #46 Sign-in History) keep the time of
+-- each sign-in, and each visit's start and last activity, so that Robin can
+-- see when and for how long testers used Abodeo. Only the account and the
+-- server's times are kept: no IP address, browser or device details.
 
 create table if not exists auth_user (
     id text primary key,
@@ -86,3 +91,22 @@ create table if not exists calendar_link (
     calendar_id text not null,
     updated_at timestamptz not null default now()
 );
+
+create table if not exists account_sign_in (
+    id bigint generated always as identity primary key,
+    user_id text not null references auth_user (id) on delete cascade,
+    signed_in_at timestamptz not null default now()
+);
+
+create index if not exists account_sign_in_user_id_idx
+    on account_sign_in (user_id, signed_in_at);
+
+create table if not exists account_visit (
+    id bigint generated always as identity primary key,
+    user_id text not null references auth_user (id) on delete cascade,
+    started_at timestamptz not null default now(),
+    last_active_at timestamptz not null default now()
+);
+
+create index if not exists account_visit_user_id_idx
+    on account_visit (user_id, last_active_at desc);

@@ -19,6 +19,7 @@ import {
 } from "vitest";
 
 import Dashboard from "./dashboard";
+import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
 import { refreshProjects } from "../projects/use-projects";
@@ -97,6 +98,8 @@ function fakeServer(overrides: Partial<Server> = {}) {
           return new Response("{}", { status: server.signOutStatus });
         case "/api/auth/sign-in/social":
           return new Response("{}", { status: server.signInStatus });
+        case "/api/account/activity":
+          return new Response(null, { status: server.session ? 204 : 401 });
         case "/api/calendar/test-appointment":
           server.calendarBodies.push(JSON.parse(String(init.body)));
           return new Response("{}", { status: server.calendarStatus });
@@ -225,6 +228,60 @@ describe("the dashboard's account control", () => {
 
     expect(screen.queryByText(/Signed in as/)).toBeNull();
     expect(signInButton()).toBeTruthy();
+  });
+
+  it("reports clicks and keypresses while signed in, at most once a minute", async () => {
+    const server = fakeServer({
+      session: { name: "Ada Lovelace", email: "ada@example.com" },
+    });
+    await renderDashboard();
+    const reports = () =>
+      server.calls.filter((call) => call === "POST /api/account/activity");
+    // An idle page reports nothing.
+    expect(reports()).toHaveLength(0);
+
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+    });
+    expect(reports()).toHaveLength(1);
+
+    clock.mockReturnValue(now + activityReportInterval - 1);
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "a" });
+      fireEvent.pointerDown(document.body);
+    });
+    expect(reports()).toHaveLength(1);
+
+    clock.mockReturnValue(now + activityReportInterval);
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "a" });
+    });
+    expect(reports()).toHaveLength(2);
+  });
+
+  it("lists the sign-in record without saying it ends on sign-out", async () => {
+    fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
+    await renderDashboard();
+
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+
+    expect(
+      screen.getByText("A sign-in record for each browser you use."),
+    ).toBeTruthy();
+  });
+
+  it("reports no activity while signed out", async () => {
+    const server = fakeServer();
+    await renderDashboard();
+
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+      fireEvent.keyDown(document.body, { key: "a" });
+    });
+
+    expect(server.calls).not.toContain("POST /api/account/activity");
   });
 
   it("keeps showing the account and says so when sign-out fails", async () => {
