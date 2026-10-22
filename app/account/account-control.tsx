@@ -1,7 +1,7 @@
 // The account area below the dashboard's logo: who is signed in, the
 // preferred name, the Calendar test, what is kept, and signing in and out. It is plain text with
 // no picture, so that it cannot be mistaken for an assignee or a project.
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   calendarMessages,
@@ -12,12 +12,7 @@ import {
 import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import { useActivityReport } from "./use-activity-report";
-import {
-  useAccount,
-  type Account,
-  type AccountView,
-  type ProfileSaveResult,
-} from "./use-account";
+import type { Account, AccountView, ProfileSaveResult } from "./use-account";
 
 const saveMessages: Record<ProfileSaveResult, string> = {
   saved: "Saved.",
@@ -29,21 +24,38 @@ const saveMessages: Record<ProfileSaveResult, string> = {
 
 type SignedIn = Extract<AccountView, { kind: "signed-in" }>;
 
+// The account comes from the dashboard, whose projects depend on it.
 export function AccountControl({
+  account,
   onBeforeLeave,
 }: {
+  account: Account;
   onBeforeLeave: () => Promise<boolean>;
 }) {
-  const account = useAccount({ onBeforeLeave });
   const calendar = useCalendarTest({ onBeforeLeave });
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
   const { view, message } = account;
   useActivityReport(view.kind === "signed-in");
 
+  // A press anywhere outside the account area closes the panel. The button
+  // is inside it and toggles the panel itself.
+  const accountRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [isOpen]);
+
   return (
-    <div className="account">
-      {view.kind === "unavailable" && (
+    <div className="account" ref={accountRef}>
+      {(view.kind === "unavailable" || view.kind === "not-configured") && (
         <p className="account-unavailable">Sign-in is unavailable</p>
       )}
       {view.kind === "signed-out" && (
@@ -223,9 +235,10 @@ function AccountPanel({
           The ID of your Abodeo calendar in Google Calendar, if one was made.
         </li>
         <li>A sign-in record for each browser you use.</li>
+        <li>Your projects and their tasks.</li>
       </ul>
       <p className="account-hint">
-        Your projects stay in this browser and are not linked to your account.{" "}
+        Projects you add while signed out stay in this browser.{" "}
         <a href="/privacy.html">Privacy</a>
       </p>
       <button

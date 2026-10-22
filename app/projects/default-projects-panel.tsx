@@ -1,6 +1,8 @@
 // Development only: saves the projects here as the default projects that
-// every visitor receives, or resets the projects here to those defaults. The
-// dashboard shows it only in development, so the deployed app leaves it out.
+// every visitor receives, or resets the projects here to those defaults.
+// It works on this browser's signed-out projects only, even while signed
+// in. The dashboard shows it only in development, so the deployed app leaves
+// it out.
 import { useState } from "react";
 
 import {
@@ -17,8 +19,12 @@ import {
 import { refreshProjects } from "./use-projects";
 
 export function DefaultProjectsPanel({
+  isSignedIn,
   onBeforeChange,
 }: {
+  // Signed in, the panel still acts on this browser's signed-out projects,
+  // never on the account's.
+  isSignedIn: boolean;
   // Closes an open project, saving its changes.
   onBeforeChange: () => void;
 }) {
@@ -92,6 +98,11 @@ export function DefaultProjectsPanel({
       <button type="button" onClick={resetToDefaults} disabled={isSaving}>
         Reset to defaults
       </button>
+      {isSignedIn && (
+        <span className="default-projects-note">
+          Acts on this browser's signed-out projects
+        </span>
+      )}
       <p role="status">{message}</p>
     </section>
   );

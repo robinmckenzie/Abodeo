@@ -7,7 +7,14 @@ import {
 } from "./default-projects";
 import {
   createProject,
+  declineMove,
+  forgetDeclinedMove,
   hasProjectsScript,
+  isMoveDeclined,
+  listOwnProjects,
+  removeAccountHint,
+  removeProjectsIfUnchanged,
+  writeAccountHint,
   hasOwnProjects,
   loadProjects,
   markProjectsAsDefaults,
@@ -396,5 +403,75 @@ describe("default projects", () => {
     expect(hasOwnProjects()).toBe(true);
     runScript();
     expect(isMarked()).toBe(true);
+  });
+});
+
+describe("a browser's own projects, for moving into an account", () => {
+  it("lists only readable projects that are not defaults", async () => {
+    const own = await createProject(fields);
+    const other = await createProject({ ...fields, title: "Default" });
+    localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
+    if (!own.ok || !other.ok) throw new Error("Not created");
+    markProjectsAsDefaults({ hash: "h", projects: [other.project] });
+
+    expect(listOwnProjects().map(({ id }) => id)).toEqual([own.project.id]);
+  });
+
+  it("removes a moved project only if it has not changed since", async () => {
+    const kept = await createProject(fields);
+    const removed = await createProject({ ...fields, title: "Hall" });
+    if (!kept.ok || !removed.ok) throw new Error("Not created");
+    await saveProjectChanges(kept.project.id, { notes: "Changed in a tab" });
+
+    removeProjectsIfUnchanged([kept.project, removed.project]);
+
+    expect(loadProjects()).toMatchObject({
+      projects: [{ id: kept.project.id, notes: "Changed in a tab" }],
+    });
+  });
+
+  it("remembers a declined move for one account until forgotten", () => {
+    declineMove("ada");
+    expect(isMoveDeclined("ada")).toBe(true);
+    expect(isMoveDeclined("grace")).toBe(false);
+    forgetDeclinedMove();
+    expect(isMoveDeclined("ada")).toBe(false);
+  });
+});
+
+describe("the signed-in account's hint for the welcome screen", () => {
+  const runScript = () => new Function(hasProjectsScript)();
+  const isMarked = () =>
+    document.documentElement.hasAttribute("data-has-projects");
+
+  afterEach(() => {
+    removeAccountHint();
+    document.documentElement.removeAttribute("data-has-projects");
+  });
+
+  it("decides instead of the browser's projects while it is there", async () => {
+    await createProject(fields);
+    writeAccountHint("ada", false);
+    expect(hasOwnProjects()).toBe(false);
+    runScript();
+    expect(isMarked()).toBe(false);
+
+    writeAccountHint("ada", true);
+    localStorage.removeItem(
+      Object.keys(localStorage).find((key) =>
+        key.startsWith(projectKeyPrefix),
+      )!,
+    );
+    expect(hasOwnProjects()).toBe(true);
+    runScript();
+    expect(isMarked()).toBe(true);
+  });
+
+  it("leaves the browser's projects to decide once removed", async () => {
+    writeAccountHint("ada", true);
+    removeAccountHint();
+    expect(hasOwnProjects()).toBe(false);
+    await createProject(fields);
+    expect(hasOwnProjects()).toBe(true);
   });
 });

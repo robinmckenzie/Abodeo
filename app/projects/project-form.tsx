@@ -11,7 +11,9 @@ export type FormMessage = { text: string; isError: boolean } | null;
 export function ProjectForm({
   values,
   isNew,
+  isReadOnly = false,
   message,
+  messageActions,
   getFocusField,
   onChange,
   onFieldFocus,
@@ -25,7 +27,12 @@ export function ProjectForm({
 }: {
   values: ProjectFields;
   isNew: boolean;
+  // While an account's project loads its latest copy, it can be read and
+  // closed but not changed.
+  isReadOnly?: boolean;
   message: FormMessage;
+  // Buttons beside the message, such as for choosing which version to keep.
+  messageActions?: React.ReactNode;
   // The field to focus when the form appears: title, notes or assignee, or
   // "start" for a point just before the title, from which Tab goes into it.
   getFocusField: () => string;
@@ -64,6 +71,23 @@ export function ProjectForm({
       ?.focus({ preventScroll: isNew });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A field cannot take focus while the form is read-only, so the starting
+  // point is focused once it can be changed, unless focus has moved since.
+  const wasReadOnlyRef = useRef(isReadOnly);
+  useEffect(() => {
+    const wasReadOnly = wasReadOnlyRef.current;
+    wasReadOnlyRef.current = isReadOnly;
+    if (!wasReadOnly || isReadOnly) return;
+    const form = formRef.current;
+    if (form?.contains(document.activeElement)) return;
+    if (document.activeElement && document.activeElement !== document.body) {
+      return;
+    }
+    form
+      ?.querySelector<HTMLElement>(".project-form-fields")
+      ?.focus({ preventScroll: true });
+  }, [isReadOnly]);
 
   // Only for an opened project, as a new one is saved by Create, and not
   // while a save has failed, which the form reports. It sits under the
@@ -121,7 +145,12 @@ export function ProjectForm({
           </div>
         )}
       </div>
-      <div className="project-form-body">
+      <div
+        className={
+          isReadOnly ? "project-form-body is-read-only" : "project-form-body"
+        }
+        inert={isReadOnly}
+      >
         <div className="project-form-side">
           <fieldset className="assignee-list">
             <legend>Assigned to</legend>
@@ -202,6 +231,9 @@ export function ProjectForm({
         >
           {message?.text}
         </p>
+        {messageActions && (
+          <div className="project-form-message-actions">{messageActions}</div>
+        )}
         {isNew && (
           <>
             <button

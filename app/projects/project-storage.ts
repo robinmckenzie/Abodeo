@@ -1,14 +1,17 @@
-// Keeps projects in the browser's local storage. Each project has its own
-// entry, so that saving one project, or two tabs saving at once, can never
-// overwrite another project. This is the only code that touches projects in
-// storage: moving to a database means replacing these functions.
+// Keeps projects in the browser's local storage, for use while signed out.
+// Each project has its own entry, so that saving one project, or two tabs
+// saving at once, can never overwrite another project. This is the only code
+// that touches projects in browser storage. A signed-in account's projects
+// are never kept here (see account-projects.ts).
 //
 // The saving functions are async, as a database's would be, but they write to
 // local storage before they first wait, so that a save started as the page is
 // left is complete before it goes.
 import {
   bundledDefaultProjects,
+  planDefaultsReceipt,
   type DefaultProjects,
+  type DefaultsRecord,
 } from "./default-projects";
 import {
   hasTitle,
@@ -25,6 +28,15 @@ const keyPrefix = "abodeo-project:";
 // Which default projects this browser last received: their hash and ids. Its
 // name does not start with keyPrefix, so it is not counted as a project.
 const defaultsKey = "abodeo-default-projects";
+
+// While signed in: whether the account has projects of its own, so that the
+// welcome screen can be chosen before the account's projects load. Only yes
+// or no, with the account it is for, never any project data.
+const accountHintKey = "abodeo-account-has-projects";
+
+// The account for which the person chose not to move this browser's
+// projects in, until they next sign in or out.
+const moveDeclinedKey = "abodeo-move-declined";
 
 export type SaveFailure = "unavailable" | "full" | "unreadable" | "no-title";
 
@@ -138,27 +150,18 @@ function writeProject(project: Project): SaveResult {
 export function receiveDefaultProjects(
   defaults = bundledDefaultProjects,
 ): SaveResult {
-  // A damaged defaults file changes nothing.
-  if (!defaults) return { ok: true };
   try {
-    const record = readDefaultsRecord();
-    if (record?.hash === defaults.hash) return { ok: true };
-    // Nothing received yet and nothing to receive.
-    if (!record && defaults.projects.length === 0) return { ok: true };
-    const ids = new Set(defaults.projects.map(({ id }) => id));
-    for (const project of defaults.projects) {
-      if (!isUnreadableEntry(project.id)) {
-        localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
-      }
+    const receipt = planDefaultsReceipt(
+      readDefaultsRecord(),
+      defaults,
+      isUnreadableEntry,
+    );
+    if (!receipt) return { ok: true };
+    for (const project of receipt.write) {
+      localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
     }
-    // An unreadable default that is kept still counts as a default.
-    const keptIds: string[] = [];
-    for (const id of record?.ids ?? []) {
-      if (ids.has(id)) continue;
-      if (isUnreadableEntry(id)) keptIds.push(id);
-      else localStorage.removeItem(keyPrefix + id);
-    }
-    writeDefaultsRecord(defaults.hash, [...ids, ...keptIds]);
+    for (const id of receipt.remove) localStorage.removeItem(keyPrefix + id);
+    writeDefaultsRecord(receipt.record.hash, receipt.record.ids);
     return { ok: true };
   } catch (error) {
     return toFailure(error);
@@ -202,12 +205,93 @@ export function resetToDefaultProjects(
   }
 }
 
+// The visitor's own projects that can be read, not default projects, to
+// offer to move into an account.
+export function listOwnProjects(): Project[] {
+  const loaded = loadProjects();
+  if (!loaded.ok) return [];
+  const defaultIds = new Set([
+    ...(readDefaultsRecord()?.ids ?? []),
+    ...(bundledDefaultProjects?.projects.map(({ id }) => id) ?? []),
+  ]);
+  return loaded.projects.filter(({ id }) => !defaultIds.has(id));
+}
+
+// Removes each project that is still exactly as given, such as once it has
+// been moved into an account. One changed since, such as in another tab, is
+// kept, to be offered again.
+export function removeProjectsIfUnchanged(projects: Project[]) {
+  try {
+    for (const project of projects) {
+      const key = keyPrefix + project.id;
+      const saved = parseProject(project.id, localStorage.getItem(key));
+      if (saved && serialiseProject(saved) === serialiseProject(project)) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // What is left is offered again.
+  }
+}
+
+export function writeAccountHint(accountId: string, hasProjects: boolean) {
+  try {
+    localStorage.setItem(
+      accountHintKey,
+      JSON.stringify({ accountId, hasProjects }),
+    );
+  } catch {
+    // Without it, the browser's own projects choose the welcome screen.
+  }
+}
+
+export function removeAccountHint() {
+  try {
+    localStorage.removeItem(accountHintKey);
+  } catch {
+    // Nothing to remove.
+  }
+}
+
+function readAccountHint(): boolean | null {
+  try {
+    const hint = JSON.parse(localStorage.getItem(accountHintKey) ?? "null");
+    return typeof hint?.hasProjects === "boolean" ? hint.hasProjects : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isMoveDeclined(accountId: string) {
+  try {
+    return localStorage.getItem(moveDeclinedKey) === accountId;
+  } catch {
+    return false;
+  }
+}
+
+export function declineMove(accountId: string) {
+  try {
+    localStorage.setItem(moveDeclinedKey, accountId);
+  } catch {
+    // The offer is made again on the next load.
+  }
+}
+
+export function forgetDeclinedMove() {
+  try {
+    localStorage.removeItem(moveDeclinedKey);
+  } catch {
+    // Nothing to forget.
+  }
+}
+
 function isUnreadableEntry(id: string) {
   const json = localStorage.getItem(keyPrefix + id);
   return json !== null && parseProject(id, json) === null;
 }
 
-function readDefaultsRecord(): { hash: string; ids: string[] } | null {
+function readDefaultsRecord(): DefaultsRecord | null {
   try {
     const saved = JSON.parse(localStorage.getItem(defaultsKey) ?? "null");
     if (
@@ -251,8 +335,11 @@ export function isProjectKey(key: string | null) {
 // A visitor's own projects are those that are not default projects. Any
 // counts, including one that cannot be read, so that a returning visitor
 // whose projects are damaged is told so on the dashboard rather than being
-// welcomed as new. Default projects and tuning settings do not count.
+// welcomed as new. Default projects and tuning settings do not count. While
+// signed in, the account's hint decides instead.
 export function hasOwnProjects() {
+  const hint = readAccountHint();
+  if (hint !== null) return hint;
   try {
     const defaultIds = new Set(readDefaultsRecord()?.ids);
     return listProjectKeys().some(
@@ -277,12 +364,15 @@ export const hasProjectsAttribute = "data-has-projects";
 // hasOwnProjects and isWelcomeRequested do.
 export const hasProjectsScript = `try{
 if(!new URLSearchParams(location.search).has("welcome")){
+var h=null;try{h=JSON.parse(localStorage.getItem(${JSON.stringify(accountHintKey)}))}catch(e){}
+if(h&&typeof h.hasProjects==="boolean"){
+if(h.hasProjects)document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"")}else{
 var d=[];try{var r=JSON.parse(localStorage.getItem(${JSON.stringify(defaultsKey)}));
 if(r&&typeof r.hash==="string"&&Array.isArray(r.ids))d=r.ids}catch(e){}
 var p=${JSON.stringify(keyPrefix)};
 for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i)||"";
 if(k.indexOf(p)===0&&d.indexOf(k.slice(p.length))<0){
-document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"");break}}}
+document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"");break}}}}
 }catch(e){}`;
 
 export const projectKeyPrefix = keyPrefix;

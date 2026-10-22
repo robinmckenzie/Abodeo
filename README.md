@@ -39,8 +39,10 @@ Every visitor receives the default projects in `app/projects/default-projects.js
 deployment includes. When a visitor loads a version whose defaults differ from those their browser
 last received, the defaults are added or replaced, overwriting any edits to them, and defaults the
 file no longer has are removed. Projects the visitor created are left alone, and default projects
-alone do not skip the welcome screen. The deployed site is public, so keep anything private out of
-the default projects.
+alone do not skip the welcome screen. A signed-in account receives the default projects once, by
+the same rules, rather than one copy per browser, and a browser's default projects are never moved
+into an account. The deployed site is public, so keep anything private out of the default
+projects.
 
 When the app runs with `npm run dev`, the dashboard shows a Development panel:
 
@@ -51,15 +53,19 @@ When the app runs with `npm run dev`, the dashboard shows a Development panel:
 - **Reset to defaults** leaves exactly the saved default projects in this browser, removing any
   others and discarding edits.
 
-The panel is not in the deployed app. Switching to a branch with a different defaults file applies
-that branch's defaults in local development too.
+The panel is not in the deployed app. It always works on this browser's signed-out projects, even
+while signed in, and never changes an account's projects. Switching to a branch with a different
+defaults file applies that branch's defaults in local development too.
 
 ## Sign-in
 
 Anyone with a Google account can sign in, from the dashboard, and set a preferred name that only
 they see. A signed-in account can also create a test appointment in Google Calendar (see
-[Calendar test](#calendar-test)). Sign-in is optional: projects, tasks and settings stay in the
-browser either way, and are not linked to the account.
+[Calendar test](#calendar-test)). Sign-in is optional. Signed out, projects and tasks stay in the
+browser. Signed in, the dashboard shows and saves the account's projects instead, kept on the
+server, so they can be used on every device where the person signs in (see
+[Projects while signed in](#projects-while-signed-in)). Settings, such as the presentation and the
+tuning panels, stay in the browser either way.
 
 ### How it works
 
@@ -67,7 +73,8 @@ browser either way, and are not linked to the account.
   (`app/account/*.server.ts`). Every address under `/api` goes to the resource route
   `app/routes/api.ts`, which serves Better Auth's Google endpoints, `/api/account/status`
   (whether sign-in is configured), `/api/account/profile` (the preferred name), `/api/account/activity` (see
-  [Sign-in history](#sign-in-history)) and the Calendar
+  [Sign-in history](#sign-in-history)), `/api/projects` (see
+  [Projects while signed in](#projects-while-signed-in)) and the Calendar
   test's `/api/calendar/test-appointment` and `/api/calendar/callback`. Any other Better Auth
   endpoint gets a 404.
 - Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
@@ -93,7 +100,41 @@ tokens, the profile photo, and the IP address and browser details of a sign-in a
 their columns exist because Better Auth expects them, and are always empty. Tests in
 `app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
-`account_visit`.
+`account_visit`. The account's projects and their tasks are in `project`, and which default
+projects it has received in `project_defaults_received`.
+
+### Projects while signed in
+
+AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.server.ts` and
+`app/projects/account-projects.ts`.
+
+- Each project is a row of `project`, keyed by account and project id, holding the same saved form
+  as the browser keeps, so a project saved by a later version is never overwritten. Whose projects
+  are read or changed comes only from the session. Every request also names the account the page
+  is working for, in `X-Abodeo-Account`, and is refused if it differs, so a page left open for one
+  account cannot change another's after a sign-in in another tab.
+- The account's projects are held only in the page's memory, never in browser storage, so signing
+  out, which reloads the page, leaves none behind. Until the sign-in is known, or if it cannot be
+  checked, no projects are shown, so that a signed-in person never edits the browser's by mistake.
+- A save sends, for each field it changes, the value it was based on. A field changed elsewhere
+  since is refused: the form says "This project was changed on another device." and offers "Use
+  saved version" or "Keep mine". A change to the tasks is applied again to tasks changed
+  elsewhere, unless both touch the same task or both change the order, when it is not saved and
+  the saved tasks are shown.
+- Opening a project loads its latest copy first, and it cannot be changed until that arrives. The
+  list is loaded again when the window comes back into use, at most every 10 seconds.
+- On signing in with projects of the browser's own, the dashboard offers to move them in. Moving
+  sends each one; the server adds a copy rather than replacing a different project with the same
+  id, and sending the same projects again adds nothing. Each project is then removed from the
+  browser only if it has not changed there since. "Not now" is remembered until the next sign-in
+  or sign-out.
+- The welcome screen is chosen before the page loads, so while signed in the browser keeps a yes
+  or no hint, `abodeo-account-has-projects`, of whether the account has projects of its own. It
+  holds no project data and is removed on signing out.
+- While signed in, the browser asks before the page is left while a change is still being sent or
+  has failed to save. A save started as the page closes is sent so that it can finish afterwards,
+  but can still be lost if the network fails then.
+- Provisional limits: a request body of 256 KB, or 1 MB when moving projects in.
 
 ### Sign-in history
 
@@ -179,7 +220,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
 3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
    `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile`,
-   `calendar_link`, `account_sign_in` and `account_visit`.
+   `calendar_link`, `account_sign_in`, `account_visit`, `project` and
+   `project_defaults_received`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |
@@ -209,9 +251,9 @@ Vercel previews have no sign-in, and report it as unavailable.
 In the Neon SQL Editor for the right database:
 
 ```sql
--- Every account, with what is kept about it.
+-- Every account, with what is kept about it and how many projects it has.
 select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name,
-    c.calendar_id
+    c.calendar_id, (select count(*) from project j where j.user_id = u.id) as projects
 from auth_user u
 left join auth_account a on a.user_id = u.id
 left join user_profile p on p.user_id = u.id
@@ -227,7 +269,8 @@ from account_visit v
 join auth_user u on u.id = v.user_id
 order by email, at desc;
 
--- Removes an account, with its sessions, Google link, profile, calendar link and history.
+-- Removes an account, with its sessions, Google link, profile, calendar link, history and
+-- projects.
 delete from auth_user where email = 'someone@example.com';
 ```
 

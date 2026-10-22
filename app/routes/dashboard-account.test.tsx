@@ -22,6 +22,8 @@ import Dashboard from "./dashboard";
 import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
+import { handleProjectsRequest } from "../projects/project-handler.server";
+import { createMemoryProjectStore } from "../projects/test-projects.server";
 import { refreshProjects } from "../projects/use-projects";
 
 beforeAll(() => {
@@ -55,6 +57,12 @@ type Server = {
   calendarBodies: unknown[];
   calls: string[];
   hang: boolean;
+  // The account's projects, behind the real projects endpoints.
+  projects: ReturnType<typeof createMemoryProjectStore>;
+  // Answers every projects request with this status instead, when set.
+  projectsStatus: number | null;
+  // Handles this many projects requests, then answers 503, as if lost.
+  lostAnswers: number;
 };
 
 // Answers as the account endpoints would, recording each call.
@@ -69,6 +77,9 @@ function fakeServer(overrides: Partial<Server> = {}) {
     calendarBodies: [],
     calls: [],
     hang: false,
+    projects: createMemoryProjectStore(),
+    projectsStatus: null,
+    lostAnswers: 0,
     ...overrides,
   };
   vi.stubGlobal(
@@ -76,6 +87,33 @@ function fakeServer(overrides: Partial<Server> = {}) {
     vi.fn(async (path: string, init: RequestInit = {}) => {
       server.calls.push(`${init.method ?? "GET"} ${path}`);
       if (server.hang) return new Promise(() => {});
+      if (path.startsWith("/api/projects")) {
+        if (server.projectsStatus !== null) {
+          return Response.json(
+            { error: "unavailable" },
+            { status: server.projectsStatus },
+          );
+        }
+        const answer = handleProjectsRequest(
+          new Request(`http://localhost${path}`, {
+            method: init.method,
+            headers: init.headers,
+            body: init.body,
+          }),
+          {
+            readSessionUserId: async () => (server.session ? "ada" : undefined),
+            store: server.projects.store,
+            reportFailure: () => {},
+            defaultIds: [],
+          },
+        );
+        if (server.lostAnswers > 0) {
+          server.lostAnswers--;
+          await answer;
+          return Response.json({ error: "unavailable" }, { status: 503 });
+        }
+        return answer;
+      }
       switch (path) {
         case "/api/account/status":
           return Response.json({ configured: server.configured });
@@ -183,14 +221,30 @@ describe("the dashboard's account control", () => {
     expect(screen.getByText("Sign-in is unavailable")).toBeTruthy();
   });
 
+  // Until the sign-in is known, no projects are shown, so that a signed-in
+  // person never edits the browser's by mistake.
   it("does not hold up the dashboard while the account service does not answer", async () => {
+    localStorage.setItem(
+      "abodeo-project:p1",
+      JSON.stringify({
+        version: 3,
+        title: "Paint the fence",
+        notes: "",
+        assignee: "andy",
+        dueDate: null,
+        tasks: [],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+    refreshProjects();
     fakeServer({ hang: true });
     await renderDashboard();
 
-    await addProject("Paint the fence");
+    expect(screen.getByRole("button", { name: "Add project" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Paint the fence/ }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: /Paint the fence/ }),
+    ).toBeNull();
     expect(screen.queryByText(/Signed in as/)).toBeNull();
   });
 
@@ -272,6 +326,25 @@ describe("the dashboard's account control", () => {
     ).toBeTruthy();
   });
 
+  it("closes the account panel on a press outside it, not inside it", async () => {
+    fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
+    await renderDashboard();
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+    const panel = screen.getByRole("region", { name: "Your account" });
+
+    await act(async () => {
+      fireEvent.pointerDown(panel);
+    });
+    expect(
+      screen.queryByRole("region", { name: "Your account" }),
+    ).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.pointerDown(document.body);
+    });
+    expect(screen.queryByRole("region", { name: "Your account" })).toBeNull();
+  });
+
   it("reports no activity while signed out", async () => {
     const server = fakeServer();
     await renderDashboard();
@@ -300,23 +373,25 @@ describe("the dashboard's account control", () => {
     expect(screen.getByText(/Signed in as/)).toBeTruthy();
   });
 
-  it("leaves projects and settings as they are when signing in or out", async () => {
-    const server = fakeServer({
-      session: { name: "Ada Lovelace", email: "ada@example.com" },
-      signOutStatus: 503,
-    });
+  it("leaves the browser's projects and settings as they are when signing in or out", async () => {
+    const server = fakeServer();
     await renderDashboard();
     await addProject("Paint the fence");
     const before = { ...localStorage };
 
-    await click(screen.getByRole("button", { name: /Signed in as/ }));
-    await click(screen.getByRole("button", { name: "Sign out" }));
-    server.session = null;
+    await click(signInButton());
+    server.session = { name: "Ada Lovelace", email: "ada@example.com" };
+    server.signOutStatus = 503;
     cleanup();
     await renderDashboard();
-    await click(signInButton());
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+    await click(screen.getByRole("button", { name: "Sign out" }));
 
-    expect({ ...localStorage }).toEqual(before);
+    // Signed in, the account's projects were shown, so the hint for the
+    // welcome screen is the only addition.
+    const after = { ...localStorage };
+    delete after["abodeo-account-has-projects"];
+    expect(after).toEqual(before);
   });
 });
 
@@ -569,5 +644,438 @@ describe("the Calendar test", () => {
 
     await renderDashboard("?calendar=nonsense");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("a signed-in account's projects (AD #41)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const fields = {
+    notes: "",
+    assignee: "andy" as const,
+    dueDate: null,
+    tasks: [],
+  };
+  const browserProject = (id: string, title: string) =>
+    localStorage.setItem(
+      `abodeo-project:${id}`,
+      JSON.stringify({
+        version: 3,
+        title,
+        ...fields,
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+  const browserProjectIds = () =>
+    Object.keys(localStorage).filter((key) =>
+      key.startsWith("abodeo-project:"),
+    );
+  const titleField = () =>
+    screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement;
+  const accountProject = (server: Server, id: string) =>
+    server.projects.accounts.get("ada")?.get(id);
+
+  // Lets every request and the answers' effects finish.
+  async function settle() {
+    for (let i = 0; i < 5; i++) await act(async () => {});
+  }
+
+  async function openProject(title: string) {
+    await click(screen.getByRole("button", { name: new RegExp(title) }));
+    await settle();
+  }
+
+  async function typeTitle(title: string) {
+    fireEvent.change(titleField(), { target: { value: title } });
+    await act(async () => {
+      fireEvent.blur(titleField());
+    });
+    await settle();
+  }
+
+  it("shows the account's projects, not the browser's", async () => {
+    browserProject("b1", "Browser shed");
+    refreshProjects();
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Account shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+
+    expect(screen.getByRole("button", { name: /Account shed/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Browser shed/ })).toBeNull();
+  });
+
+  it("adds a project to the account and not to the browser", async () => {
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+
+    await addProject("Paint the fence");
+    await settle();
+
+    expect(
+      screen.getByRole("button", { name: /Paint the fence/ }),
+    ).toBeTruthy();
+    expect(browserProjectIds()).toEqual([]);
+    const [saved] = server.projects.accounts.get("ada")!.values();
+    expect(saved.title).toBe("Paint the fence");
+  });
+
+  it("adds a new project once when Create is pressed again after a failure", async () => {
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(titleField(), { target: { value: "Paint the fence" } });
+    server.projectsStatus = 503;
+    await click(screen.getByRole("button", { name: "Create" }));
+    await settle();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Not saved: Abodeo cannot reach your projects right now.",
+    );
+
+    server.projectsStatus = null;
+    await click(screen.getByRole("button", { name: "Create" }));
+    await settle();
+
+    expect(server.projects.accounts.get("ada")!.size).toBe(1);
+  });
+
+  describe("when a Create's answer was lost", () => {
+    async function createWithLostAnswer() {
+      const server = fakeServer({ session: ada });
+      await renderDashboard();
+      await settle();
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Shed" } });
+      server.lostAnswers = 1;
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+      const [added] = server.projects.accounts.get("ada")!.values();
+      return { server, added };
+    }
+
+    it("saves edits made before Create is pressed again", async () => {
+      const { server, added } = await createWithLostAnswer();
+      fireEvent.change(titleField(), { target: { value: "Painted shed" } });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(server.projects.accounts.get("ada")!.size).toBe(1);
+      expect(accountProject(server, added.id)?.title).toBe("Painted shed");
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    });
+
+    it("keeps changes made on another device since", async () => {
+      const { server, added } = await createWithLostAnswer();
+      await server.projects.store.saveChanges(
+        "ada",
+        added.id,
+        { notes: "" },
+        { notes: "From the other device" },
+      );
+      fireEvent.change(titleField(), { target: { value: "Painted shed" } });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(accountProject(server, added.id)).toMatchObject({
+        title: "Painted shed",
+        notes: "From the other device",
+      });
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    });
+
+    it("says so when this form and another device both changed a field", async () => {
+      const { server, added } = await createWithLostAnswer();
+      await server.projects.store.saveChanges(
+        "ada",
+        added.id,
+        { notes: "" },
+        { notes: "From the other device" },
+      );
+      fireEvent.change(screen.getByRole("textbox", { name: "Notes" }), {
+        target: { value: "Mine" },
+      });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(accountProject(server, added.id)?.notes).toBe(
+        "From the other device",
+      );
+      expect(
+        screen.getByText(/changed on another device, so some/),
+      ).toBeTruthy();
+    });
+  });
+
+  it("offers to move the browser's own projects in, and moves them", async () => {
+    browserProject("b1", "Browser shed");
+    refreshProjects();
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    expect(
+      screen.getByText(
+        "This browser has 1 project saved while signed out. Move it into your account?",
+      ),
+    ).toBeTruthy();
+
+    await click(screen.getByRole("button", { name: "Move" }));
+    await settle();
+
+    expect(accountProject(server, "b1")?.title).toBe("Browser shed");
+    expect(browserProjectIds()).toEqual([]);
+    expect(screen.getByRole("button", { name: /Browser shed/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+  });
+
+  it("leaves the browser and account as they are on Not now, and offers again at the next sign-in", async () => {
+    browserProject("b1", "Browser shed");
+    refreshProjects();
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+
+    await click(screen.getByRole("button", { name: "Not now" }));
+    expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
+    expect(server.projects.accounts.get("ada")!.size).toBe(0);
+    cleanup();
+    await renderDashboard();
+    await settle();
+    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+
+    // jsdom cannot leave the page, so the reload after signing out is stood
+    // in for by rendering again, and its complaint is silenced.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // Earlier tests can leave typed tasks behind, which the check before
+    // leaving asks about.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+    await click(screen.getByRole("button", { name: "Sign out" }));
+    await settle();
+    cleanup();
+    await renderDashboard();
+    await settle();
+    expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
+  });
+
+  it("does not offer default projects", async () => {
+    browserProject("d1", "Welcome");
+    localStorage.setItem(
+      "abodeo-default-projects",
+      JSON.stringify({ hash: "h", ids: ["d1"] }),
+    );
+    refreshProjects();
+    fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+
+    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+  });
+
+  it("says the projects cannot be loaded, showing none of the browser's", async () => {
+    browserProject("b1", "Browser shed");
+    refreshProjects();
+    fakeServer({ session: ada, projectsStatus: 503 });
+    await renderDashboard();
+    await settle();
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Your projects cannot be loaded right now. Please try again later.",
+    );
+    expect(screen.queryByRole("button", { name: /Browser shed/ })).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Add project" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: /Signed in as/ })).toBeTruthy();
+  });
+
+  it("opens the latest saved copy, which can be changed once it has loaded", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Old",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await server.projects.store.saveChanges(
+      "ada",
+      "a1",
+      { notes: "" },
+      { notes: "Changed on another device" },
+    );
+
+    await openProject("Old");
+
+    expect(
+      (screen.getByRole("textbox", { name: "Notes" }) as HTMLTextAreaElement)
+        .value,
+    ).toBe("Changed on another device");
+    expect(titleField().closest("[inert]")).toBeNull();
+  });
+
+  it("cannot change a project whose latest copy cannot be loaded", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Old",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    server.projectsStatus = 503;
+
+    await openProject("Old");
+
+    expect(
+      screen.getByText("This project cannot be loaded right now."),
+    ).toBeTruthy();
+    expect(titleField().closest("[inert]")).not.toBeNull();
+  });
+
+  it("closes an open project when the account's projects stop loading", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await openProject("Shed");
+    server.projectsStatus = 503;
+
+    const later = Date.now() + 11_000;
+    vi.spyOn(Date, "now").mockReturnValue(later);
+    await act(async () => {
+      fireEvent.focus(window);
+    });
+    await settle();
+
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(
+      screen.getByText(
+        "Your projects cannot be loaded right now. Please try again later.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("keeps a field changed elsewhere when saving another", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await openProject("Shed");
+    await server.projects.store.saveChanges(
+      "ada",
+      "a1",
+      { notes: "" },
+      { notes: "From the other device" },
+    );
+
+    await typeTitle("Shed, painted");
+
+    expect(accountProject(server, "a1")).toMatchObject({
+      title: "Shed, painted",
+      notes: "From the other device",
+    });
+  });
+
+  describe("when a field was changed on another device", () => {
+    async function openConflict() {
+      const server = fakeServer({ session: ada });
+      await server.projects.store.create("ada", "a1", {
+        title: "Shed",
+        ...fields,
+      });
+      await renderDashboard();
+      await settle();
+      await openProject("Shed");
+      await server.projects.store.saveChanges(
+        "ada",
+        "a1",
+        { title: "Shed" },
+        { title: "Theirs" },
+      );
+      await typeTitle("Mine");
+      return server;
+    }
+
+    it("does not save over it, and says so", async () => {
+      const server = await openConflict();
+
+      expect(
+        screen.getByText("This project was changed on another device.")
+          .className,
+      ).toBe("project-form-error");
+      expect(accountProject(server, "a1")?.title).toBe("Theirs");
+    });
+
+    it("saves over it on Keep mine", async () => {
+      const server = await openConflict();
+
+      await click(screen.getByRole("button", { name: "Keep mine" }));
+      await settle();
+
+      expect(accountProject(server, "a1")?.title).toBe("Mine");
+      expect(screen.queryByRole("button", { name: "Keep mine" })).toBeNull();
+    });
+
+    it("shows the saved version on Use saved version", async () => {
+      const server = await openConflict();
+
+      await click(screen.getByRole("button", { name: "Use saved version" }));
+      await settle();
+
+      expect(titleField().value).toBe("Theirs");
+      expect(accountProject(server, "a1")?.title).toBe("Theirs");
+      expect(
+        screen.queryByText("This project was changed on another device."),
+      ).toBeNull();
+    });
+  });
+
+  it("chooses the welcome screen by the account's projects, until signed out", async () => {
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    const hint = () =>
+      JSON.parse(localStorage.getItem("abodeo-account-has-projects") ?? "null");
+    expect(hint()).toEqual({ accountId: "ada", hasProjects: false });
+
+    await addProject("Paint the fence");
+    await settle();
+    expect(hint()).toEqual({ accountId: "ada", hasProjects: true });
+
+    server.session = null;
+    cleanup();
+    await renderDashboard();
+    await settle();
+    expect(hint()).toBeNull();
+  });
+
+  it("resets only the browser's projects to the defaults while signed in", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderDashboard();
+    await settle();
+
+    expect(
+      screen.getByText("Acts on this browser's signed-out projects"),
+    ).toBeTruthy();
+    await click(screen.getByRole("button", { name: "Reset to defaults" }));
+    await settle();
+
+    expect(accountProject(server, "a1")?.title).toBe("Shed");
+    expect(screen.getByRole("button", { name: /Shed/ })).toBeTruthy();
   });
 });

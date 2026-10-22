@@ -1,5 +1,7 @@
 // The signed-in account, if any. It is kept apart from projects, tasks,
-// assignees and settings: nothing here reads or changes them. It is looked up
+// assignees and settings: nothing here reads or changes them, though the
+// dashboard is told just before sign-in or sign-out leaves the page. It is
+// looked up
 // once the page has loaded, so a slow or failed lookup never holds the page
 // up, and again when the window comes back into use, when the session is due
 // to end, and when another tab signs out, so that a session that has ended
@@ -25,6 +27,7 @@ import {
 
 export type AccountView =
   | { kind: "checking" }
+  | { kind: "not-configured" }
   | { kind: "unavailable" }
   | { kind: "signed-out" }
   | {
@@ -45,6 +48,8 @@ export type Account = {
   isLeaving: boolean;
   signIn(): void;
   signOut(): void;
+  // Looks up who is signed in again, such as after a request was refused.
+  recheck(): void;
   savePreferredName(preferredName: string | null): Promise<ProfileSaveResult>;
 };
 
@@ -64,9 +69,12 @@ const channelName = "abodeo-account";
 
 export function useAccount({
   onBeforeLeave,
+  onLeaving,
 }: {
   // Gets the page ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
+  // Just before sign-in or sign-out leaves the page.
+  onLeaving?: (action: "sign-in" | "sign-out") => void;
 }): Account {
   const location = useLocation();
   const navigate = useNavigate();
@@ -77,9 +85,12 @@ export function useAccount({
   const [isLeaving, setIsLeaving] = useState(false);
   const viewRef = useRef(view);
   const onBeforeLeaveRef = useRef(onBeforeLeave);
+  const onLeavingRef = useRef(onLeaving);
+  const recheckRef = useRef(() => {});
   useEffect(() => {
     viewRef.current = view;
     onBeforeLeaveRef.current = onBeforeLeave;
+    onLeavingRef.current = onLeaving;
   });
 
   // Removes the sign-in error from the address, so that a reload does not
@@ -167,6 +178,7 @@ export function useAccount({
       // Without it, other tabs notice a sign-out when next used.
     }
 
+    recheckRef.current = () => void check();
     void check();
     window.addEventListener("focus", checkIfDue);
     document.addEventListener("visibilitychange", checkIfDue);
@@ -194,7 +206,9 @@ export function useAccount({
   const signIn = () =>
     void leave(async () => {
       try {
-        window.location.assign(await requestSignInAddress());
+        const address = await requestSignInAddress();
+        onLeavingRef.current?.("sign-in");
+        window.location.assign(address);
       } catch {
         setMessage(signInUnavailableMessage);
       }
@@ -210,6 +224,7 @@ export function useAccount({
         return;
       }
       announceSignOut();
+      onLeavingRef.current?.("sign-out");
       window.location.replace(accountReturnPath);
     });
 
@@ -232,7 +247,17 @@ export function useAccount({
     }
   };
 
-  return { view, message, isLeaving, signIn, signOut, savePreferredName };
+  const recheck = () => recheckRef.current();
+
+  return {
+    view,
+    message,
+    isLeaving,
+    signIn,
+    signOut,
+    recheck,
+    savePreferredName,
+  };
 }
 
 function shownAs(id: string, name: string, email: string) {

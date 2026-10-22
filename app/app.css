@@ -330,12 +330,12 @@ body:has(.dashboard) {
 
 .account-button {
   display: block;
-  max-width: 100%;
-  padding: 0.35rem 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
   border: 1px solid #8a857a;
   border-radius: 999px;
   background: transparent;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -343,7 +343,10 @@ body:has(.dashboard) {
   background: #ece9e1;
 }
 
+/* "Signed in as" above the name, so the button's text stays whole for
+   screen readers. */
 .account-label {
+  display: block;
   color: #6b675e;
 }
 
@@ -480,16 +483,21 @@ body:has(.dashboard) {
   margin-bottom: 1.25rem;
 }
 
-/* Development only. */
+/* Development only. Fixed at the bottom right of the window, out of the
+   toolbar's way. */
 .default-projects-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-right: auto;
   padding: 0.4rem 0.75rem;
   border: 1px dashed #8a857a;
   border-radius: 10px;
+  background: #fdfcf8;
   font-size: 0.85rem;
 }
 
@@ -522,8 +530,19 @@ body:has(.dashboard) {
   display: none;
 }
 
+.default-projects-note {
+  color: #6b675e;
+}
+
 .dashboard-toolbar .add-project {
   flex-shrink: 0;
+}
+
+/* While the account's projects are unavailable, Add project is disabled, and
+   it and the development panel, which has nothing to act on, are hidden. */
+.dashboard-toolbar .add-project:disabled,
+.dashboard-toolbar .default-projects-panel:has(~ .add-project:disabled) {
+  display: none;
 }
 
 .add-project,
@@ -553,6 +572,35 @@ body:has(.dashboard) {
   border-radius: 10px;
   background: #f8e9e6;
   color: #8c2a1e;
+}
+
+/* The offer to move a browser's projects into the account: a question,
+   not an error. */
+.dashboard-move-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  background: #ece9e1;
+  color: #1a1a1a;
+}
+
+.dashboard-move-offer p {
+  flex: 1 1 20rem;
+  margin: 0;
+}
+
+.dashboard-move-offer button {
+  padding: 0.4rem 1rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.dashboard-move-offer button:hover:not(:disabled) {
+  background: #fdfcf8;
 }
 
 /* Centred in the space below the button, as the dashboard's message was. */
@@ -1477,6 +1525,32 @@ body:has(.dashboard) {
 
 .project-form-error {
   color: #a12a2a;
+}
+
+/* An account's project, while its latest copy loads. */
+.project-form-body.is-read-only {
+  opacity: 0.6;
+}
+
+/* Space the choice from the tasks input above it. */
+.project-form-footer:has(.project-form-message-actions) {
+  margin-top: 1rem;
+}
+
+/* Use saved version and Keep mine, outlined like Cancel. */
+.project-form-message-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.project-form-footer .project-form-message-actions button {
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #1a1a1a;
+}
+
+.project-form-footer .project-form-message-actions button:hover {
+  background: #f1eee6;
 }
 
 /* The crossfade between screens, for links with React Router's

@@ -17,6 +17,8 @@ type Fetch = typeof fetch;
 // Who is signed in, as far as this page knows. expiresAt is when the
 // session ends, in milliseconds, unless it is renewed before then.
 export type AccountSession =
+  // Sign-in is not set up here, as on previews.
+  | { kind: "not-configured" }
   | { kind: "unavailable" }
   | { kind: "signed-out" }
   | {
@@ -70,9 +72,10 @@ export async function loadAccountSession(
   try {
     const status = await sendRequest(fetchFn, accountStatusPath);
     const statusBody: unknown = status.ok ? await status.json() : undefined;
-    if ((statusBody as Partial<AccountStatusResponse>)?.configured !== true) {
-      return { kind: "unavailable" };
-    }
+    const configured = (statusBody as Partial<AccountStatusResponse>)
+      ?.configured;
+    if (configured === false) return { kind: "not-configured" };
+    if (configured !== true) return { kind: "unavailable" };
     const response = await sendRequest(fetchFn, `${authBasePath}/get-session`);
     if (!response.ok) return { kind: "unavailable" };
     const body: unknown = await response.json();
