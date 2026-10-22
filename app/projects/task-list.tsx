@@ -594,7 +594,7 @@ function findShift(row: HTMLElement) {
   return !transform || transform === "none" ? 0 : new DOMMatrix(transform).m42;
 }
 
-function fitHeightToText(box: HTMLTextAreaElement) {
+export function fitHeightToText(box: HTMLTextAreaElement) {
   box.style.height = "auto";
   const borders = box.offsetHeight - box.clientHeight;
   box.style.height = `${box.scrollHeight + borders}px`;

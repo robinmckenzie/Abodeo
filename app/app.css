@@ -1847,7 +1847,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   border-radius: 6px;
   font: inherit;
   font-size: 0.875rem;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 
 .image-entry-footer {

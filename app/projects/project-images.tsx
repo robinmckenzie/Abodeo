@@ -23,6 +23,7 @@ import {
   type ImageInfo,
 } from "./images-api";
 import type { ImageFailure } from "./images-client";
+import { fitHeightToText } from "./task-list";
 import { useProjectImages } from "./use-project-images";
 
 // What the dashboard calls to add files dropped on the page.
@@ -256,6 +257,7 @@ function ImageEntry({
   const [draft, setDraft] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const latestDraftRef = useRef<string | null>(null);
+  const boxRef = useRef<HTMLTextAreaElement>(null);
   const caption = draft ?? image.caption;
   const length = countCharacters(caption);
   const isTooLong = length > maxCaptionLength;
@@ -279,6 +281,17 @@ function ImageEntry({
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The box grows with its text, as a task's title does, and again when a
+  // change of window width rewraps it.
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    fitHeightToText(box);
+    const refit = () => fitHeightToText(box);
+    window.addEventListener("resize", refit);
+    return () => window.removeEventListener("resize", refit);
+  }, [caption]);
 
   const saveCaption = async () => {
     if (draft === null || draft === image.caption) {
@@ -322,6 +335,7 @@ function ImageEntry({
       <div className="image-entry-details">
         <time dateTime={image.createdAt}>{time}</time>
         <textarea
+          ref={boxRef}
           aria-label="Caption"
           placeholder="Add a caption"
           rows={2}
