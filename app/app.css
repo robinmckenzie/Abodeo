@@ -953,7 +953,13 @@ body:has(.dashboard) {
   gap: 0.625rem;
   padding: 0.375rem 0.25rem;
   border-radius: 8px;
+  color: #6b665c;
   cursor: pointer;
+}
+
+/* Lighter text and icon, darker on hover, and fully dark when selected. */
+.assignee-option:is(:hover, :has(input:checked)) {
+  color: #1a1a1a;
 }
 
 /* As the form appears, its parts arrive one by one (see arriveAt in
