@@ -530,6 +530,13 @@ body:has(.dashboard) {
   flex-shrink: 0;
 }
 
+/* While the account's projects are unavailable, Add project is disabled, and
+   it and the development panel, which has nothing to act on, are hidden. */
+.dashboard-toolbar .add-project:disabled,
+.dashboard-toolbar .default-projects-panel:has(~ .add-project:disabled) {
+  display: none;
+}
+
 .add-project,
 .project-form-footer button {
   padding: 0.55rem 1.15rem;
