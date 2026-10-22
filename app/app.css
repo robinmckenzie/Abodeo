@@ -1145,17 +1145,21 @@ body:has(.dashboard) {
 .due-date-month button {
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  /* The larger hover circle takes the same room as the old one. */
+  margin: -0.125rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
+  color: #6b665c;
   cursor: pointer;
 }
 
 .due-date-month button:hover {
-  background: #f7f5ef;
+  background: #ebe6da;
+  color: #1a1a1a;
 }
 
 .due-date-month svg {
@@ -1748,24 +1752,32 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   background: #f6f3ec;
 }
 
-/* The add button is the thin circle of the assignee icon, with a plus, and
-   the date picker's hover. The remove button is the same turned 45 degrees,
-   beside the caption box. */
+/* The add button is the thin circle of the assignee icon, with a plus. The
+   remove button is the same turned 45 degrees, beside the caption box. Both,
+   like the task buttons and the date picker's month arrows, have a lighter
+   icon that darkens on hover, and a hover circle larger than the icon's. */
 .project-images .project-images-add,
 .project-images .project-images-remove {
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
+  color: #6b665c;
 }
 
 .project-images .project-images-add:hover:not(:disabled),
 .project-images .project-images-remove:hover:not(:disabled) {
-  background: #f7f5ef;
+  background: #ebe6da;
+  color: #1a1a1a;
+}
+
+/* The larger hover circle takes the same room as the old one. */
+.project-images .project-images-add {
+  margin: -0.125rem;
 }
 
 .project-images-add svg,
@@ -1779,19 +1791,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   stroke-linejoin: round;
 }
 
-/* The remove button copies the task buttons: a lighter icon that darkens on
-   hover, and a hover circle larger than the icon's circle. */
 .project-images .project-images-remove {
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
   margin-top: 1.125rem;
-  color: #6b665c;
-}
-
-.project-images .project-images-remove:hover:not(:disabled) {
-  background: #ebe6da;
-  color: #1a1a1a;
 }
 
 .project-images-remove svg {
