@@ -42,7 +42,8 @@ file no longer has are removed. Projects the visitor created are left alone, and
 alone do not skip the welcome screen. A signed-in account receives the default projects once, by
 the same rules, rather than one copy per browser, and a browser's default projects are never moved
 into an account. The deployed site is public, so keep anything private out of the default
-projects.
+projects. An account's copy of a default that is kept under the same id keeps its images when the
+defaults are refreshed; a default that the file no longer has is removed with its images.
 
 When the app runs with `npm run dev`, the dashboard shows a Development panel:
 
@@ -101,7 +102,8 @@ their columns exist because Better Auth expects them, and are always empty. Test
 `app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
 `account_visit`. The account's projects and their tasks are in `project`, and which default
-projects it has received in `project_defaults_received`.
+projects it has received in `project_defaults_received`. The images added to its projects are in
+`project_image` (details, caption and sizes) and `project_image_bytes` (the files).
 
 ### Projects while signed in
 
@@ -135,6 +137,45 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
   has failed to save. A save started as the page closes is sent so that it can finish afterwards,
   but can still be lost if the network fails then.
 - Provisional limits: a request body of 256 KB, or 1 MB when moving projects in.
+
+### Images on projects
+
+AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images-*.ts`,
+`use-project-images.ts`, `project-images.tsx` and `thumbnail.ts`.
+
+- Only an account's own projects have images. Signed out, a project shows "Sign in to add images".
+  A person adds JPEG or PNG images with the Add image button, or by dropping them on the page,
+  which adds them to the open project (and says why when none is open, or the open one is new and
+  not yet saved).
+- A project with images shows the thumbnail of its newest one at the right of its bar. The project
+  list answer carries the newest image id of each project (`latestImageIds`, one query), and the
+  browser fetches those thumbnails with the same checks as any image, holding them in memory only
+  (`use-bar-thumbnails.ts`). The open project's images keep its bar up to date as they change.
+- Each image is a row of `project_image` (its id, type, sizes, caption and time) and two rows of
+  `project_image_bytes` (the original and a thumbnail), which go with the image, the project or
+  the account when any is removed. The bytes are behind `ImageBytesStore`
+  (`image-bytes-store.server.ts`), so they can move to another store later, such as Vercel Blob,
+  without touching the details. They are read as base64, as the driver would give bytea as hex,
+  twice the size.
+- The browser decodes each file, draws a thumbnail (at most 100 KB, usually 20 to 40 KB) and sends
+  both in one binary request, with an id it made, so that sending it again after a lost answer
+  gives the same image. The server decides the type from the file's content, and checks the
+  structure of both files (PNG chunk lengths and checksums, JPEG markers and ends). It does not
+  decode pixels, so a hand-made request could store damaged pixel data, in its own account only.
+- Provisional limits, in `images-api.ts`: 4 MiB per image, 100 KB per thumbnail, 100 MB of images
+  and thumbnails per account, captions of 500 characters (counted as people count them), and 100
+  images in each answer of the list. The largest request is 4,296,708 bytes, under Vercel's limit
+  of 4.5 MB for a request or response, which a test checks. Uploads of one account are serialised
+  by a lock on its `auth_user` row, so two at once cannot both pass the 100 MB.
+- Images have no public address. Each is fetched with the same session and `X-Abodeo-Account`
+  check as projects, shown from a blob URL held only in memory, and never cached (`no-store`,
+  `nosniff`). Changes need a JSON or binary type and the account header, which another site
+  cannot send, and a request naming another origin is refused. Photos are stored exactly as
+  added, including any location data.
+- A caption is saved with the caption it was based on. If another device saved a different one
+  meanwhile, the saved one is kept and the page says so. Captions of different images never clash.
+- Not included: sharing, live updates on other devices, offline use, editing an image, and
+  images on signed-out projects.
 
 ### Sign-in history
 
@@ -220,8 +261,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
 3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
    `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile`,
-   `calendar_link`, `account_sign_in`, `account_visit`, `project` and
-   `project_defaults_received`.
+   `calendar_link`, `account_sign_in`, `account_visit`, `project`,
+   `project_defaults_received`, `project_image` and `project_image_bytes`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |
@@ -269,8 +310,18 @@ from account_visit v
 join auth_user u on u.id = v.user_id
 order by email, at desc;
 
--- Removes an account, with its sessions, Google link, profile, calendar link, history and
--- projects.
+-- How much each account uses of its 100 MB of images, and the total, in MB.
+select u.email, count(*) as images,
+    round(sum(i.original_size + i.thumbnail_size) / 1048576.0, 1) as mb
+from project_image i
+join auth_user u on u.id = i.user_id
+group by u.email
+union all
+select 'total', count(*), round(coalesce(sum(original_size + thumbnail_size), 0) / 1048576.0, 1)
+from project_image;
+
+-- Removes an account, with its sessions, Google link, profile, calendar link, history,
+-- projects and images.
 delete from auth_user where email = 'someone@example.com';
 ```
 
@@ -280,9 +331,25 @@ and `auth_session`'s `ip_address` and `user_agent` should all be empty.
 ### Costs
 
 Everything is on free tiers: Google sign-in costs nothing, the Neon free plan allows each
-database 0.5 GB and a limited number of compute hours a month (it sleeps when unused, so a demo
-stays well within it), and the Vercel Hobby plan covers the function. Nothing needs a paid plan
-or an upgrade.
+database 1 GB of storage, 100 compute-hours and 5 GB of network transfer a month (it sleeps when
+unused), and the Vercel Hobby plan covers the function, with 100 GB of fast data transfer,
+1,000,000 invocations a month and a limit of 4.5 MB on a request or response body. Nothing needs a
+paid plan or an upgrade. These figures were checked against Neon's and Vercel's documents on
+2026-10-22.
+
+Images (AD #48) share the database with sign-in and projects, so they are the main use of it:
+
+- **Storage**: each account may keep 100 MB of images. With fewer than 5 testers (Robin, Andrew and
+  perhaps Robin's father) the worst case is half of the 1 GB. Beyond about 8 full accounts there
+  is no room for projects, and uploads are refused with a message while existing data is kept.
+  There is no limit across accounts, by Robin's decision.
+- **Transfer** is the tightest limit. Opening a project with 40 images sends about 1.6 MB of
+  thumbnails, and a full-size view up to 5.6 MB (base64). Thumbnails are small, fetched when they
+  come into view, and kept in memory, so they are not fetched again in the same page. Check
+  Neon's usage page after the first week of testing.
+- **If a limit is reached**, Neon suspends the database or refuses writes, which also stops
+  sign-in and project saves until the next month, or until space is freed. Use the usage query
+  under [Inspecting and removing an account](#inspecting-and-removing-an-account) to watch it.
 
 ## Deployment
 

@@ -32,6 +32,15 @@
 -- revision changes on every write, so that two saves at once cannot both
 -- apply. project_defaults_received records which default projects the
 -- account has received, as each browser does for itself.
+--
+-- project_image and project_image_bytes (AD #48 Add Images To Projects) keep
+-- the images added to an account's projects. project_image holds each
+-- image's details, its caption, and the sizes that count towards the
+-- account's 100 MB; project_image_bytes holds the original and the
+-- thumbnail, so that the bytes can move elsewhere later without touching the
+-- details. An image id is made by the browser, so a retry is recognisable,
+-- and content_hash tells a retry from a different image with the same id.
+-- Removing a project, or the account, removes its images.
 
 create table if not exists auth_user (
     id text primary key,
@@ -132,4 +141,32 @@ create table if not exists project_defaults_received (
     user_id text primary key references auth_user (id) on delete cascade,
     hash text not null,
     ids jsonb not null
+);
+
+create table if not exists project_image (
+    user_id text not null,
+    project_id text not null,
+    id text not null,
+    content_type text not null check (content_type in ('image/jpeg', 'image/png')),
+    original_size integer not null check (original_size between 1 and 4194304),
+    thumbnail_size integer not null check (thumbnail_size between 1 and 102400),
+    content_hash text not null,
+    caption text not null default '' check (char_length(caption) <= 500),
+    created_at timestamptz not null default now(),
+    primary key (user_id, project_id, id),
+    foreign key (user_id, project_id) references project (user_id, id) on delete cascade
+);
+
+create index if not exists project_image_account_idx
+    on project_image (user_id);
+
+create table if not exists project_image_bytes (
+    user_id text not null,
+    project_id text not null,
+    image_id text not null,
+    kind text not null check (kind in ('original', 'thumbnail')),
+    data bytea not null,
+    primary key (user_id, project_id, image_id, kind),
+    foreign key (user_id, project_id, image_id)
+        references project_image (user_id, project_id, id) on delete cascade
 );

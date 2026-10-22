@@ -778,6 +778,25 @@ body:has(.dashboard) {
   font-size: 0.85rem;
 }
 
+/* The newest image's thumbnail, on the right, centred down the bar, with the
+   border of the images' caption box. After the unsaved note, if there is
+   one, so that neither leaves a gap. */
+.project-bar-thumbnail {
+  grid-area: 1 / 3 / span 3;
+  align-self: center;
+  width: 5.25rem;
+  height: 3.9375rem;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid #d8d3c6;
+  border-radius: 8px;
+  background: #f6f3ec;
+}
+
+.project-bar-unsaved ~ .project-bar-thumbnail {
+  grid-column: 4;
+}
+
 .project-bar.is-expanded {
   padding: 1.25rem 1.5rem 0.5rem;
   border: 1px solid #cfc8b8;
@@ -953,7 +972,13 @@ body:has(.dashboard) {
   gap: 0.625rem;
   padding: 0.375rem 0.25rem;
   border-radius: 8px;
+  color: #6b665c;
   cursor: pointer;
+}
+
+/* Lighter text and icon, darker on hover, and fully dark when selected. */
+.assignee-option:is(:hover, :has(input:checked)) {
+  color: #1a1a1a;
 }
 
 /* As the form appears, its parts arrive one by one (see arriveAt in
@@ -1145,17 +1170,21 @@ body:has(.dashboard) {
 .due-date-month button {
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  /* The larger hover circle takes the same room as the old one. */
+  margin: -0.125rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
+  color: #6b665c;
   cursor: pointer;
 }
 
 .due-date-month button:hover {
-  background: #f7f5ef;
+  background: #ebe6da;
+  color: #1a1a1a;
 }
 
 .due-date-month svg {
@@ -1443,6 +1472,23 @@ body:has(.dashboard) {
   stroke-linejoin: round;
 }
 
+/* The delete button is the image buttons' thin circle, with the plus turned
+   45 degrees to make an X. It keeps the other task buttons' hover. */
+.task-button-circled-x {
+  border-radius: 50%;
+}
+
+.task-button-circled-x svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  stroke-width: 1;
+}
+
+.task-button-circled-x svg path {
+  transform: rotate(45deg);
+  transform-origin: center;
+}
+
 .task-undo {
   display: flex;
   align-items: center;
@@ -1697,4 +1743,330 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 /* While a task is dragged, the notes do not scroll under the pointer. */
 [data-dragging-task] textarea {
   overflow: hidden;
+}
+
+/* An opened account project's images (AD #48): a timeline that scrolls, with
+   the newest at the bottom. */
+.project-images {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.project-images-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.project-images .task-heading {
+  margin: 0;
+}
+
+.project-images button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.project-images button:hover:not(:disabled) {
+  background: #f6f3ec;
+}
+
+/* The add button is the thin circle of the assignee icon, with a plus. The
+   remove button is the same turned 45 degrees, beside the caption box. Both,
+   like the task buttons and the date picker's month arrows, have a lighter
+   icon that darkens on hover, and a hover circle larger than the icon's. */
+.project-images .project-images-add,
+.project-images .project-images-remove {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #6b665c;
+}
+
+.project-images .project-images-add:hover:not(:disabled),
+.project-images .project-images-remove:hover:not(:disabled) {
+  background: #ebe6da;
+  color: #1a1a1a;
+}
+
+/* The larger hover circle takes the same room as the old one. */
+.project-images .project-images-add {
+  margin: -0.125rem;
+}
+
+.project-images-add svg,
+.project-images-remove svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.project-images .project-images-remove {
+  flex: none;
+  margin-top: 1.125rem;
+}
+
+.project-images-remove svg {
+  transform: rotate(45deg);
+}
+
+.project-images button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.project-images-note {
+  margin: 0.375rem 0;
+  color: #5a5548;
+  font-size: 0.875rem;
+}
+
+.project-images-notices {
+  margin: 0.375rem 0;
+  padding-left: 1.125rem;
+  color: #8a1c1c;
+  font-size: 0.875rem;
+}
+
+.image-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  max-height: 22rem;
+  margin-top: 0.5rem;
+  /* Only up and down: with its scroll bar, the entries fit the width left. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.image-timeline[hidden] {
+  display: none;
+}
+
+.image-entry {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-start;
+}
+
+.image-entry-thumbnail {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  height: 5.25rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #d8d3c6;
+  border-radius: 8px;
+  background: #f6f3ec;
+  cursor: zoom-in;
+}
+
+/* More specific than the images' button rule, which would make the border dark,
+   unlike the caption box's. */
+.project-images .image-entry-thumbnail {
+  border-color: #d8d3c6;
+  background: #f6f3ec;
+}
+
+.image-entry-thumbnail img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-entry-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.image-entry-details time {
+  display: block;
+  color: #5a5548;
+  font-size: 0.8125rem;
+}
+
+.image-entry-details textarea {
+  width: 100%;
+  margin-top: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid #d8d3c6;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  resize: none;
+  overflow: hidden;
+}
+
+.image-entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.5rem;
+}
+
+.image-entry-count {
+  color: #5a5548;
+  font-size: 0.75rem;
+}
+
+.image-entry-count.is-over {
+  color: #8a1c1c;
+}
+
+.image-viewer {
+  max-width: 92vw;
+  max-height: 92vh;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 10px;
+  text-align: center;
+}
+
+/* With step buttons, the box stays clear of them: each is 1rem from the window's
+   side and 3.5rem wide, and the box keeps 1rem beyond that. */
+.image-viewer.has-step-buttons {
+  max-width: calc(100vw - 11rem);
+}
+
+.image-viewer.has-step-buttons img {
+  max-width: calc(100vw - 12.5rem);
+}
+
+.image-viewer img {
+  display: block;
+  max-width: 88vw;
+  max-height: 80vh;
+  margin: 0 auto;
+}
+
+/* Below the image: the caption at the left, the time added at the right. */
+.image-viewer-details {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.image-viewer-caption {
+  margin: 0;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.image-viewer-details time {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #5a5548;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+/* The step buttons are the date picker's month arrows at twice the size, fixed
+   to the window's sides and middle, so they stay put as the page scrolls. */
+.image-viewer-previous,
+.image-viewer-next {
+  position: fixed;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-top: -1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  /* Over the page behind the dialog, so a blurred, lightened circle sets them
+     apart from it. When the button is on, the arrow's circle is lighter than
+     the disc around it; when it is off, the two are the same. */
+  background: rgb(255 255 255 / 0.26);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #6b665c;
+  cursor: pointer;
+}
+
+.image-viewer-previous {
+  left: 1rem;
+}
+
+.image-viewer-next {
+  right: 1rem;
+}
+
+.image-viewer-previous:hover:not([aria-disabled]),
+.image-viewer-next:hover:not([aria-disabled]) {
+  background: #ebe6da;
+  color: #1a1a1a;
+}
+
+/* The dimmed arrow is faded by its colour, not by the button's opacity, which
+   would fade the disc too. */
+.image-viewer-previous[aria-disabled],
+.image-viewer-next[aria-disabled] {
+  color: rgb(107 102 92 / 0.35);
+  cursor: default;
+}
+
+/* On, the arrow's circle is as light as the whole disc was (75% white over the
+   page): 66% white over the disc's 26%. */
+.image-viewer-previous:not([aria-disabled]) circle,
+.image-viewer-next:not([aria-disabled]) circle {
+  fill: rgb(255 255 255 / 0.66);
+}
+
+.image-viewer-previous:hover:not([aria-disabled]) circle,
+.image-viewer-next:hover:not([aria-disabled]) circle {
+  fill: none;
+}
+
+.image-viewer-previous svg,
+.image-viewer-next svg {
+  width: 2.75rem;
+  height: 2.75rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.image-viewer-previous svg {
+  transform: scaleX(-1);
+}
+
+/* Why a drop added nothing, over everything, as a popover in the top layer. */
+.drop-message {
+  position: fixed;
+  inset: auto auto 1.5rem 50%;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  transform: translateX(-50%);
+}
+
+.drop-message:not(:popover-open) {
+  display: none;
 }

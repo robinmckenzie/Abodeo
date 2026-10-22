@@ -40,10 +40,14 @@ export function ProjectBar({
   project,
   hasUnsavedChanges,
   isInert = false,
+  thumbnailUrl,
   onOpen,
 }: {
   project: Project;
   hasUnsavedChanges: boolean;
+  // The thumbnail of the project's newest image, if it has one (AD #48 Add
+  // Images To Projects). Decoration: the bar's label does not mention it.
+  thumbnailUrl?: string;
   // While a new project is being added in place, so that a click cannot
   // open another project and lose what was typed.
   isInert?: boolean;
@@ -85,6 +89,9 @@ export function ProjectBar({
         </span>
         {hasUnsavedChanges && (
           <span className="project-bar-unsaved">Last changes not saved</span>
+        )}
+        {thumbnailUrl && (
+          <img className="project-bar-thumbnail" src={thumbnailUrl} alt="" />
         )}
       </button>
     </li>
