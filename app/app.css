@@ -1996,8 +1996,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   border: 0;
   border-radius: 50%;
   /* Over the page behind the dialog, so a blurred, lightened circle sets them
-     apart from it. */
-  background: rgb(255 255 255 / 0.75);
+     apart from it. Its 26% white is what the dimmed (35%) 75% white gave, so
+     the circle looks the same whether the button is on or off. */
+  background: rgb(255 255 255 / 0.26);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   color: #6b665c;
