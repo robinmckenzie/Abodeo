@@ -143,9 +143,13 @@ function SignedInImages({
     });
   };
 
+  // Only the latest request may open the viewer, and dismissing it cancels
+  // any still downloading.
+  const viewRequestRef = useRef(0);
   const view = async (image: ImageInfo) => {
+    const request = ++viewRequestRef.current;
     const url = await images.openOriginal(image.id);
-    if (url) {
+    if (url && request === viewRequestRef.current) {
       setViewing({
         imageId: image.id,
         url,
@@ -162,10 +166,8 @@ function SignedInImages({
   const viewingIndex = viewing
     ? state.images.findIndex(({ id }) => id === viewing.imageId)
     : -1;
-  const stepTo = (step: number) => {
-    const image = state.images[viewingIndex + step];
-    return image ? () => void view(image) : null;
-  };
+  const previousImage = state.images[viewingIndex - 1];
+  const nextImage = state.images[viewingIndex + 1];
 
   return (
     <section className="project-images" aria-label="Images">
@@ -259,10 +261,18 @@ function SignedInImages({
             createdAt={viewing.createdAt}
             navigation={
               state.images.length > 1 && viewingIndex >= 0
-                ? { onPrevious: stepTo(-1), onNext: stepTo(1) }
+                ? {
+                    onPrevious: previousImage
+                      ? () => void view(previousImage)
+                      : null,
+                    onNext: nextImage ? () => void view(nextImage) : null,
+                  }
                 : undefined
             }
-            onClose={() => setViewing(null)}
+            onClose={() => {
+              viewRequestRef.current++;
+              setViewing(null);
+            }}
           />,
           document.body,
         )}

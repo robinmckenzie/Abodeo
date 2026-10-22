@@ -475,6 +475,25 @@ describe("ProjectImages", () => {
       expect(viewerImage()).not.toBeNull();
     });
 
+    it("stays closed when dismissed while the next image is still loading", async () => {
+      const server = fakeServer();
+      await seed(server, "ada", ["one", "two"]);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
+      const views = await screen.findAllByRole("button", {
+        name: /View full size/,
+      });
+      fireEvent.click(views[0]);
+      await waitFor(() => expect(viewerImage()).not.toBeNull());
+
+      fireEvent.click(step("Next image")!);
+      fireEvent.click(document.querySelector("dialog")!);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(document.querySelector(".image-viewer")).toBeNull();
+    });
+
     it("has no step buttons when the project has one image", async () => {
       const server = fakeServer();
       await seed(server, "ada", ["one"]);

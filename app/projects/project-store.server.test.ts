@@ -23,6 +23,7 @@ function createFakeDatabase() {
   // Runs just before a save's update, as another save landing in between.
   let beforeUpdate: (() => void) | null = null;
   let isFailing = false;
+  let isImageTableMissing = false;
 
   const find = (userId: string, id: string) =>
     projects.find((row) => row.user_id === userId && row.id === id);
@@ -96,6 +97,9 @@ function createFakeDatabase() {
       };
     }
     if (sql.startsWith("select distinct on (project_id) project_id, id")) {
+      if (isImageTableMissing) {
+        throw Object.assign(new Error("no table"), { code: "42P01" });
+      }
       return {
         rows: latestImages.filter((row) => row.user_id === userId),
       };
@@ -136,6 +140,7 @@ function createFakeDatabase() {
     released: () => released,
     setBeforeUpdate: (work: () => void) => (beforeUpdate = work),
     fail: () => (isFailing = true),
+    removeImageTable: () => (isImageTableMissing = true),
   };
 }
 
@@ -338,6 +343,14 @@ describe("the project store", () => {
 
       expect((await store.list("ada")).latestImageIds).toEqual({ p1: "i2" });
       expect((await store.list("cy")).latestImageIds).toEqual({});
+    });
+
+    it("are left out, not fatal, when the image tables are not installed", async () => {
+      const fake = createFakeDatabase();
+      fake.removeImageTable();
+      const store = createProjectStore(fake.database, { now });
+
+      expect((await store.list("ada")).latestImageIds).toEqual({});
     });
   });
 
