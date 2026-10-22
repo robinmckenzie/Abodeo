@@ -147,6 +147,10 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   A person adds JPEG or PNG images with the Add image button, or by dropping them on the page,
   which adds them to the open project (and says why when none is open, or the open one is new and
   not yet saved).
+- A project with images shows the thumbnail of its newest one at the right of its bar. The project
+  list answer carries the newest image id of each project (`latestImageIds`, one query), and the
+  browser fetches those thumbnails with the same checks as any image, holding them in memory only
+  (`use-bar-thumbnails.ts`). The open project's images keep its bar up to date as they change.
 - Each image is a row of `project_image` (its id, type, sizes, caption and time) and two rows of
   `project_image_bytes` (the original and a thumbnail), which go with the image, the project or
   the account when any is removed. The bytes are behind `ImageBytesStore`

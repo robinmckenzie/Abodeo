@@ -19,6 +19,7 @@ export function createMemoryProjectStore() {
         projects: sortProjects([...projectsOf(userId).values()]),
         unreadableCount: 0,
         defaultIds: [],
+        latestImageIds: {},
       };
     },
     async read(userId, id) {

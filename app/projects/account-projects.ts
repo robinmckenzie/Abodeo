@@ -119,8 +119,19 @@ export type AccountLoad =
       projects: Project[];
       unreadableCount: number;
       defaultIds: string[];
+      latestImageIds: Record<string, string>;
     }
   | { ok: false; reason: AccountFailure };
+
+// A server without the map, or with a damaged one, shows no thumbnails.
+function readLatestImageIds(value: unknown) {
+  if (typeof value !== "object" || value === null) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
 
 export async function loadAccountProjects(
   accountId: string,
@@ -134,6 +145,7 @@ export async function loadAccountProjects(
     projects?: unknown;
     unreadableCount?: unknown;
     defaultIds?: unknown;
+    latestImageIds?: unknown;
   } | null;
   if (
     !Array.isArray(body?.projects) ||
@@ -156,6 +168,7 @@ export async function loadAccountProjects(
     defaultIds: body.defaultIds.filter(
       (id): id is string => typeof id === "string",
     ),
+    latestImageIds: readLatestImageIds(body.latestImageIds),
   };
 }
 

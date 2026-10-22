@@ -16,6 +16,9 @@ type Row = { user_id: string; id: string; data: unknown; revision: number };
 function createFakeDatabase() {
   const projects: Row[] = [];
   const records = new Map<string, { hash: string; ids: string[] }>();
+  // The newest image of each project, as the database would answer.
+  const latestImages: { user_id: string; project_id: string; id: string }[] =
+    [];
   const statements: { text: string; values: unknown[] }[] = [];
   // Runs just before a save's update, as another save landing in between.
   let beforeUpdate: (() => void) | null = null;
@@ -92,6 +95,11 @@ function createFakeDatabase() {
           .map(({ id, data }) => ({ id, data })),
       };
     }
+    if (sql.startsWith("select distinct on (project_id) project_id, id")) {
+      return {
+        rows: latestImages.filter((row) => row.user_id === userId),
+      };
+    }
     if (sql.startsWith("select data from project")) {
       const row = find(userId, values[1] as string);
       return { rows: row ? [{ data: row.data }] : [] };
@@ -123,6 +131,7 @@ function createFakeDatabase() {
     database,
     projects,
     records,
+    latestImages,
     statements,
     released: () => released,
     setBeforeUpdate: (work: () => void) => (beforeUpdate = work),
@@ -318,6 +327,20 @@ describe("the project store", () => {
     });
   });
 
+  describe("latest images", () => {
+    it("are listed by project, for the account only", async () => {
+      const fake = createFakeDatabase();
+      fake.latestImages.push(
+        { user_id: "ada", project_id: "p1", id: "i2" },
+        { user_id: "bob", project_id: "p9", id: "i7" },
+      );
+      const store = createProjectStore(fake.database, { now });
+
+      expect((await store.list("ada")).latestImageIds).toEqual({ p1: "i2" });
+      expect((await store.list("cy")).latestImageIds).toEqual({});
+    });
+  });
+
   describe("default projects", () => {
     it("are received once, and not again while they are unchanged", async () => {
       const fake = createFakeDatabase();
@@ -334,6 +357,7 @@ describe("the project store", () => {
       expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
         "select hash, ids from project_defaults_received where user_id = $1",
         "select id, data from project where user_id = $1",
+        "select distinct on (project_id) project_id, id from project_image where user_id = $1 order by project_id, created_at desc, id desc",
       ]);
       expect(fake.released()).toBe(1);
     });

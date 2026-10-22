@@ -80,10 +80,20 @@ export type ProjectsView =
       projects: Project[];
       unreadableCount: number;
       defaultIds: string[];
+      // The newest image of each project that has any (AD #48 Add Images To
+      // Projects), for its bar's thumbnail.
+      latestImageIds: Record<string, string>;
     };
 
 export type ProjectsSource = {
   view: ProjectsView;
+  // Shows a project's newest image as it is now, as an open project's images
+  // change. Null when it has none.
+  showLatestImage(
+    generation: number,
+    projectId: string,
+    imageId: string | null,
+  ): void;
   // Shows a project as just saved in the account, without loading them all.
   showSavedProject(generation: number, project: Project): void;
   reload(): void;
@@ -142,6 +152,7 @@ export function useProjectsSource(
           projects: [],
           unreadableCount: 0,
           defaultIds: [],
+          latestImageIds: {},
         });
         return;
       }
@@ -151,7 +162,7 @@ export function useProjectsSource(
         void load();
         return;
       }
-      const { projects, unreadableCount, defaultIds } = result;
+      const { projects, unreadableCount, defaultIds, latestImageIds } = result;
       writeAccountHint(
         accountId,
         hasOwnAccountProjects(projects, unreadableCount, defaultIds),
@@ -164,6 +175,7 @@ export function useProjectsSource(
         projects,
         unreadableCount,
         defaultIds,
+        latestImageIds,
       });
     };
     const loadIfDue = () => {
@@ -199,11 +211,29 @@ export function useProjectsSource(
       projects: [],
       unreadableCount: 0,
       defaultIds: [],
+      latestImageIds: {},
     };
   }
 
   return {
     view,
+    showLatestImage(generation, projectId, imageId) {
+      setState((current) => {
+        if (current?.generation !== generation || current.state !== "ready") {
+          return current;
+        }
+        if ((current.latestImageIds[projectId] ?? null) === imageId) {
+          return current;
+        }
+        const others = Object.entries(current.latestImageIds).filter(
+          ([id]) => id !== projectId,
+        );
+        const latestImageIds = Object.fromEntries(
+          imageId ? [...others, [projectId, imageId]] : others,
+        );
+        return { ...current, latestImageIds };
+      });
+    },
     showSavedProject(generation, project) {
       actionsRef.current.noteSavedProject();
       setState((current) => {

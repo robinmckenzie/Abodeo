@@ -67,6 +67,7 @@ import {
   useProjectsSource,
   type ProjectsView,
 } from "../projects/use-projects";
+import { useBarThumbnails } from "../projects/use-bar-thumbnails";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Dashboard - Abodeo" },
@@ -114,6 +115,9 @@ export const tasksConflictMessage =
 // the last one, so that it does not close what is open. An account whose
 // projects or sign-in cannot be checked counts as a change, so that none of
 // its projects stays shown.
+// One object, so that a hook given it does not see a change on each render.
+const noLatestImageIds: Record<string, string> = {};
+
 function readSourceKey(view: ProjectsView, previous: string | null) {
   if (view.kind === "browser") return "browser";
   if (view.kind === "unavailable") return "unavailable";
@@ -692,6 +696,11 @@ export default function Dashboard() {
   const list = isAccountReady
     ? view.projects
     : (browserProjects?.projects ?? []);
+  const barThumbnails = useBarThumbnails(
+    isAccountReady ? view.accountId : null,
+    isAccountReady ? view.latestImageIds : noLatestImageIds,
+    noteAccountFailure,
+  );
   const isShowingList = isAccountReady || browserProjects !== null;
   const isAccountUnavailable =
     view.kind === "unavailable" ||
@@ -820,6 +829,11 @@ export default function Dashboard() {
             projectId={open.id}
             onFailure={noteAccountFailure}
             addFilesRef={addFilesRef}
+            onLatestImageChange={(imageId) => {
+              if (view.kind === "account" && open.id !== null) {
+                source.showLatestImage(view.generation, open.id, imageId);
+              }
+            }}
           />
         )
       }
@@ -974,6 +988,7 @@ export default function Dashboard() {
                 project={project}
                 hasUnsavedChanges={unsavedIds.has(project.id)}
                 isInert={isAddingInPlace}
+                thumbnailUrl={barThumbnails[project.id]}
                 onOpen={(barHeight) => openProject(project, barHeight)}
               />
             );

@@ -238,10 +238,21 @@ export function createProjectStore(
         if (project) projects.push(project);
         else unreadableCount++;
       }
+      const { rows: latestRows } = await database.query(
+        `select distinct on (project_id) project_id, id from project_image
+         where user_id = $1
+         order by project_id, created_at desc, id desc`,
+        [userId],
+      );
+      // Object.fromEntries defines each key, even one named like a prototype's.
+      const latestImageIds = Object.fromEntries(
+        latestRows.map((row) => [String(row.project_id), String(row.id)]),
+      );
       return {
         projects: sortProjects(projects),
         unreadableCount,
         defaultIds: record?.ids ?? [],
+        latestImageIds,
       };
     },
 

@@ -401,12 +401,47 @@ describe("ProjectImages", () => {
     });
   });
 
+  it("tells the newest image's id once loaded, and as images are added and removed", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one", "two"]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onLatestImageChange = vi.fn();
+    render(
+      <ProjectImages
+        accountId="ada"
+        projectId="shed"
+        onLatestImageChange={onLatestImageChange}
+      />,
+    );
+    await waitFor(() =>
+      expect(onLatestImageChange).toHaveBeenCalledWith("two"),
+    );
+    expect(onLatestImageChange).not.toHaveBeenCalledWith(null);
+
+    chooseFiles([pngFile()]);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(3),
+    );
+    const added = document
+      .querySelectorAll(".image-entry")[2]
+      .getAttribute("data-image-id");
+    expect(onLatestImageChange).toHaveBeenLastCalledWith(added);
+
+    const removes = screen.getAllByRole("button", { name: "Remove image" });
+    fireEvent.click(removes[2]);
+    await waitFor(() =>
+      expect(onLatestImageChange).toHaveBeenLastCalledWith("two"),
+    );
+  });
+
   it("removes an image after confirming", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ProjectImages accountId="ada" projectId="shed" />);
-    const [first] = await screen.findAllByRole("button", { name: "Remove image" });
+    const [first] = await screen.findAllByRole("button", {
+      name: "Remove image",
+    });
     fireEvent.click(first);
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
@@ -420,7 +455,9 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<ProjectImages accountId="ada" projectId="shed" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Remove image" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove image" }),
+    );
     expect(server.store.accounts.get("ada")).toHaveLength(1);
   });
 

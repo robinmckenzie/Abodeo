@@ -31,6 +31,9 @@ export type ProjectListResponse = {
   unreadableCount: number;
   // The account's default projects, so that the browser can tell its own.
   defaultIds: string[];
+  // The newest image of each project that has any, by project id, for its
+  // bar's thumbnail (AD #48 Add Images To Projects).
+  latestImageIds: Record<string, string>;
 };
 
 export type ProjectResponse = { project: Project };

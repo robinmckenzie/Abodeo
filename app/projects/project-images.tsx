@@ -43,12 +43,16 @@ export function ProjectImages({
   projectId,
   onFailure,
   addFilesRef,
+  onLatestImageChange,
 }: {
   // Null while signed out, when images are unavailable.
   accountId: string | null;
   projectId: string;
   onFailure?: (reason: ImageFailure) => void;
   addFilesRef?: RefObject<AddFiles | null>;
+  // Given the newest image's id (null when none) once the images have
+  // loaded, and again whenever it changes, for the project's bar.
+  onLatestImageChange?: (imageId: string | null) => void;
 }) {
   if (accountId === null) {
     return (
@@ -67,6 +71,7 @@ export function ProjectImages({
       projectId={projectId}
       onFailure={onFailure}
       addFilesRef={addFilesRef}
+      onLatestImageChange={onLatestImageChange}
     />
   );
 }
@@ -76,14 +81,24 @@ function SignedInImages({
   projectId,
   onFailure,
   addFilesRef,
+  onLatestImageChange,
 }: {
   accountId: string;
   projectId: string;
   onFailure?: (reason: ImageFailure) => void;
   addFilesRef?: RefObject<AddFiles | null>;
+  onLatestImageChange?: (imageId: string | null) => void;
 }) {
   const images = useProjectImages({ accountId, projectId, onFailure });
   const { state } = images;
+  const onLatestRef = useRef(onLatestImageChange);
+  useEffect(() => {
+    onLatestRef.current = onLatestImageChange;
+  });
+  const latestImageId = state.images.at(-1)?.id ?? null;
+  useEffect(() => {
+    if (state.status === "ready") onLatestRef.current?.(latestImageId);
+  }, [state.status, latestImageId]);
   const inputRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [viewing, setViewing] = useState<{
