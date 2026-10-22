@@ -1956,6 +1956,30 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   margin: 0 auto;
 }
 
+/* Below the image: the caption at the left, the time added at the right. */
+.image-viewer-details {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.image-viewer-caption {
+  margin: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.image-viewer-details time {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #5a5548;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
 /* The step buttons are the date picker's month arrows at twice the size, fixed
    to the window's sides and middle, so they stay put as the page scrolls. */
 .image-viewer-previous,

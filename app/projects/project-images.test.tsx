@@ -548,4 +548,23 @@ describe("ProjectImages", () => {
     delete proto.showModal;
     delete proto.close;
   });
+
+  it("shows the caption and the time added below the image", () => {
+    const { container } = render(
+      <ImageViewer
+        url="blob:x"
+        label="Porch"
+        caption="Front porch"
+        createdAt="2026-10-22T10:30:00Z"
+        onClose={() => {}}
+      />,
+      { container: document.body.appendChild(document.createElement("div")) },
+    );
+    const details = container.querySelector(".image-viewer-details");
+    expect(details?.firstElementChild?.textContent).toBe("Front porch");
+    expect(details?.lastElementChild?.tagName).toBe("TIME");
+    expect(details?.lastElementChild?.getAttribute("datetime")).toBe(
+      "2026-10-22T10:30:00Z",
+    );
+  });
 });

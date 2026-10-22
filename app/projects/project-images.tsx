@@ -105,6 +105,8 @@ function SignedInImages({
     imageId: string;
     url: string;
     label: string;
+    caption: string;
+    createdAt: string;
   } | null>(null);
 
   const addFiles = images.addFiles;
@@ -144,7 +146,13 @@ function SignedInImages({
   const view = async (image: ImageInfo) => {
     const url = await images.openOriginal(image.id);
     if (url) {
-      setViewing({ imageId: image.id, url, label: describeImage(image) });
+      setViewing({
+        imageId: image.id,
+        url,
+        label: describeImage(image),
+        caption: image.caption,
+        createdAt: image.createdAt,
+      });
     }
   };
 
@@ -247,6 +255,8 @@ function SignedInImages({
           <ImageViewer
             url={viewing.url}
             label={viewing.label}
+            caption={viewing.caption}
+            createdAt={viewing.createdAt}
             navigation={
               state.images.length > 1 && viewingIndex >= 0
                 ? { onPrevious: stepTo(-1), onNext: stepTo(1) }
@@ -427,11 +437,16 @@ function ImageEntry({
 export function ImageViewer({
   url,
   label,
+  caption,
+  createdAt,
   navigation,
   onClose,
 }: {
   url: string;
   label: string;
+  // Shown below the image: the caption at the left, the time added at the right.
+  caption?: string;
+  createdAt?: string;
   // Left and right buttons, fixed to the window, to move between a project's
   // images. A null step is at an end, and its button is off.
   navigation?: { onPrevious: (() => void) | null; onNext: (() => void) | null };
@@ -462,6 +477,12 @@ export function ImageViewer({
       }}
     >
       <img src={url} alt={label} />
+      <div className="image-viewer-details">
+        <p className="image-viewer-caption">{caption}</p>
+        {createdAt && (
+          <time dateTime={createdAt}>{formatAddedTime(createdAt)}</time>
+        )}
+      </div>
       {navigation && (
         <>
           <ViewerStepButton
