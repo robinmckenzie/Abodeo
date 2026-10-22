@@ -1996,8 +1996,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   border: 0;
   border-radius: 50%;
   /* Over the page behind the dialog, so a blurred, lightened circle sets them
-     apart from it. Its 26% white is what the dimmed (35%) 75% white gave, so
-     the circle looks the same whether the button is on or off. */
+     apart from it. When the button is on, the arrow's circle is lighter than
+     the disc around it; when it is off, the two are the same. */
   background: rgb(255 255 255 / 0.26);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
@@ -2019,10 +2019,24 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   color: #1a1a1a;
 }
 
+/* The dimmed arrow is faded by its colour, not by the button's opacity, which
+   would fade the disc too. */
 .image-viewer-previous[aria-disabled],
 .image-viewer-next[aria-disabled] {
-  opacity: 0.35;
+  color: rgb(107 102 92 / 0.35);
   cursor: default;
+}
+
+/* On, the arrow's circle is as light as the whole disc was (75% white over the
+   page): 66% white over the disc's 26%. */
+.image-viewer-previous:not([aria-disabled]) circle,
+.image-viewer-next:not([aria-disabled]) circle {
+  fill: rgb(255 255 255 / 0.66);
+}
+
+.image-viewer-previous:hover:not([aria-disabled]) circle,
+.image-viewer-next:hover:not([aria-disabled]) circle {
+  fill: none;
 }
 
 .image-viewer-previous svg,
