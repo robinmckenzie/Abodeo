@@ -16,6 +16,7 @@ import {
   testBaseUrl,
 } from "./test-account.server";
 import { createFakeCalendarDependencies } from "../calendar/test-calendar.server";
+import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
 
 afterEach(() => {
@@ -59,6 +60,7 @@ function createTestHandler() {
     profiles: store,
     history,
     projects: projectStore.store,
+    images: createMemoryImageStore().store,
     calendar: calendar.dependencies,
     close,
   };
@@ -136,6 +138,7 @@ describe("createAccountRequestHandler", () => {
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
           projects: createMemoryProjectStore().store,
+          images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: async () => {},
         }),
@@ -165,6 +168,7 @@ describe("createAccountRequestHandler", () => {
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
         projects: createMemoryProjectStore().store,
+        images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -554,6 +558,7 @@ describe("createAccountRequestHandler", () => {
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
         projects: createMemoryProjectStore().store,
+        images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -578,6 +583,7 @@ describe("createAccountRequestHandler", () => {
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
           projects: createMemoryProjectStore().store,
+          images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: () => new Promise(() => {}),
         }),

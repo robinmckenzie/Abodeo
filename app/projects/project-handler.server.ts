@@ -19,8 +19,8 @@ import {
   parseProject,
   type Project,
 } from "./projects";
+import { readRequestAccount } from "./request-account.server";
 import {
-  accountHeader,
   importBodyLimit,
   isProjectId,
   projectBodyLimit,
@@ -139,19 +139,16 @@ export async function handleProjectsRequest(
   ) {
     return respondWithProjectError(400, "invalid_request");
   }
-  const pageAccount = request.headers.get(accountHeader);
-  if (!pageAccount) return respondWithProjectError(400, "invalid_request");
   try {
-    const userId = await withTimeout(
-      readSessionUserId(request.headers),
+    const account = await readRequestAccount(
+      request,
+      readSessionUserId,
       timeout,
     );
-    if (userId === undefined) {
-      return respondWithProjectError(401, "not_signed_in");
+    if (account.kind === "refused") {
+      return respondWithProjectError(account.status, account.error);
     }
-    if (pageAccount !== userId) {
-      return respondWithProjectError(409, "account_changed");
-    }
+    const userId = account.userId;
     const body = isWrite
       ? await readBody(
           request,

@@ -1,7 +1,8 @@
 // Answers every request under /api: sign-in through Better Auth, whether
 // sign-in is configured, the profile, activity for the visit history, the
-// signed-in account's projects, and the Calendar test. The resource route in
-// app/routes/api.ts sends requests here, in development and on Vercel alike.
+// signed-in account's projects and their images, and the Calendar test. The
+// resource route in app/routes/api.ts sends requests here, in development and
+// on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
 
 import { createCalendarGoogle } from "../calendar/calendar-grant.server";
@@ -13,6 +14,14 @@ import {
 } from "../calendar/calendar-handler.server";
 import { createCalendarStore } from "../calendar/calendar-store.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
+import {
+  handleImagesRequest,
+  isImagesPath,
+} from "../projects/image-handler.server";
+import {
+  createImageStore,
+  type ImageStore,
+} from "../projects/image-store.server";
 import {
   handleProjectsRequest,
   isProjectsPath,
@@ -49,13 +58,14 @@ import {
 } from "./account-profile.server";
 
 // What one request needs: Better Auth, the profile, history and project
-// stores, the Calendar test, and a way to let go of them.
+// and image stores, the Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
   projects: ProjectStore;
+  images: ImageStore;
   calendar: CalendarDependencies;
   // Closes the database connections, once the response is ready.
   close(): Promise<void>;
@@ -75,6 +85,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     profiles: createProfileStore(pool),
     history,
     projects: createProjectStore(pool),
+    images: createImageStore(pool),
     calendar: {
       secret: config.secret,
       isSecure: config.baseUrl.startsWith("https:"),
@@ -130,12 +141,14 @@ export function createAccountRequestHandler(
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
     const isCalendar = isCalendarPath(pathname);
-    const isProjects = isProjectsPath(pathname);
+    const isImages = isImagesPath(pathname);
+    const isProjects = !isImages && isProjectsPath(pathname);
     if (
       !isProfile &&
       !isActivity &&
       !isCalendar &&
       !isProjects &&
+      !isImages &&
       !isEnabledAuthPath(pathname)
     ) {
       return new Response(null, {
@@ -179,6 +192,12 @@ export function createAccountRequestHandler(
         return await handleProfileRequest(request, {
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.profiles,
+        });
+      }
+      if (isImages) {
+        return await handleImagesRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.images,
         });
       }
       if (isProjects) {
