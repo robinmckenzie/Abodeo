@@ -61,6 +61,8 @@ type Server = {
   projects: ReturnType<typeof createMemoryProjectStore>;
   // Answers every projects request with this status instead, when set.
   projectsStatus: number | null;
+  // Handles this many projects requests, then answers 503, as if lost.
+  lostAnswers: number;
 };
 
 // Answers as the account endpoints would, recording each call.
@@ -77,6 +79,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
     hang: false,
     projects: createMemoryProjectStore(),
     projectsStatus: null,
+    lostAnswers: 0,
     ...overrides,
   };
   vi.stubGlobal(
@@ -91,7 +94,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
             { status: server.projectsStatus },
           );
         }
-        return handleProjectsRequest(
+        const answer = handleProjectsRequest(
           new Request(`http://localhost${path}`, {
             method: init.method,
             headers: init.headers,
@@ -104,6 +107,12 @@ function fakeServer(overrides: Partial<Server> = {}) {
             defaultIds: [],
           },
         );
+        if (server.lostAnswers > 0) {
+          server.lostAnswers--;
+          await answer;
+          return Response.json({ error: "unavailable" }, { status: 503 });
+        }
+        return answer;
       }
       switch (path) {
         case "/api/account/status":
@@ -714,6 +723,73 @@ describe("a signed-in account's projects (AD #41)", () => {
     await settle();
 
     expect(server.projects.accounts.get("ada")!.size).toBe(1);
+  });
+
+  describe("when a Create's answer was lost", () => {
+    async function createWithLostAnswer() {
+      const server = fakeServer({ session: ada });
+      await renderDashboard();
+      await settle();
+      fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+      fireEvent.change(titleField(), { target: { value: "Shed" } });
+      server.lostAnswers = 1;
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+      const [added] = server.projects.accounts.get("ada")!.values();
+      return { server, added };
+    }
+
+    it("saves edits made before Create is pressed again", async () => {
+      const { server, added } = await createWithLostAnswer();
+      fireEvent.change(titleField(), { target: { value: "Painted shed" } });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(server.projects.accounts.get("ada")!.size).toBe(1);
+      expect(accountProject(server, added.id)?.title).toBe("Painted shed");
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    });
+
+    it("keeps changes made on another device since", async () => {
+      const { server, added } = await createWithLostAnswer();
+      await server.projects.store.saveChanges(
+        "ada",
+        added.id,
+        { notes: "" },
+        { notes: "From the other device" },
+      );
+      fireEvent.change(titleField(), { target: { value: "Painted shed" } });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(accountProject(server, added.id)).toMatchObject({
+        title: "Painted shed",
+        notes: "From the other device",
+      });
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    });
+
+    it("says so when this form and another device both changed a field", async () => {
+      const { server, added } = await createWithLostAnswer();
+      await server.projects.store.saveChanges(
+        "ada",
+        added.id,
+        { notes: "" },
+        { notes: "From the other device" },
+      );
+      fireEvent.change(screen.getByRole("textbox", { name: "Notes" }), {
+        target: { value: "Mine" },
+      });
+      await click(screen.getByRole("button", { name: "Create" }));
+      await settle();
+
+      expect(accountProject(server, added.id)?.notes).toBe(
+        "From the other device",
+      );
+      expect(
+        screen.getByText(/changed on another device, so some/),
+      ).toBeTruthy();
+    });
   });
 
   it("offers to move the browser's own projects in, and moves them", async () => {

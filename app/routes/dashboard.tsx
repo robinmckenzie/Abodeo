@@ -83,6 +83,8 @@ type OpenProject = {
   barHeight: number;
   isLoading?: boolean;
   hasConflict?: boolean;
+  // A new project's values as sent by each Create, for a retry.
+  submitted?: ProjectFields[];
 };
 
 // How an opened project is saved, in the browser or in the account.
@@ -115,6 +117,13 @@ function readSourceKey(view: ProjectsView, previous: string | null) {
       : `account:${view.accountId}`;
   }
   return previous;
+}
+
+export const changedSinceAddedMessage =
+  "This project was added, then changed on another device, so some of your changes were not saved. Cancel to see it as saved.";
+
+function isSameValue(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function isSameFields(a: ProjectFields, b: ProjectFields) {
@@ -248,6 +257,14 @@ export default function Dashboard() {
       }
     }
     if (hasUnsubmittedTaskText()) losses.push("tasks typed but not yet added");
+    // Projects closed earlier whose changes are still on their way or
+    // failed.
+    if (pendingKeysRef.current.size > 0 || sendingRef.current > 0) {
+      losses.push("changes still being saved");
+    }
+    if ([...unsavedIdsRef.current].some((id) => id !== current?.id)) {
+      losses.push("changes to other projects that were not saved");
+    }
     if (losses.length === 0) return true;
     return window.confirm(
       `Leaving now will lose ${joinList(losses)}.\n\nOK continues without them. Cancel stays here.`,
@@ -431,7 +448,8 @@ export default function Dashboard() {
         );
       },
     });
-    setUnsavedIds((ids) => toggleId(ids, id, false));
+    // A mark of changes not saved from an earlier opening stays until this
+    // one saves.
     // Just before the title, so opening a project does not put the cursor in
     // it, while Tab does.
     focusFieldRef.current = "start";
@@ -544,7 +562,7 @@ export default function Dashboard() {
   };
 
   const createOpenProject = async () => {
-    if (!open || open.id !== null) return;
+    if (!open || open.id !== null || open.isLoading) return;
     if (!hasTitle(open.values.title)) {
       setOpen({ ...open, message: describeFailure("no-title") });
       return;
@@ -552,42 +570,55 @@ export default function Dashboard() {
     const { key } = open;
     let result:
       | { ok: true; project: Project }
-      | { ok: false; reason: ProjectSaveFailure };
+      | { ok: false; reason: ProjectSaveFailure | "changed-since-added" };
     if (view.kind === "browser") {
       result = await createProject(open.values);
       refreshProjects();
     } else if (view.kind === "account" && view.state === "ready") {
-      const { generation } = view;
-      const { accountId } = view;
+      const { generation, accountId } = view;
+      // The form cannot be changed while Create is on its way.
+      const sending = open.values;
+      const submitted = [...(open.submitted ?? []), sending];
+      setOpen({ ...open, isLoading: true, submitted });
       result = await whileSending(
-        createAccountProject(accountId, open.newId!, open.values),
+        createAccountProject(accountId, open.newId!, sending),
       );
       // A retry, after an answer was lost, gives the project as first
-      // added, and the form may have changed since: what differs is saved
-      // onto it.
-      const current = openRef.current;
-      if (
-        result.ok &&
-        current?.key === key &&
-        !isSameFields(result.project, current.values)
-      ) {
+      // added. A field still as one of this form's Creates left it is
+      // given this one's value. One that matches none was changed on
+      // another device since, and is left as it is, which loses a change
+      // only if this form also changed it between Creates.
+      if (result.ok && !isSameFields(result.project, sending)) {
         const added = result.project;
-        const changes = Object.fromEntries(
-          (Object.keys(current.values) as (keyof ProjectFields)[])
-            .filter(
-              (field) =>
-                JSON.stringify(current.values[field]) !==
-                JSON.stringify(added[field]),
-            )
-            .map((field) => [field, current.values[field]]),
-        ) as Partial<ProjectFields>;
-        const saved = await whileSending(
-          openAccountProject(accountId, added).saveChanges(changes),
+        const differing = (
+          Object.keys(sending) as (keyof ProjectFields)[]
+        ).filter((field) => !isSameValue(sending[field], added[field]));
+        const ours = differing.filter((field) =>
+          submitted.some((values) => isSameValue(values[field], added[field])),
         );
-        result = saved.ok
-          ? { ok: true, project: saved.project }
-          : { ok: false, reason: saved.reason };
-        if (!saved.ok) source.showSavedProject(generation, added);
+        let latest = added;
+        if (ours.length > 0) {
+          const changes: Partial<ProjectFields> = {};
+          for (const field of ours) {
+            Object.assign(changes, { [field]: sending[field] });
+          }
+          const saved = await whileSending(
+            openAccountProject(accountId, added).saveChanges(changes),
+          );
+          if (saved.ok) latest = saved.project;
+          else result = { ok: false, reason: saved.reason };
+        }
+        source.showSavedProject(generation, latest);
+        const isLost = differing.some(
+          (field) =>
+            !ours.includes(field) &&
+            submitted.some(
+              (values) => !isSameValue(values[field], sending[field]),
+            ),
+        );
+        if (result.ok && isLost) {
+          result = { ok: false, reason: "changed-since-added" };
+        }
       }
       if (result.ok) source.showSavedProject(generation, result.project);
       else noteAccountFailure(result.reason);
@@ -598,7 +629,14 @@ export default function Dashboard() {
       const { reason } = result;
       setOpen((current) =>
         current?.key === key
-          ? { ...current, message: describeFailure(reason) }
+          ? {
+              ...current,
+              isLoading: false,
+              message:
+                reason === "changed-since-added"
+                  ? { text: changedSinceAddedMessage, isError: true }
+                  : describeFailure(reason),
+            }
           : current,
       );
       return;
