@@ -1517,6 +1517,11 @@ body:has(.dashboard) {
   opacity: 0.6;
 }
 
+/* Space the choice from the tasks input above it. */
+.project-form-footer:has(.project-form-message-actions) {
+  margin-top: 1rem;
+}
+
 /* Use saved version and Keep mine, outlined like Cancel. */
 .project-form-message-actions {
   display: flex;
