@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addTasks,
+  canMergeTaskChanges,
   createTasks,
   deleteTask,
   describeTaskCount,
@@ -147,5 +148,73 @@ describe("changing tasks", () => {
     expect(describeTaskCount(tasks.slice(1))).toBe("1 task");
     expect(describeTaskCount(tasks.slice(0, 1))).toBe("1 task, 1 completed");
     expect(describeTaskCount(tasks)).toBe("2 tasks, 1 completed");
+  });
+});
+
+describe("merging task changes made in two places", () => {
+  const extra = { id: "d", title: "Polish", isDone: false };
+
+  it("merges changes to different tasks", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        setTaskDone(tasks, "a", true),
+        renameTask(tasks, "c", "Seal twice"),
+      ),
+    ).toBe(true);
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        addTasks(tasks, [extra]),
+        deleteTask(tasks, "b"),
+      ),
+    ).toBe(true);
+  });
+
+  it("merges a move with a change to another task", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        moveTask(tasks, "c", 0),
+        setTaskDone(tasks, "a", true),
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses changes to the same task", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        setTaskDone(tasks, "a", true),
+        renameTask(tasks, "a", "Tiles first"),
+      ),
+    ).toBe(false);
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        renameTask(tasks, "b", "Grout again"),
+        deleteTask(tasks, "b"),
+      ),
+    ).toBe(false);
+  });
+
+  it("refuses a move of a task changed elsewhere", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        moveTask(tasks, "a", 2),
+        setTaskDone(tasks, "a", true),
+      ),
+    ).toBe(false);
+  });
+
+  it("refuses two changes of order", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        moveTask(tasks, "a", 2),
+        moveTask(tasks, "c", 0),
+      ),
+    ).toBe(false);
   });
 });

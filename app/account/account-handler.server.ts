@@ -1,6 +1,6 @@
 // Answers every request under /api: sign-in through Better Auth, whether
-// sign-in is configured, the profile, activity for the visit history, and the
-// Calendar test. The resource route in
+// sign-in is configured, the profile, activity for the visit history, the
+// signed-in account's projects, and the Calendar test. The resource route in
 // app/routes/api.ts sends requests here, in development and on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
 
@@ -13,6 +13,14 @@ import {
 } from "../calendar/calendar-handler.server";
 import { createCalendarStore } from "../calendar/calendar-store.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
+import {
+  handleProjectsRequest,
+  isProjectsPath,
+} from "../projects/project-handler.server";
+import {
+  createProjectStore,
+  type ProjectStore,
+} from "../projects/project-store.server";
 
 import {
   accountActivityPath,
@@ -40,13 +48,14 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 
-// What one request needs: Better Auth, the profile and history stores, the
-// Calendar test, and a way to let go of them.
+// What one request needs: Better Auth, the profile, history and project
+// stores, the Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
+  projects: ProjectStore;
   calendar: CalendarDependencies;
   // Closes the database connections, once the response is ready.
   close(): Promise<void>;
@@ -65,6 +74,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
     history,
+    projects: createProjectStore(pool),
     calendar: {
       secret: config.secret,
       isSecure: config.baseUrl.startsWith("https:"),
@@ -120,10 +130,12 @@ export function createAccountRequestHandler(
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
     const isCalendar = isCalendarPath(pathname);
+    const isProjects = isProjectsPath(pathname);
     if (
       !isProfile &&
       !isActivity &&
       !isCalendar &&
+      !isProjects &&
       !isEnabledAuthPath(pathname)
     ) {
       return new Response(null, {
@@ -167,6 +179,12 @@ export function createAccountRequestHandler(
         return await handleProfileRequest(request, {
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.profiles,
+        });
+      }
+      if (isProjects) {
+        return await handleProjectsRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.projects,
         });
       }
       if (isActivity) {

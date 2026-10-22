@@ -3,11 +3,24 @@ import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
 import { AccountControl } from "../account/account-control";
+import { useAccount } from "../account/use-account";
 import logo from "../images/abodeo-home-logo.jpeg";
 import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
-import { createAutosaver, type Autosaver } from "../projects/autosave";
+import {
+  createAccountProject,
+  importProjects,
+  openAccountProject,
+  setPageLeaving,
+  type OpenedAccountProject,
+} from "../projects/account-projects";
+import {
+  createAutosaver,
+  type Autosaver,
+  type ProjectSaveFailure,
+  type ProjectSaveResult,
+} from "../projects/autosave";
 import { DefaultProjectsPanel } from "../projects/default-projects-panel";
 import {
   ExpandedProjectBar,
@@ -18,9 +31,14 @@ import { ProjectForm, type FormMessage } from "../projects/project-form";
 import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
+  declineMove,
+  forgetDeclinedMove,
+  isMoveDeclined,
+  listOwnProjects,
+  removeAccountHint,
+  removeProjectsIfUnchanged,
   saveProjectChanges,
   saveProjectTasks,
-  type SaveFailure,
 } from "../projects/project-storage";
 import {
   hasTitle,
@@ -37,7 +55,12 @@ import {
   TaskList,
   type TaskChange,
 } from "../projects/task-list";
-import { refreshProjects, useProjects } from "../projects/use-projects";
+import type { Task } from "../projects/tasks";
+import {
+  refreshProjects,
+  useProjectsSource,
+  type ProjectsView,
+} from "../projects/use-projects";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Dashboard - Abodeo" },
@@ -47,14 +70,45 @@ export const meta: Route.MetaFunction = () => [
 // The project being added (id null) or opened, with the values in its form
 // and its collapsed bar's height, which an expanded bar grows from. Each
 // opening has its own key, so that a bar still squashing after one opening
-// is never mistaken for the bar of the next.
+// is never mistaken for the bar of the next. A new project has the id it
+// will be added under in an account, kept for any retry. An account's
+// project cannot be changed until its latest copy has loaded, and a field
+// changed on another device waits for the person to choose a version.
 type OpenProject = {
   key: string;
   id: string | null;
+  newId?: string;
   values: ProjectFields;
   message: FormMessage;
   barHeight: number;
+  isLoading?: boolean;
+  hasConflict?: boolean;
 };
+
+// How an opened project is saved, in the browser or in the account.
+type OpenedProject = {
+  saveChanges(changes: Partial<ProjectFields>): Promise<ProjectSaveResult>;
+  saveTasks(change: TaskChange): Promise<
+    | { ok: true; tasks: Task[] }
+    | {
+        ok: false;
+        reason: ProjectSaveFailure | "tasks-conflict";
+        tasks?: Task[];
+      }
+  >;
+  account?: OpenedAccountProject;
+};
+
+export const tasksConflictMessage =
+  "These tasks were changed on another device. Your last change was not saved.";
+
+// Which source projects are being shown from. Checking the sign-in, or
+// failing to, keeps the last one, so that it does not close what is open.
+function readSourceKey(view: ProjectsView, previous: string | null) {
+  if (view.kind === "browser") return "browser";
+  if (view.kind === "account") return `account:${view.accountId}`;
+  return previous;
+}
 
 let openings = 0;
 
@@ -65,7 +119,6 @@ function createOpeningKey() {
 
 export default function Dashboard() {
   const mainRef = useRef<HTMLElement>(null);
-  const projects = useProjects();
   const presentation = usePresentation();
   const isInPlace = presentation === "in-place";
   const [open, setOpen] = useState<OpenProject | null>(null);
@@ -77,6 +130,14 @@ export default function Dashboard() {
     () => new Set(),
   );
   const saverRef = useRef<Autosaver | null>(null);
+  const openedRef = useRef<OpenedProject | null>(null);
+  // Saves of tasks and new projects on their way, and whether the opened
+  // project has changes not yet saved, for the warning on leaving the page.
+  const sendingRef = useRef(0);
+  const isPendingRef = useRef(false);
+  const unsavedIdsRef = useRef(unsavedIds);
+  // Set once sign-in or sign-out is leaving the page, having asked already.
+  const isLeavingRef = useRef(false);
   // The field last focused in the form, so that switching presentation
   // returns to it, and where focus goes when the form closes.
   const focusFieldRef = useRef("title");
@@ -102,18 +163,47 @@ export default function Dashboard() {
 
   // Saves an opened project's changes when the page is left or hidden, or
   // the dashboard is left for another screen.
+  // Saves sent then can finish after the page has gone.
   useEffect(() => {
     const saveNow = () => saverRef.current?.saveNow();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") saveNow();
+    const onPageHide = () => {
+      setPageLeaving(true);
+      saveNow();
     };
-    window.addEventListener("pagehide", saveNow);
+    const onVisibilityChange = () => {
+      const isHidden = document.visibilityState === "hidden";
+      setPageLeaving(isHidden);
+      if (isHidden) saveNow();
+    };
+    const onPageShow = () => setPageLeaving(false);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.removeEventListener("pagehide", saveNow);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       saveNow();
     };
+  }, []);
+
+  // Signed in, the browser asks before the page is left while a change is
+  // still being sent or has failed to save, as it may then be lost.
+  const isAccountSourceRef = useRef(false);
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isAccountSourceRef.current || isLeavingRef.current) return;
+      if (
+        sendingRef.current > 0 ||
+        isPendingRef.current ||
+        unsavedIdsRef.current.size > 0
+      ) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
   useEffect(() => {
@@ -152,13 +242,56 @@ export default function Dashboard() {
   const openRef = useRef(open);
   useEffect(() => {
     openRef.current = open;
+    unsavedIdsRef.current = unsavedIds;
   });
+
+  const account = useAccount({
+    onBeforeLeave: prepareToLeave,
+    onLeaving: () => {
+      isLeavingRef.current = true;
+      // The offer to move projects returns at the next sign-in, and the
+      // account's hint no longer applies.
+      forgetDeclinedMove();
+      removeAccountHint();
+    },
+  });
+  const source = useProjectsSource(account.view, account.recheck);
+  const { view } = source;
+  useEffect(() => {
+    isAccountSourceRef.current = view.kind === "account";
+  });
+
+  // A change of account, such as another tab signing out, closes the
+  // project open for the last one. A new project's form stays, as nothing
+  // of it is saved yet.
+  const [sourceKey, setSourceKey] = useState<string | null>(null);
+  const nextSourceKey = readSourceKey(view, sourceKey);
+  if (nextSourceKey !== sourceKey) {
+    setSourceKey(nextSourceKey);
+    if (sourceKey !== null && open && open.id !== null) setOpen(null);
+  }
+  useEffect(
+    () => () => {
+      saverRef.current?.saveNow();
+      saverRef.current = null;
+      openedRef.current = null;
+    },
+    [sourceKey],
+  );
+
+  // Signed in, a failure that means the sign-in has changed checks it again.
+  const noteAccountFailure = (reason: string) => {
+    if (reason === "signed-out" || reason === "account-changed") {
+      account.recheck();
+    }
+  };
 
   const closeProject = () => {
     if (!open) return;
     void finishTaskEditRef.current?.();
     saverRef.current?.saveNow();
     saverRef.current = null;
+    openedRef.current = null;
     focusAfterCloseRef.current = open.id
       ? `[data-project-id="${open.id}"]`
       : ".add-project";
@@ -178,47 +311,153 @@ export default function Dashboard() {
     setOpen({
       key: createOpeningKey(),
       id: null,
+      newId: crypto.randomUUID(),
       values: newProjectFields,
       message: null,
       barHeight: 0,
     });
   };
 
+  // Counts a save on its way, for the warning on leaving the page.
+  const whileSending = async <Result,>(work: Promise<Result>) => {
+    sendingRef.current++;
+    try {
+      return await work;
+    } finally {
+      sendingRef.current--;
+    }
+  };
+
+  const openInBrowser = (id: string): OpenedProject => ({
+    saveChanges: async (changes) => {
+      const result = await saveProjectChanges(id, changes);
+      refreshProjects();
+      return result;
+    },
+    saveTasks: async (change) => {
+      const result = await saveProjectTasks(id, change);
+      refreshProjects();
+      return result;
+    },
+  });
+
+  // Shows the project from the list straight away, read-only until its
+  // latest copy has loaded, which the form then shows and saves are based
+  // on, so that a reopened project never starts from an older copy.
+  const openInAccount = (
+    accountId: string,
+    generation: number,
+    project: Project,
+    key: string,
+  ): OpenedProject => {
+    const opened = openAccountProject(accountId, project);
+    void opened.load().then((result) => {
+      if (result.ok) source.showSavedProject(generation, result.project);
+      else noteAccountFailure(result.reason);
+      setOpen((current) => {
+        if (current?.key !== key) return current;
+        if (!result.ok) {
+          return {
+            ...current,
+            message: {
+              text: "This project cannot be loaded right now.",
+              isError: true,
+            },
+          };
+        }
+        return {
+          ...current,
+          values: pickFormValues(result.project),
+          isLoading: false,
+          message: null,
+        };
+      });
+    });
+    return {
+      account: opened,
+      saveChanges: async (changes) => {
+        const result = await opened.saveChanges(changes);
+        if (result.ok) source.showSavedProject(generation, result.project);
+        else noteAccountFailure(result.reason);
+        return result.ok ? { ok: true } : result;
+      },
+      saveTasks: async (change) => {
+        const result = await whileSending(opened.saveTasks(change));
+        if (result.ok) source.showSavedProject(generation, result.project);
+        else noteAccountFailure(result.reason);
+        return result;
+      },
+    };
+  };
+
   const openProject = (project: Project, barHeight: number) => {
     closeForNextProject();
     const { id } = project;
+    const key = createOpeningKey();
+    const opened =
+      view.kind === "account"
+        ? openInAccount(view.accountId, view.generation, project, key)
+        : openInBrowser(id);
+    openedRef.current = opened;
     saverRef.current = createAutosaver({
-      save: async (changes) => {
-        const result = await saveProjectChanges(id, changes);
-        refreshProjects();
-        return result;
-      },
+      save: (changes) => opened.saveChanges(changes),
       onStatus: (status) => {
         const isFailed = status.state === "failed";
+        if (openedRef.current === opened) {
+          isPendingRef.current = status.state === "pending";
+        }
         setUnsavedIds((ids) => toggleId(ids, id, isFailed));
         setOpen((current) =>
-          current?.id === id
+          current?.key === key
             ? {
                 ...current,
                 message: isFailed ? describeFailure(status.reason) : null,
+                hasConflict: isFailed && status.reason === "conflict",
               }
             : current,
         );
       },
     });
+    isPendingRef.current = false;
     setUnsavedIds((ids) => toggleId(ids, id, false));
     // Just before the title, so opening a project does not put the cursor in
     // it, while Tab does.
     focusFieldRef.current = "start";
     calendarDateRef.current = null;
-    const { title, notes, assignee, dueDate, tasks } = project;
     setOpen({
-      key: createOpeningKey(),
+      key,
       id,
-      values: { title, notes, assignee, dueDate, tasks },
-      message: null,
+      values: pickFormValues(project),
+      message: opened.account
+        ? { text: "Loading the latest copy…", isError: false }
+        : null,
       barHeight,
+      isLoading: opened.account !== undefined,
     });
+  };
+
+  // A field changed on another device: the person keeps the saved version,
+  // which the form then shows, or their own, which is then saved over it.
+  const keepSavedVersion = () => {
+    const opened = openedRef.current?.account;
+    if (!opened || !open) return;
+    const saved = opened.takeSavedVersion();
+    saverRef.current?.discard(Object.keys(saved) as (keyof ProjectFields)[]);
+    setOpen({
+      ...open,
+      values: { ...open.values, ...saved },
+      message: null,
+      hasConflict: false,
+    });
+    void saverRef.current?.saveNow();
+  };
+
+  const keepMine = () => {
+    const opened = openedRef.current?.account;
+    if (!opened || !open) return;
+    opened.keepMine();
+    setOpen({ ...open, message: null, hasConflict: false });
+    void saverRef.current?.saveNow();
   };
 
   // Pressing Get Started opens the Add project form as the crossfade to the
@@ -236,6 +475,7 @@ export default function Dashboard() {
     setOpen({
       key: createOpeningKey(),
       id: null,
+      newId: crypto.randomUUID(),
       values: newProjectFields,
       message: null,
       barHeight: 0,
@@ -248,7 +488,7 @@ export default function Dashboard() {
   }, [isAddProjectDue, location.pathname, navigate]);
 
   const changeOpenProject = (changes: Partial<ProjectFields>) => {
-    if (!open) return;
+    if (!open || open.isLoading) return;
     setOpen({ ...open, values: { ...open.values, ...changes } });
     if (open.id === null) return;
     saverRef.current?.change(changes);
@@ -262,12 +502,13 @@ export default function Dashboard() {
   // Shows a change to the opened project's tasks at once and saves it
   // straight away, going back to the tasks as they were if saving fails.
   const changeOpenTasks = async (change: TaskChange) => {
-    if (!open?.id) return null;
-    const { id } = open;
+    const opened = openedRef.current;
+    if (!open?.id || open.isLoading || !opened) return null;
+    const { key } = open;
     const before = open.values.tasks;
     const showTasks = (update: TaskChange) =>
       setOpen((current) =>
-        current?.id === id
+        current?.key === key
           ? {
               ...current,
               values: {
@@ -278,10 +519,16 @@ export default function Dashboard() {
           : current,
       );
     showTasks(change);
-    const result = await saveProjectTasks(id, change);
-    refreshProjects();
-    showTasks(() => (result.ok ? result.tasks : before));
-    return result.ok ? null : describeFailure(result.reason).text;
+    const result = await opened.saveTasks(change);
+    if (result.ok) {
+      showTasks(() => result.tasks);
+      return null;
+    }
+    // Tasks changed elsewhere are shown as saved.
+    showTasks(() => result.tasks ?? before);
+    return result.reason === "tasks-conflict"
+      ? tasksConflictMessage
+      : describeFailure(result.reason).text;
   };
 
   const createOpenProject = async () => {
@@ -290,25 +537,110 @@ export default function Dashboard() {
       setOpen({ ...open, message: describeFailure("no-title") });
       return;
     }
-    const result = await createProject(open.values);
+    const { key } = open;
+    let result:
+      | { ok: true; project: Project }
+      | { ok: false; reason: ProjectSaveFailure };
+    if (view.kind === "browser") {
+      result = await createProject(open.values);
+      refreshProjects();
+    } else if (view.kind === "account" && view.state === "ready") {
+      const { generation } = view;
+      result = await whileSending(
+        createAccountProject(view.accountId, open.newId!, open.values),
+      );
+      if (result.ok) source.showSavedProject(generation, result.project);
+      else noteAccountFailure(result.reason);
+    } else {
+      result = { ok: false, reason: "unreachable" };
+    }
     if (!result.ok) {
-      setOpen(
-        (current) =>
-          current && { ...current, message: describeFailure(result.reason) },
+      const { reason } = result;
+      setOpen((current) =>
+        current?.key === key
+          ? { ...current, message: describeFailure(reason) }
+          : current,
       );
       return;
     }
-    refreshProjects();
+    if (openRef.current?.key !== key) return;
     focusAfterCloseRef.current = `[data-project-id="${result.project.id}"]`;
     setOpen(null);
   };
 
-  const list = projects?.ok ? projects.projects : [];
+  const isAccountReady = view.kind === "account" && view.state === "ready";
+  const browserProjects =
+    view.kind === "browser" && view.result?.ok ? view.result : null;
+  const list = isAccountReady
+    ? view.projects
+    : (browserProjects?.projects ?? []);
+  const isShowingList = isAccountReady || browserProjects !== null;
+  const isAccountUnavailable =
+    view.kind === "unavailable" ||
+    (view.kind === "account" && view.state === "unavailable");
   // In place, a new project's form is the only part of the dashboard that
   // can be used, as in the floating window, so that what was typed is not
   // lost by opening something else.
   const isAddingInPlace = isInPlace && open?.id === null;
-  const unreadableCount = projects?.ok ? projects.unreadableCount : 0;
+  const unreadableCount = isAccountReady
+    ? view.unreadableCount
+    : (browserProjects?.unreadableCount ?? 0);
+  // An opened project stays open, at the list's end, while the list cannot
+  // be shown.
+  const isOpenOutsideList =
+    open !== null &&
+    open.id !== null &&
+    !list.some((project) => project.id === open.id);
+
+  // Signed in, the browser's own projects, if any, are offered to be moved
+  // into the account once its projects have loaded, unless declined.
+  const offerKey =
+    view.kind === "account" && view.state === "ready"
+      ? `${view.accountId}:${view.generation}`
+      : null;
+  const [moveOffer, setMoveOffer] = useState<{
+    key: string;
+    projects: Project[];
+    status: "offered" | "moving" | "failed";
+  } | null>(null);
+  if (offerKey && moveOffer?.key !== offerKey && view.kind === "account") {
+    setMoveOffer({
+      key: offerKey,
+      projects: isMoveDeclined(view.accountId) ? [] : listOwnProjects(),
+      status: "offered",
+    });
+  }
+  const offeredCount =
+    offerKey && moveOffer?.key === offerKey ? moveOffer.projects.length : 0;
+
+  const moveProjects = async () => {
+    if (view.kind !== "account" || !moveOffer) return;
+    const { key, projects } = moveOffer;
+    setMoveOffer({ ...moveOffer, status: "moving" });
+    const result = await whileSending(importProjects(view.accountId, projects));
+    if (!result.ok) {
+      noteAccountFailure(result.reason);
+      setMoveOffer((current) =>
+        current?.key === key ? { ...current, status: "failed" } : current,
+      );
+      return;
+    }
+    // Only those the account now has, each only if not changed here since.
+    removeProjectsIfUnchanged(
+      projects.filter(({ id }) => result.outcomes[id] !== undefined),
+    );
+    refreshProjects();
+    setMoveOffer((current) =>
+      current?.key === key ? { ...current, projects: [] } : current,
+    );
+    source.reload();
+  };
+
+  const declineMoveOffer = () => {
+    if (view.kind !== "account" || !moveOffer) return;
+    declineMove(view.accountId);
+    setMoveOffer({ ...moveOffer, projects: [] });
+  };
 
   // In place, the expanded bar closes the form its own way, squashing. Esc
   // and its keycap in the shortcuts panel both close it this way.
@@ -340,7 +672,20 @@ export default function Dashboard() {
     <ProjectForm
       values={open.values}
       isNew={open.id === null}
+      isReadOnly={open.isLoading}
       message={open.message}
+      messageActions={
+        open.hasConflict && (
+          <>
+            <button type="button" onClick={keepSavedVersion}>
+              Use saved version
+            </button>
+            <button type="button" onClick={keepMine}>
+              Keep mine
+            </button>
+          </>
+        )
+      }
       getFocusField={() => focusFieldRef.current}
       onChange={changeOpenProject}
       onFieldFocus={(name) => (focusFieldRef.current = name)}
@@ -413,28 +758,64 @@ export default function Dashboard() {
             height={868}
           />
         </h1>
-        <AccountControl onBeforeLeave={prepareToLeave} />
+        <AccountControl account={account} onBeforeLeave={prepareToLeave} />
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
           {/* Replaced by false when the app is built for deployment, which
               leaves the panel out. */}
           {import.meta.env.DEV && (
-            <DefaultProjectsPanel onBeforeChange={closeProject} />
+            <DefaultProjectsPanel
+              isSignedIn={view.kind === "account"}
+              onBeforeChange={() => {
+                if (view.kind === "browser") closeProject();
+              }}
+            />
           )}
           <button
             type="button"
             className="add-project"
+            disabled={isAccountUnavailable}
             onClick={openNewProject}
           >
             Add project
           </button>
         </div>
-        {projects && !projects.ok && (
+        {view.kind === "browser" && view.result && !view.result.ok && (
           <p className="dashboard-notice" role="alert">
             This browser is not letting Abodeo use its storage, so projects
             cannot be saved here.
           </p>
+        )}
+        {isAccountUnavailable && (
+          <p className="dashboard-notice" role="alert">
+            Your projects cannot be loaded right now. Please try again later.
+          </p>
+        )}
+        {offeredCount > 0 && moveOffer && (
+          <div className="dashboard-notice dashboard-move-offer" role="status">
+            <p>
+              {offeredCount === 1
+                ? "This browser has 1 project saved while signed out. Move it into your account?"
+                : `This browser has ${offeredCount} projects saved while signed out. Move them into your account?`}
+              {moveOffer.status === "failed" &&
+                " They could not be moved just now. Please try again."}
+            </p>
+            <button
+              type="button"
+              disabled={moveOffer.status === "moving"}
+              onClick={moveProjects}
+            >
+              Move
+            </button>
+            <button
+              type="button"
+              disabled={moveOffer.status === "moving"}
+              onClick={declineMoveOffer}
+            >
+              Not now
+            </button>
+          </div>
         )}
         {unreadableCount > 0 && (
           <p className="dashboard-notice" role="alert">
@@ -469,6 +850,16 @@ export default function Dashboard() {
               />
             );
           })}
+          {isInPlace && isOpenOutsideList && (
+            <ExpandedProjectBar
+              key={open.key}
+              ref={expandedBarRef}
+              barHeight={open.barHeight}
+              onCollapse={closeProject}
+            >
+              {form}
+            </ExpandedProjectBar>
+          )}
           {/* New projects' bars, in one array so that an open one keeps its
               bar and form as it starts closing. */}
           {[
@@ -487,7 +878,7 @@ export default function Dashboard() {
             ),
           ]}
         </ul>
-        {projects?.ok && list.length === 0 && unreadableCount === 0 && (
+        {isShowingList && list.length === 0 && unreadableCount === 0 && (
           <p className="dashboard-empty">No projects added yet.</p>
         )}
         {!isInPlace && open && (
@@ -550,13 +941,31 @@ function joinList(items: string[]) {
   return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-function describeFailure(reason: SaveFailure) {
+function pickFormValues({
+  title,
+  notes,
+  assignee,
+  dueDate,
+  tasks,
+}: Project): ProjectFields {
+  return { title, notes, assignee, dueDate, tasks };
+}
+
+function describeFailure(reason: ProjectSaveFailure) {
   const text = {
     "no-title": "A project needs a title.",
     full: "Not saved: this browser's storage for Abodeo is full.",
     unavailable: "Not saved: this browser is not letting Abodeo save.",
     unreadable:
       "Not saved: the saved copy of this project cannot be read, so it has been left as it is.",
+    unreachable: "Not saved: Abodeo cannot reach your projects right now.",
+    "signed-out": "Not saved: you have been signed out.",
+    "account-changed":
+      "Not saved: this page is no longer signed in to this account.",
+    "not-found": "Not saved: this project is no longer in your account.",
+    "too-large": "Not saved: this project is too large to save.",
+    refused: "Not saved: Abodeo could not accept this change.",
+    conflict: "This project was changed on another device.",
   }[reason];
   return { text, isError: true } satisfies FormMessage;
 }

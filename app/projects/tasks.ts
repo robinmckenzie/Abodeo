@@ -107,3 +107,69 @@ export function describeTaskCount(tasks: Task[]) {
   const done = tasks.filter((task) => task.isDone).length;
   return done > 0 ? `${count}, ${done} completed` : count;
 }
+
+// The tasks one side changed, going from base to result: added, removed,
+// renamed, ticked or unticked, or moved. A task counts as moved when it is
+// not among the most tasks that kept their order, so that moving one task
+// counts only that task.
+function findTouchedTasks(base: Task[], result: Task[]) {
+  const before = new Map(base.map((task) => [task.id, task]));
+  const after = new Map(result.map((task) => [task.id, task]));
+  const touched = new Set<string>();
+  for (const task of result) {
+    const old = before.get(task.id);
+    if (!old || old.title !== task.title || old.isDone !== task.isDone) {
+      touched.add(task.id);
+    }
+  }
+  for (const task of base) if (!after.has(task.id)) touched.add(task.id);
+  const moved = findMovedTasks(
+    base.filter((task) => after.has(task.id)).map(({ id }) => id),
+    result.filter((task) => before.has(task.id)).map(({ id }) => id),
+  );
+  moved.forEach((id) => touched.add(id));
+  return { touched, isReordered: moved.length > 0 };
+}
+
+// The ids, among the same ids in two orders, that are not in the longest run
+// kept in the same order.
+function findMovedTasks(before: string[], after: string[]) {
+  const positions = after.map((id) => before.indexOf(id));
+  // Longest increasing subsequence, by patience sorting.
+  const tails: number[] = [];
+  const tailIndexes: number[] = [];
+  const previous: number[] = [];
+  positions.forEach((position, index) => {
+    let low = 0;
+    let high = tails.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (tails[middle] < position) low = middle + 1;
+      else high = middle;
+    }
+    tails[low] = position;
+    tailIndexes[low] = index;
+    previous[index] = low > 0 ? tailIndexes[low - 1] : -1;
+  });
+  const kept = new Set<number>();
+  let index = tailIndexes[tails.length - 1] ?? -1;
+  while (index !== -1) {
+    kept.add(index);
+    index = previous[index];
+  }
+  return after.filter((_id, i) => !kept.has(i));
+}
+
+// Whether a change to the tasks, from base to mine, can be applied again to
+// tasks changed elsewhere, from base to theirs, without undoing either: they
+// touch no task in common, and they did not both change the order.
+export function canMergeTaskChanges(
+  base: Task[],
+  mine: Task[],
+  theirs: Task[],
+) {
+  const my = findTouchedTasks(base, mine);
+  const other = findTouchedTasks(base, theirs);
+  if (my.isReordered && other.isReordered) return false;
+  return ![...my.touched].some((id) => other.touched.has(id));
+}

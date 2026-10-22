@@ -6,9 +6,10 @@
 --
 -- The auth_ tables are Better Auth's user, session, account and verification
 -- tables, renamed and with snake_case columns, as "user" is a reserved word.
--- user_profile, calendar_link, account_sign_in and account_visit are
--- Abodeo's own. Deleting a row from auth_user deletes that account's
--- sessions, Google link, profile, calendar link and history.
+-- user_profile, calendar_link, account_sign_in, account_visit, project and
+-- project_defaults_received are Abodeo's own. Deleting a row from auth_user
+-- deletes that account's sessions, Google link, profile, calendar link,
+-- history and projects.
 --
 -- What is kept: Google's permanent account ID (auth_account.account_id), and
 -- the name and email from the first sign-in. The token, scope, image,
@@ -23,6 +24,14 @@
 -- each sign-in, and each visit's start and last activity, so that Robin can
 -- see when and for how long testers used Abodeo. Only the account and the
 -- server's times are kept: no IP address, browser or device details.
+--
+-- project and project_defaults_received (AD #41 Access Projects Across
+-- Devices) keep a signed-in account's projects and their tasks, so that they
+-- can be used on every device where the person signs in. data is a project's
+-- saved form, as the browser keeps it, so the same version rules apply.
+-- revision changes on every write, so that two saves at once cannot both
+-- apply. project_defaults_received records which default projects the
+-- account has received, as each browser does for itself.
 
 create table if not exists auth_user (
     id text primary key,
@@ -110,3 +119,17 @@ create table if not exists account_visit (
 
 create index if not exists account_visit_user_id_idx
     on account_visit (user_id, last_active_at desc);
+
+create table if not exists project (
+    user_id text not null references auth_user (id) on delete cascade,
+    id text not null,
+    data jsonb not null,
+    revision bigint not null default 1,
+    primary key (user_id, id)
+);
+
+create table if not exists project_defaults_received (
+    user_id text primary key references auth_user (id) on delete cascade,
+    hash text not null,
+    ids jsonb not null
+);

@@ -12,12 +12,7 @@ import {
 import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import { useActivityReport } from "./use-activity-report";
-import {
-  useAccount,
-  type Account,
-  type AccountView,
-  type ProfileSaveResult,
-} from "./use-account";
+import type { Account, AccountView, ProfileSaveResult } from "./use-account";
 
 const saveMessages: Record<ProfileSaveResult, string> = {
   saved: "Saved.",
@@ -29,12 +24,14 @@ const saveMessages: Record<ProfileSaveResult, string> = {
 
 type SignedIn = Extract<AccountView, { kind: "signed-in" }>;
 
+// The account comes from the dashboard, whose projects depend on it.
 export function AccountControl({
+  account,
   onBeforeLeave,
 }: {
+  account: Account;
   onBeforeLeave: () => Promise<boolean>;
 }) {
-  const account = useAccount({ onBeforeLeave });
   const calendar = useCalendarTest({ onBeforeLeave });
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
@@ -43,7 +40,7 @@ export function AccountControl({
 
   return (
     <div className="account">
-      {view.kind === "unavailable" && (
+      {(view.kind === "unavailable" || view.kind === "not-configured") && (
         <p className="account-unavailable">Sign-in is unavailable</p>
       )}
       {view.kind === "signed-out" && (
@@ -223,9 +220,10 @@ function AccountPanel({
           The ID of your Abodeo calendar in Google Calendar, if one was made.
         </li>
         <li>A sign-in record for each browser you use.</li>
+        <li>Your projects and their tasks.</li>
       </ul>
       <p className="account-hint">
-        Your projects stay in this browser and are not linked to your account.{" "}
+        Projects you add while signed out stay in this browser.{" "}
         <a href="/privacy.html">Privacy</a>
       </p>
       <button

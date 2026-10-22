@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createAutosaver, type AutosaveStatus } from "./autosave";
-import type { SaveResult } from "./project-storage";
+import {
+  createAutosaver,
+  type AutosaveStatus,
+  type ProjectSaveResult,
+} from "./autosave";
 import type { ProjectFields } from "./projects";
 
 let saved: Partial<ProjectFields>[];
 let statuses: AutosaveStatus["state"][];
-let nextResult: SaveResult;
+let nextResult: ProjectSaveResult;
 
 function createTestSaver() {
   return createAutosaver({
@@ -115,5 +118,22 @@ describe("autosave", () => {
     saver.change({ notes: "Two" });
     await vi.advanceTimersByTimeAsync(0);
     expect(statuses.at(-1)).toBe("pending");
+  });
+});
+
+describe("discarding unsaved changes", () => {
+  it("drops only the fields given and clears the failure", async () => {
+    const saver = createTestSaver();
+    nextResult = { ok: false, reason: "conflict" };
+    saver.change({ title: "Mine", notes: "Also mine" });
+    await saver.saveNow();
+    expect(statuses.at(-1)).toBe("failed");
+
+    saver.discard(["title"]);
+    expect(statuses.at(-1)).toBe("pending");
+    nextResult = { ok: true };
+    expect(await saver.saveNow()).toBe(true);
+
+    expect(saved.at(-1)).toEqual({ notes: "Also mine" });
   });
 });

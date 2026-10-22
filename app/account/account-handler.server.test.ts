@@ -16,6 +16,7 @@ import {
   testBaseUrl,
 } from "./test-account.server";
 import { createFakeCalendarDependencies } from "../calendar/test-calendar.server";
+import { createMemoryProjectStore } from "../projects/test-projects.server";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -50,12 +51,14 @@ function createTestHandler() {
   const { names, store } = createMemoryProfileStore();
   const close = vi.fn(async () => {});
   const calendar = createFakeCalendarDependencies();
+  const projectStore = createMemoryProjectStore();
   const runtime: AccountRuntime = {
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: store,
     history,
+    projects: projectStore.store,
     calendar: calendar.dependencies,
     close,
   };
@@ -64,7 +67,17 @@ function createTestHandler() {
     () => true,
     () => {},
   );
-  return { auth, rows, names, handle, close, calendar, signIns, activity };
+  return {
+    auth,
+    rows,
+    names,
+    handle,
+    close,
+    calendar,
+    signIns,
+    activity,
+    projectStore,
+  };
 }
 
 function request(path: string, init: RequestInit = {}) {
@@ -122,6 +135,7 @@ describe("createAccountRequestHandler", () => {
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
+          projects: createMemoryProjectStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: async () => {},
         }),
@@ -150,6 +164,7 @@ describe("createAccountRequestHandler", () => {
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
+        projects: createMemoryProjectStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -387,6 +402,70 @@ describe("createAccountRequestHandler", () => {
     expect(after.status).toBe(401);
   });
 
+  it("reaches only the signed-in account's projects, and none after signing out", async () => {
+    const { auth, handle, projectStore } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const grace = await signInTestAccount(auth, {
+      name: "Grace Hopper",
+      email: "grace@example.com",
+      sub: "google-sub-2",
+    });
+    const projectRequest = (
+      who: typeof ada,
+      path: string,
+      init: RequestInit = {},
+    ) =>
+      request(path, {
+        ...init,
+        headers: {
+          cookie: who.cookie,
+          "X-Abodeo-Account": who.user.id,
+          "Content-Type": "application/json",
+          ...init.headers,
+        },
+      });
+
+    const created = await handle(
+      projectRequest(ada, "/api/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          id: "p1",
+          userId: grace.user.id,
+          fields: {
+            title: "Ada's shed",
+            notes: "",
+            assignee: "andy",
+            dueDate: null,
+            tasks: [],
+          },
+        }),
+      }),
+    );
+    expect(created.status).toBe(200);
+    expect([...projectStore.accounts.keys()]).toEqual([ada.user.id]);
+
+    const graceList = await handle(projectRequest(grace, "/api/projects"));
+    expect((await graceList.json()).projects).toEqual([]);
+    const graceRead = await handle(projectRequest(grace, "/api/projects/p1"));
+    expect(graceRead.status).toBe(404);
+    // Naming Ada's account does not make Grace's session Ada's.
+    const pretending = await handle(
+      projectRequest(grace, "/api/projects", {
+        headers: { "X-Abodeo-Account": ada.user.id },
+      }),
+    );
+    expect(pretending.status).toBe(409);
+
+    await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    const after = await handle(projectRequest(ada, "/api/projects"));
+    expect(after.status).toBe(401);
+  });
+
   it("refuses a profile change that is not JSON or not a valid name", async () => {
     const { auth, handle } = createTestHandler();
     const ada = await signInTestAccount(auth);
@@ -474,6 +553,7 @@ describe("createAccountRequestHandler", () => {
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
+        projects: createMemoryProjectStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
       }),
@@ -497,6 +577,7 @@ describe("createAccountRequestHandler", () => {
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
+          projects: createMemoryProjectStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: () => new Promise(() => {}),
         }),

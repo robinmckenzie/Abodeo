@@ -51,9 +51,51 @@ export function buildDefaultProjectsFile(projects: Project[]) {
 
 export const bundledDefaultProjects = readDefaultProjects(bundledFile);
 
+// Which default projects a browser or an account last received.
+export type DefaultsRecord = { hash: string; ids: string[] };
+
+export type DefaultsReceipt = {
+  write: Project[];
+  remove: string[];
+  record: DefaultsRecord;
+};
+
+// What receiving the defaults changes, or null when nothing needs doing:
+// every default is written, overwriting any edits, and defaults the app no
+// longer has are removed. A project that cannot be read, such as one saved
+// by a later version, is never written or removed, and one that is kept
+// still counts as a default. The same rules apply to a browser and an
+// account.
+export function planDefaultsReceipt(
+  record: DefaultsRecord | null,
+  defaults: DefaultProjects | null,
+  isUnreadable: (id: string) => boolean,
+): DefaultsReceipt | null {
+  // A damaged defaults file changes nothing.
+  if (!defaults) return null;
+  if (record?.hash === defaults.hash) return null;
+  // Nothing received yet and nothing to receive.
+  if (!record && defaults.projects.length === 0) return null;
+  const ids = new Set(defaults.projects.map(({ id }) => id));
+  const write = defaults.projects.filter(({ id }) => !isUnreadable(id));
+  const remove: string[] = [];
+  const keptIds: string[] = [];
+  for (const id of record?.ids ?? []) {
+    if (ids.has(id)) continue;
+    if (isUnreadable(id)) keptIds.push(id);
+    else remove.push(id);
+  }
+  return {
+    write,
+    remove,
+    record: { hash: defaults.hash, ids: [...ids, ...keptIds] },
+  };
+}
+
 // cyrb53, a fast 53-bit string hash. It only needs to tell one set of
-// default projects from another, not to be secure.
-function hashText(text: string) {
+// default projects, or one copy of a project, from another, not to be
+// secure.
+export function hashText(text: string) {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {

@@ -18,25 +18,17 @@ requirements, commitments, or scheduled work.
 
 ## Saving projects
 
-- Autosave with a database: AD #16 Simple Projects saves project edits
-  automatically to local storage, already after a 0.5-second pause in typing
-  and when a field or project is closed, sending only changed fields
-  (`app/projects/autosave.ts`). Moving to a database means replacing the
-  functions in `app/projects/project-storage.ts`, which are async for that
-  reason. Consider keeping local storage as a buffer that syncs in the
-  background. A save started as the page is left must still complete, which a
-  network request may not. Shared projects will also need a way to spot two
-  people editing the same project, such as a version number checked on
-  saving. For now the later save of a field wins, and, as each project is one
-  entry, two tabs saving different fields of one project within moments of
-  each other can lose the earlier change (accepted by Robin for AD #16 Simple
-  Projects as very unlikely). The welcome screen's splash for a returning
-  visitor also depends on local storage: `hasProjectsScript`, in the same
-  file, looks there for projects before the page first appears and sets
-  `data-has-projects`. With a database, the server would set the attribute
-  when it renders the page instead. The default projects (AD #36 Save Default
-  Projects) are written into the same storage, and the browser's record of
-  which it received, which that script also reads, would move with them.
+- Saves at page leave: since AD #41 Access Projects Across Devices, a
+  signed-in account's projects are saved on the server. A save started as the
+  page closes is sent with `keepalive`, and the browser asks before leaving
+  while a change is unsent or failed, but the save can still be lost if the
+  network fails then. Local storage is not used as an offline buffer that
+  syncs later, which would also allow editing offline.
+- Signed out, the browser's projects still use the later-save-wins rule of
+  AD #16 Simple Projects: two tabs saving different fields of one project
+  within moments of each other can lose the earlier change (accepted by Robin
+  as very unlikely). The per-field check used for accounts could be applied
+  there too if it ever matters.
 
 ## Tasks
 
