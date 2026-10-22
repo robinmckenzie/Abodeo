@@ -236,6 +236,11 @@ function AccountPanel({
         </li>
         <li>A sign-in record for each browser you use.</li>
         <li>Your projects and their tasks.</li>
+        <li>
+          The images you add to your projects, exactly as you added them, with
+          any location details inside the file, and your captions. Only you can
+          see them.
+        </li>
       </ul>
       <p className="account-hint">
         Projects you add while signed out stay in this browser.{" "}
