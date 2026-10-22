@@ -121,6 +121,41 @@ describe("autosave", () => {
   });
 });
 
+describe("a failed save followed by a newer one", () => {
+  it("does not put back a value that a later change has replaced", async () => {
+    let finishFirst: (result: ProjectSaveResult) => void = () => {};
+    const sent: Partial<ProjectFields>[] = [];
+    let calls = 0;
+    const saver = createAutosaver({
+      save: (changes) => {
+        sent.push(changes);
+        calls++;
+        if (calls === 1) {
+          return new Promise((resolve) => (finishFirst = resolve));
+        }
+        return Promise.resolve({ ok: true });
+      },
+      onStatus: () => {},
+    });
+    saver.change({ title: "Older" });
+    const first = saver.saveNow();
+    saver.change({ title: "Newer" });
+    const second = saver.saveNow();
+    await second;
+    finishFirst({ ok: false, reason: "unreachable" });
+    await first;
+
+    saver.change({ notes: "Then notes" });
+    await saver.saveNow();
+
+    expect(sent).toEqual([
+      { title: "Older" },
+      { title: "Newer" },
+      { notes: "Then notes" },
+    ]);
+  });
+});
+
 describe("discarding unsaved changes", () => {
   it("drops only the fields given and clears the failure", async () => {
     const saver = createTestSaver();

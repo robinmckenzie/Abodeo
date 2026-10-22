@@ -841,6 +841,32 @@ describe("a signed-in account's projects (AD #41)", () => {
     expect(titleField().closest("[inert]")).not.toBeNull();
   });
 
+  it("closes an open project when the account's projects stop loading", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await openProject("Shed");
+    server.projectsStatus = 503;
+
+    const later = Date.now() + 11_000;
+    vi.spyOn(Date, "now").mockReturnValue(later);
+    await act(async () => {
+      fireEvent.focus(window);
+    });
+    await settle();
+
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(
+      screen.getByText(
+        "Your projects cannot be loaded right now. Please try again later.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("keeps a field changed elsewhere when saving another", async () => {
     const server = fakeServer({ session: ada });
     await server.projects.store.create("ada", "a1", {

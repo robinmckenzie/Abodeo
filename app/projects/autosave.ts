@@ -41,6 +41,11 @@ export function createAutosaver({
   delay?: number;
 }): Autosaver {
   let unsaved: Partial<ProjectFields> = {};
+  // Which change each field's value came from, so that a failed save puts
+  // back only values that no later change has replaced, even one already
+  // sent and saved.
+  let changeCount = 0;
+  let latestChange: Partial<Record<keyof ProjectFields, number>> = {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   let saving = 0;
   let failure: ProjectSaveFailure | null = null;
@@ -62,6 +67,7 @@ export function createAutosaver({
     timer = undefined;
     if (!hasUnsaved()) return latestSave.then(isAllSaved);
     const sending = unsaved;
+    const sentChange = { ...latestChange };
     unsaved = {};
     saving++;
     latestSave = save(sending).then((result) => {
@@ -69,9 +75,15 @@ export function createAutosaver({
       if (result.ok) {
         failure = null;
       } else {
-        // Puts the failed changes back under any made since, to be tried
+        // Puts the failed changes back, unless changed since, to be tried
         // again with the next change, or when the project is closed.
-        unsaved = { ...sending, ...unsaved };
+        const restored: Partial<ProjectFields> = {};
+        for (const field of Object.keys(sending) as (keyof ProjectFields)[]) {
+          if (latestChange[field] === sentChange[field]) {
+            Object.assign(restored, { [field]: sending[field] });
+          }
+        }
+        unsaved = { ...restored, ...unsaved };
         failure = result.reason;
       }
       reportStatus();
@@ -88,6 +100,10 @@ export function createAutosaver({
         delete valid.title;
       }
       unsaved = { ...unsaved, ...valid };
+      changeCount++;
+      for (const field of Object.keys(valid) as (keyof ProjectFields)[]) {
+        latestChange = { ...latestChange, [field]: changeCount };
+      }
       clearTimeout(timer);
       if (hasUnsaved()) timer = setTimeout(saveNow, delay);
       if (!failure) reportStatus();

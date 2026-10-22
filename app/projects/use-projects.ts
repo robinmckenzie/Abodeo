@@ -210,6 +210,10 @@ export function useProjectsSource(
         if (current?.generation !== generation || current.state !== "ready") {
           return current;
         }
+        // An answer can arrive after a newer one, such as for a project
+        // closed and opened again, so an older copy is not shown over it.
+        const shown = current.projects.find(({ id }) => id === project.id);
+        if (shown && shown.updatedAt > project.updatedAt) return current;
         const others = current.projects.filter(({ id }) => id !== project.id);
         const projects = sortProjects([...others, project]);
         writeAccountHint(

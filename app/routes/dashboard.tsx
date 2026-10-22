@@ -102,12 +102,25 @@ type OpenedProject = {
 export const tasksConflictMessage =
   "These tasks were changed on another device. Your last change was not saved.";
 
-// Which source projects are being shown from. Checking the sign-in, or
-// failing to, keeps the last one, so that it does not close what is open.
+// Which source projects are being shown from. Checking the sign-in keeps
+// the last one, so that it does not close what is open. An account whose
+// projects or sign-in cannot be checked counts as a change, so that none of
+// its projects stays shown.
 function readSourceKey(view: ProjectsView, previous: string | null) {
   if (view.kind === "browser") return "browser";
-  if (view.kind === "account") return `account:${view.accountId}`;
+  if (view.kind === "unavailable") return "unavailable";
+  if (view.kind === "account") {
+    return view.state === "unavailable"
+      ? "unavailable"
+      : `account:${view.accountId}`;
+  }
   return previous;
+}
+
+function isSameFields(a: ProjectFields, b: ProjectFields) {
+  return (
+    JSON.stringify(pickFormValues(a)) === JSON.stringify(pickFormValues(b))
+  );
 }
 
 let openings = 0;
@@ -134,7 +147,8 @@ export default function Dashboard() {
   // Saves of tasks and new projects on their way, and whether the opened
   // project has changes not yet saved, for the warning on leaving the page.
   const sendingRef = useRef(0);
-  const isPendingRef = useRef(false);
+  // The openings, current or closed, whose changes are not yet saved.
+  const pendingKeysRef = useRef(new Set<string>());
   const unsavedIdsRef = useRef(unsavedIds);
   // Set once sign-in or sign-out is leaving the page, having asked already.
   const isLeavingRef = useRef(false);
@@ -195,7 +209,7 @@ export default function Dashboard() {
       if (!isAccountSourceRef.current || isLeavingRef.current) return;
       if (
         sendingRef.current > 0 ||
-        isPendingRef.current ||
+        pendingKeysRef.current.size > 0 ||
         unsavedIdsRef.current.size > 0
       ) {
         event.preventDefault();
@@ -403,9 +417,8 @@ export default function Dashboard() {
       save: (changes) => opened.saveChanges(changes),
       onStatus: (status) => {
         const isFailed = status.state === "failed";
-        if (openedRef.current === opened) {
-          isPendingRef.current = status.state === "pending";
-        }
+        if (status.state === "pending") pendingKeysRef.current.add(key);
+        else pendingKeysRef.current.delete(key);
         setUnsavedIds((ids) => toggleId(ids, id, isFailed));
         setOpen((current) =>
           current?.key === key
@@ -418,7 +431,6 @@ export default function Dashboard() {
         );
       },
     });
-    isPendingRef.current = false;
     setUnsavedIds((ids) => toggleId(ids, id, false));
     // Just before the title, so opening a project does not put the cursor in
     // it, while Tab does.
@@ -546,9 +558,37 @@ export default function Dashboard() {
       refreshProjects();
     } else if (view.kind === "account" && view.state === "ready") {
       const { generation } = view;
+      const { accountId } = view;
       result = await whileSending(
-        createAccountProject(view.accountId, open.newId!, open.values),
+        createAccountProject(accountId, open.newId!, open.values),
       );
+      // A retry, after an answer was lost, gives the project as first
+      // added, and the form may have changed since: what differs is saved
+      // onto it.
+      const current = openRef.current;
+      if (
+        result.ok &&
+        current?.key === key &&
+        !isSameFields(result.project, current.values)
+      ) {
+        const added = result.project;
+        const changes = Object.fromEntries(
+          (Object.keys(current.values) as (keyof ProjectFields)[])
+            .filter(
+              (field) =>
+                JSON.stringify(current.values[field]) !==
+                JSON.stringify(added[field]),
+            )
+            .map((field) => [field, current.values[field]]),
+        ) as Partial<ProjectFields>;
+        const saved = await whileSending(
+          openAccountProject(accountId, added).saveChanges(changes),
+        );
+        result = saved.ok
+          ? { ok: true, project: saved.project }
+          : { ok: false, reason: saved.reason };
+        if (!saved.ok) source.showSavedProject(generation, added);
+      }
       if (result.ok) source.showSavedProject(generation, result.project);
       else noteAccountFailure(result.reason);
     } else {
@@ -947,7 +987,7 @@ function pickFormValues({
   assignee,
   dueDate,
   tasks,
-}: Project): ProjectFields {
+}: ProjectFields): ProjectFields {
   return { title, notes, assignee, dueDate, tasks };
 }
 
