@@ -377,8 +377,8 @@ function ImageEntry({
       <button
         type="button"
         className="project-images-remove"
-        aria-label="Remove"
-        title="Remove"
+        aria-label="Remove image"
+        title="Remove image"
         onClick={onRemove}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">

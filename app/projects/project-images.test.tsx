@@ -406,7 +406,7 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one", "two"]);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ProjectImages accountId="ada" projectId="shed" />);
-    const [first] = await screen.findAllByRole("button", { name: "Remove" });
+    const [first] = await screen.findAllByRole("button", { name: "Remove image" });
     fireEvent.click(first);
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
@@ -420,7 +420,7 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<ProjectImages accountId="ada" projectId="shed" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove image" }));
     expect(server.store.accounts.get("ada")).toHaveLength(1);
   });
 
