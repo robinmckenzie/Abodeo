@@ -335,7 +335,7 @@ body:has(.dashboard) {
   border: 1px solid #8a857a;
   border-radius: 999px;
   background: transparent;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -343,7 +343,10 @@ body:has(.dashboard) {
   background: #ece9e1;
 }
 
+/* "Signed in as" above the name, so the button's text stays whole for
+   screen readers. */
 .account-label {
+  display: block;
   color: #6b675e;
 }
 
