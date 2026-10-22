@@ -483,16 +483,21 @@ body:has(.dashboard) {
   margin-bottom: 1.25rem;
 }
 
-/* Development only. */
+/* Development only. Fixed at the bottom right of the window, out of the
+   toolbar's way. */
 .default-projects-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-right: auto;
   padding: 0.4rem 0.75rem;
   border: 1px dashed #8a857a;
   border-radius: 10px;
+  background: #fdfcf8;
   font-size: 0.85rem;
 }
 
