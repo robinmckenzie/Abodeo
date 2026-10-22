@@ -787,6 +787,7 @@ body:has(.dashboard) {
   width: 5.25rem;
   height: 3.9375rem;
   object-fit: cover;
+  object-position: top;
   border: 1px solid #d8d3c6;
   border-radius: 8px;
   background: #f6f3ec;
