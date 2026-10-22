@@ -1443,6 +1443,23 @@ body:has(.dashboard) {
   stroke-linejoin: round;
 }
 
+/* The delete button is the image buttons' thin circle, with the plus turned
+   45 degrees to make an X. It keeps the other task buttons' hover. */
+.task-button-circled-x {
+  border-radius: 50%;
+}
+
+.task-button-circled-x svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  stroke-width: 1;
+}
+
+.task-button-circled-x svg path {
+  transform: rotate(45deg);
+  transform-origin: center;
+}
+
 .task-undo {
   display: flex;
   align-items: center;

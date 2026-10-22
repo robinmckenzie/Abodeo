@@ -524,7 +524,7 @@ export function TaskList({
                     label={`Delete ${task.title}`}
                     focusKey={`${task.id}-delete`}
                     onClick={() => removeTask(task, index)}
-                    path="M4 4l8 8M12 4l-8 8"
+                    isCircledX
                   />
                 </span>
               </li>
@@ -616,18 +616,23 @@ function TaskButton({
   isDisabled = false,
   onClick,
   path,
+  isCircledX = false,
 }: {
   label: string;
   // Finds the button again after the list changes, to give it focus.
   focusKey: string;
   isDisabled?: boolean;
   onClick: () => void;
-  path: string;
+  // The thin circle with an X that the image buttons use, in place of a path.
+  path?: string;
+  isCircledX?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="task-button"
+      className={
+        isCircledX ? "task-button task-button-circled-x" : "task-button"
+      }
       aria-label={label}
       aria-disabled={isDisabled || undefined}
       data-task-button={focusKey}
@@ -635,9 +640,16 @@ function TaskButton({
         if (!isDisabled) onClick();
       }}
     >
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d={path} />
-      </svg>
+      {isCircledX ? (
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8.5" />
+          <path d="M5.5 10h9M10 5.5v9" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d={path} />
+        </svg>
+      )}
     </button>
   );
 }
