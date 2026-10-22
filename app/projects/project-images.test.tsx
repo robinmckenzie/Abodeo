@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import {
   act,
   cleanup,
@@ -10,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleImagesRequest } from "./image-handler.server";
 import { maxCaptionLength } from "./images-api";
-import { ProjectImages, type AddFiles } from "./project-images";
+import { ImageViewer, ProjectImages, type AddFiles } from "./project-images";
 import { createMemoryImageStore } from "./test-image-store.server";
 import { makeJpeg, makePng } from "./test-images";
 
@@ -432,5 +433,28 @@ describe("ProjectImages", () => {
     );
     await waitFor(() => expect(onFailure).toHaveBeenCalledWith("signed-out"));
     expect(await screen.findByText(/cannot reach your images/)).toBeTruthy();
+  });
+
+  it("stays open when its effect runs twice, as in development", async () => {
+    // jsdom has no modal dialogs, so this does what a browser does: closing
+    // sends a close event after a moment, even if it was opened again.
+    const proto = HTMLDialogElement.prototype as Partial<HTMLDialogElement>;
+    proto.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    proto.close = function (this: HTMLDialogElement) {
+      this.removeAttribute("open");
+      setTimeout(() => this.dispatchEvent(new Event("close")), 0);
+    };
+    const onClose = vi.fn();
+    render(
+      <StrictMode>
+        <ImageViewer url="blob:x" label="Porch" onClose={onClose} />
+      </StrictMode>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onClose).not.toHaveBeenCalled();
+    delete proto.showModal;
+    delete proto.close;
   });
 });

@@ -390,7 +390,7 @@ function ImageEntry({
   );
 }
 
-function ImageViewer({
+export function ImageViewer({
   url,
   label,
   onClose,
@@ -410,7 +410,11 @@ function ImageViewer({
       ref={dialogRef}
       className="image-viewer"
       aria-label="Full-size image"
-      onClose={onClose}
+      // The close event comes after the dialog's cleanup in development, when
+      // an effect runs twice, so it counts only if the dialog is still shut.
+      onClose={() => {
+        if (!dialogRef.current?.open) onClose();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
