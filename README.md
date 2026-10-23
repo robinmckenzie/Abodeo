@@ -334,6 +334,8 @@ Vercel previews have no sign-in, and report it as unavailable.
 In the Neon SQL Editor for the right database:
 
 ```sql
+-- Version: v1.51.0
+--
 -- Every account, with what is kept about it and how many projects it has.
 select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name,
     c.calendar_id, (select count(*) from project j where j.user_id = u.id) as projects
