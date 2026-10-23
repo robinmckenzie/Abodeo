@@ -1,8 +1,11 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { EventEmitter } from "node:events";
+
 import {
   createAccountRequestHandler,
+  listenForPoolErrors,
   type AccountRuntime,
 } from "./account-handler.server";
 import type { HistoryStore } from "./account-history.server";
@@ -631,5 +634,28 @@ describe("handleProfileRequest", () => {
     );
 
     expect(response.status).toBe(503);
+  });
+});
+
+describe("listenForPoolErrors", () => {
+  it("reports only the error code and does not throw", () => {
+    const pool = new EventEmitter();
+    const reportFailure = vi.fn();
+    listenForPoolErrors(pool as never, reportFailure);
+    expect(() =>
+      pool.emit(
+        "error",
+        Object.assign(new Error("secret host"), { code: "57P01" }),
+      ),
+    ).not.toThrow();
+    expect(reportFailure).toHaveBeenCalledWith("57P01");
+  });
+
+  it("reports no code for an error without one", () => {
+    const pool = new EventEmitter();
+    const reportFailure = vi.fn();
+    listenForPoolErrors(pool as never, reportFailure);
+    pool.emit("error", new Error("Unhandled error"));
+    expect(reportFailure).toHaveBeenCalledWith(undefined);
   });
 });
