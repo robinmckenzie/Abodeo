@@ -5,10 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildAccountAuthOptions,
+  buildDatabaseHooks,
   createMemoryRateLimitStorage,
   disabledPaths,
   isEnabledAuthPath,
 } from "./account-auth.server";
+import type { HistoryStore } from "./account-history.server";
 import {
   createTestAuth,
   signInTestAccount,
@@ -86,6 +88,31 @@ describe("createAccountAuth", () => {
         expect.objectContaining({ ip_address: null, user_agent: null }),
       );
     }
+  });
+
+  it("records a sign-in with the label from the request's cookie, or empty", async () => {
+    const recordSignIn = vi.fn<HistoryStore["recordSignIn"]>(async () => {});
+    const hooks = buildDatabaseHooks({
+      recordSignIn,
+      recordActivity: async () => {},
+    });
+    const after = hooks.session.create.after;
+    const withCookie = new Request(`${testBaseUrl}/api/auth/callback/google`, {
+      headers: { Cookie: "abodeo_label=Andrew%20B" },
+    });
+
+    // Better Auth's endpoint context carries the request and its headers.
+    await after({ userId: "ada" }, { request: withCookie });
+    await after({ userId: "ada" }, { headers: withCookie.headers });
+    await after({ userId: "ada" }, { request: new Request(withCookie.url) });
+    await after({ userId: "ada" }, undefined);
+
+    expect(recordSignIn.mock.calls).toEqual([
+      ["ada", "Andrew B"],
+      ["ada", "Andrew B"],
+      ["ada", ""],
+      ["ada", ""],
+    ]);
   });
 
   it("lets sign-in complete when its history entry cannot be written", async () => {

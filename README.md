@@ -101,7 +101,8 @@ tokens, the profile photo, and the IP address and browser details of a sign-in a
 their columns exist because Better Auth expects them, and are always empty. Tests in
 `app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
-`account_visit`. The account's projects and their tasks are in `project`, and which default
+`account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
+projects and their tasks are in `project`, and which default
 projects it has received in `project_defaults_received`. The images added to its projects are in
 `project_image` (details, caption and sizes) and `project_image_bytes` (the files).
 
@@ -199,11 +200,44 @@ under [Inspecting and removing an account](#inspecting-and-removing-an-account).
   account's latest visit in `account_visit`, or starts a new one if the last activity was 10 or
   more minutes ago. Both limits are provisional defaults, in `app/account/activity-report.ts` and
   `app/account/account-history.server.ts`.
-- Only the account and the server's times are kept, never the browser's clock, IP address or
-  details. The rows are deleted with the account.
+- Only the account, the server's times and the [usage label](#usage-labels) are kept, never the
+  browser's clock, IP address or details. The rows are deleted with the account.
 - Times are accurate to about a minute: a click within a minute of the last report is not sent, so
   a visit's last-active time can be up to a minute early, and a visit can end after 9 to 10
   minutes without activity. A visit with a single report has a length of 0.
+
+### Usage labels
+
+AD #51 Label Account Usage. A label is a short, self-declared name for a browser, such as a first
+name, stored with every usage record so that Robin can tell who used an account, whether it is
+shared or not. It is not used for access and is not shown to other users.
+
+**Rule: every usage record, including any added in future, must store the label.** Call
+`readLabel(request.headers)` from `app/account/usage-label.server.ts` where the record is made,
+and store the result in a `label text not null default ''` column. It gives `""` when there is no
+valid label. A record that spans a period, as a visit does, belongs to one label.
+
+- Set it by opening the app with `?label=NAME` on any address, such as `/?label=Andrew`. Open
+  `?label=PUBLIC` (any case) to clear it. The page saves it in the `abodeo_label` cookie, then
+  removes `label` from the address.
+- A label is 1 to 30 characters after trimming: Unicode letters, digits, space, hyphen,
+  apostrophe and full stop. An invalid or empty `?label=` changes nothing, so the previous label
+  stays.
+- The cookie lasts a year from when it was last set, survives reloads, restarts, sign-out and
+  other tabs, and is shared by everyone using that browser. It is limited to `/api` paths, so it
+  reaches sign-in, including Google's return to `/api/auth/callback/google`, and the activity
+  report. Page scripts can read it, as the browser sets it.
+- Sign-ins store the label sent with the request that creates the session. Activity reports
+  store the label sent with each report, so a change applies from the next report, up to a
+  minute later.
+- A visit is per account and label: people using one account at the same time under different
+  labels each have their own running visit, rather than ending each other's. A lock per account
+  and label stops two simultaneous first reports from both starting a visit.
+- Records from before labels have an empty label. A visit begun before is continued by activity
+  with no label.
+- Existing databases need `db/account-tables.sql` run again, in Neon's SQL Editor for each
+  database, before the new code is deployed. It adds the columns and replaces the visit index.
+- If the label cannot be read or saved, the app works and the record has an empty label.
 
 ### Calendar test
 
@@ -300,6 +334,8 @@ Vercel previews have no sign-in, and report it as unavailable.
 In the Neon SQL Editor for the right database:
 
 ```sql
+-- Version: v1.41.0
+--
 -- Every account, with what is kept about it and how many projects it has.
 select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name,
     c.calendar_id, (select count(*) from project j where j.user_id = u.id) as projects
@@ -308,16 +344,21 @@ left join auth_account a on a.user_id = u.id
 left join user_profile p on p.user_id = u.id
 left join calendar_link c on c.user_id = u.id;
 
--- Each account's sign-ins and visits, newest first, with each visit's length.
-select u.email, 'sign-in' as kind, s.signed_in_at as at, null::interval as length
+-- Version: v1.51.0
+--
+-- Each account's sign-ins and visits, newest first, with the usage label ('' if none) and each
+-- visit's length.
+select u.email, s.label, 'sign-in' as kind, s.signed_in_at as at, null::interval as length
 from account_sign_in s
 join auth_user u on u.id = s.user_id
 union all
-select u.email, 'visit', v.started_at, v.last_active_at - v.started_at
+select u.email, v.label, 'visit', v.started_at, v.last_active_at - v.started_at
 from account_visit v
 join auth_user u on u.id = v.user_id
 order by email, at desc;
 
+-- Version: v1.48.0
+--
 -- How much each account uses of its 100 MB of images, and the total, in MB.
 select u.email, count(*) as images,
     round(sum(i.original_size + i.thumbnail_size) / 1048576.0, 1) as mb
@@ -328,6 +369,8 @@ union all
 select 'total', count(*), round(coalesce(sum(original_size + thumbnail_size), 0) / 1048576.0, 1)
 from project_image;
 
+-- Version: v1.48.0
+--
 -- Removes an account, with its sessions, Google link, profile, calendar link, history,
 -- projects and images.
 delete from auth_user where email = 'someone@example.com';
