@@ -349,7 +349,8 @@ export default function Dashboard() {
     getRefusal: (fileTypes) =>
       dropRefusal ??
       (areAllTypesUnsupported(fileTypes) ? unsupportedFilesMessage : null),
-    onRefusal: showMessage,
+    onRefusal: (message) =>
+      showMessage(message, message === unsupportedFilesMessage),
     onDrop: (files) => {
       if (addFilesRef.current) addFilesRef.current(files);
       else showMessage(noProjectOpenMessage);

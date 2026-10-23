@@ -2090,6 +2090,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   }
 }
 
+.floating-message.is-error {
+  border-color: #d9777a;
+  background: #fdecec;
+}
+
 .floating-message.is-fading {
   opacity: 0;
 }

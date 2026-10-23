@@ -26,6 +26,8 @@ export type MessageBox = {
   text: string;
   isFading: boolean;
   isSuppression: boolean;
+  // Shown in red, for a message that says something is not allowed.
+  isError: boolean;
 };
 
 // The boxes with a message added at the bottom. At the limit the message is
@@ -36,10 +38,14 @@ export function addFloatingMessage(
   boxes: MessageBox[],
   text: string,
   id: number,
+  isError = false,
 ): MessageBox[] {
   const ordinary = boxes.filter(({ isSuppression }) => !isSuppression);
   if (ordinary.length < maxMessageBoxes) {
-    return [...boxes, { id, text, isFading: false, isSuppression: false }];
+    return [
+      ...boxes,
+      { id, text, isFading: false, isSuppression: false, isError },
+    ];
   }
   if (boxes.some(({ isSuppression }) => isSuppression)) return boxes;
   return [
@@ -49,6 +55,7 @@ export function addFloatingMessage(
       text: furtherMessagesSuppressedMessage,
       isFading: false,
       isSuppression: true,
+      isError: false,
     },
   ];
 }
@@ -73,9 +80,9 @@ export function useFloatingMessages() {
   }, []);
 
   const showMessage = useCallback(
-    (text: string) => {
+    (text: string, isError = false) => {
       const id = nextIdRef.current++;
-      const next = addFloatingMessage(boxesRef.current, text, id);
+      const next = addFloatingMessage(boxesRef.current, text, id, isError);
       if (next === boxesRef.current) return;
       change(next);
       later(() => {
@@ -137,9 +144,13 @@ export function FloatingMessages({ boxes }: { boxes: MessageBox[] }) {
       {boxes.map((box) => (
         <p
           key={box.id}
-          className={
-            box.isFading ? "floating-message is-fading" : "floating-message"
-          }
+          className={[
+            "floating-message",
+            box.isError && "is-error",
+            box.isFading && "is-fading",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           {box.text}
         </p>

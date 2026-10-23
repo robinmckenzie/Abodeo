@@ -1264,9 +1264,11 @@ describe("images on the dashboard (AD #48)", () => {
     await drag("dragenter", ["text/plain"]);
     const dataTransfer = await drag("dragover", ["text/plain"]);
     expect(dataTransfer.dropEffect).toBe("none");
-    expect(
-      screen.getAllByText("Sorry, only JPEG and PNG files can be uploaded"),
-    ).toHaveLength(1);
+    const messages = screen.getAllByText(
+      "Sorry, only JPEG and PNG files can be uploaded",
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0].classList.contains("is-error")).toBe(true);
     expect(document.querySelector(".is-drop-target")).toBeNull();
   });
 
