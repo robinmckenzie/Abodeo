@@ -20,19 +20,6 @@ import { accountHeader } from "./projects-api";
 
 type Fetch = typeof fetch;
 
-// How an upload is sent, which reports how much has gone as a fraction, or
-// null where the browser cannot tell. It rejects where the server could not
-// be reached or did not answer in time.
-export type UploadTransport = (
-  path: string,
-  init: {
-    headers: Record<string, string>;
-    body: Uint8Array;
-    timeout: number;
-  },
-  onProgress?: (fraction: number | null) => void,
-) => Promise<Response>;
-
 // How long an upload may take, as a large photo goes over a slow network.
 export const uploadTimeout = 60_000;
 
@@ -51,54 +38,6 @@ export type ImageFailure =
   | "conflict"
   | "refused";
 
-// Sends the upload with fetch, which cannot report progress.
-export function makeFetchTransport(fetchFn: Fetch = fetch): UploadTransport {
-  return (path, { headers, body, timeout }) =>
-    fetchFn(path, {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: AbortSignal.timeout(timeout),
-      headers,
-      body: body as BodyInit,
-    });
-}
-
-// Sends the upload with XMLHttpRequest, as fetch cannot report how much of a
-// request body has gone (AD #54 Change UX While Dropped Images Are Added).
-export const sendUploadByXhr: UploadTransport = (
-  path,
-  { headers, body, timeout },
-  onProgress,
-) =>
-  new Promise<Response>((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    request.open("POST", path);
-    request.timeout = timeout;
-    request.withCredentials = false;
-    request.responseType = "arraybuffer";
-    for (const [name, value] of Object.entries(headers)) {
-      request.setRequestHeader(name, value);
-    }
-    request.setRequestHeader("Cache-Control", "no-store");
-    request.upload.onprogress = (event) => {
-      onProgress?.(event.lengthComputable ? event.loaded / event.total : null);
-    };
-    request.onload = () => {
-      resolve(
-        new Response(
-          // A body is not allowed with these.
-          [204, 205, 304].includes(request.status) ? null : request.response,
-          { status: request.status },
-        ),
-      );
-    };
-    request.onerror = () => reject(new Error("network error"));
-    request.ontimeout = () => reject(new Error("timeout"));
-    request.onabort = () => reject(new Error("abort"));
-    request.send(body as XMLHttpRequestBodyInit);
-  });
-
 type Answer = { status: number; response: Response } | "unreachable";
 
 async function send(
@@ -110,34 +49,22 @@ async function send(
     headers = {},
     body,
     timeout = requestTimeout,
-    transport,
-    onProgress,
   }: {
     method?: string;
     headers?: Record<string, string>;
     body?: BodyInit;
     timeout?: number;
-    // Sends an upload in place of fetchFn.
-    transport?: { send: UploadTransport; body: Uint8Array };
-    onProgress?: (fraction: number | null) => void;
   } = {},
 ): Promise<Answer> {
   try {
-    const allHeaders = { [accountHeader]: accountId, ...headers };
-    const response = transport
-      ? await transport.send(
-          path,
-          { headers: allHeaders, body: transport.body, timeout },
-          onProgress,
-        )
-      : await fetchFn(path, {
-          method,
-          credentials: "same-origin",
-          cache: "no-store",
-          signal: AbortSignal.timeout(timeout),
-          headers: allHeaders,
-          body,
-        });
+    const response = await fetchFn(path, {
+      method,
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeout),
+      headers: { [accountHeader]: accountId, ...headers },
+      body,
+    });
     return { status: response.status, response };
   } catch {
     return "unreachable";
@@ -232,21 +159,16 @@ export async function uploadImage(
   imageId: string,
   thumbnail: Uint8Array,
   original: Uint8Array,
-  sendUpload: UploadTransport = sendUploadByXhr,
-  onProgress?: (fraction: number | null) => void,
+  fetchFn: Fetch = fetch,
 ): Promise<Outcome<{ image: ImageInfo; usedBytes: number }>> {
-  const answer = await send(fetch, accountId, buildImagesPath(projectId), {
+  const answer = await send(fetchFn, accountId, buildImagesPath(projectId), {
     method: "POST",
     headers: {
       "Content-Type": uploadContentType,
       [imageIdHeader]: imageId,
     },
-    transport: {
-      send: sendUpload,
-      body: buildUploadFrame(thumbnail, original),
-    },
+    body: buildUploadFrame(thumbnail, original),
     timeout: uploadTimeout,
-    onProgress,
   });
   if (answer === "unreachable" || answer.status !== 200) {
     return { ok: false, reason: await readFailure(answer) };

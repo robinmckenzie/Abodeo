@@ -26,7 +26,6 @@ import { handleImagesRequest } from "../projects/image-handler.server";
 import { handleProjectsRequest } from "../projects/project-handler.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { makeJpeg, makePng } from "../projects/test-images";
-import { FetchBackedXhr } from "../projects/test-xhr";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
 import { refreshProjects } from "../projects/use-projects";
 
@@ -99,7 +98,6 @@ function fakeServer(overrides: Partial<Server> = {}) {
     lostAnswers: 0,
     ...overrides,
   };
-  vi.stubGlobal("XMLHttpRequest", FetchBackedXhr);
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string, init: RequestInit = {}) => {

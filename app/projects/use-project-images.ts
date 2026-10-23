@@ -27,7 +27,6 @@ import {
   type CaptionResult,
   uploadImage,
   type ImageFailure,
-  type UploadTransport,
 } from "./images-client";
 import {
   browserThumbnailEnvironment,
@@ -60,8 +59,6 @@ export type ProjectImagesState = {
 export type PendingImage = {
   key: string;
   name: string;
-  // How much of the upload has gone, from 0 to 1, or null where unknown.
-  progress: number | null;
 };
 
 type Session = {
@@ -86,7 +83,6 @@ export type ImagesOptions = {
   // Says something to the person, for the floating messages.
   onMessage?: (text: string) => void;
   fetchFn?: typeof fetch;
-  uploadFn?: UploadTransport;
   thumbnailEnvironment?: ThumbnailEnvironment;
   createId?: () => string;
 };
@@ -109,7 +105,6 @@ export function useProjectImages({
   onFailure,
   onMessage,
   fetchFn = fetch,
-  uploadFn,
   thumbnailEnvironment = browserThumbnailEnvironment,
   createId = () => crypto.randomUUID(),
 }: ImagesOptions) {
@@ -121,7 +116,6 @@ export function useProjectImages({
     onFailure,
     onMessage,
     fetchFn,
-    uploadFn,
     thumbnailEnvironment,
     createId,
   });
@@ -131,7 +125,6 @@ export function useProjectImages({
       onFailure,
       onMessage,
       fetchFn,
-      uploadFn,
       thumbnailEnvironment,
       createId,
     };
@@ -319,19 +312,15 @@ export function useProjectImages({
     id: string,
     thumbnail: Uint8Array,
     original: Uint8Array,
-    onProgress: (fraction: number | null) => void,
   ) => {
     for (let attempt = 0; ; attempt++) {
-      // A resend starts again from the beginning.
-      onProgress(null);
       const result = await uploadImage(
         accountId,
         projectId,
         id,
         thumbnail,
         original,
-        optionsRef.current.uploadFn,
-        onProgress,
+        optionsRef.current.fetchFn,
       );
       if (result.ok) return result;
       if (result.reason !== "unreachable" || !session.isCurrent) return result;
@@ -410,13 +399,6 @@ export function useProjectImages({
         optionsRef.current.createId(),
         new Uint8Array(await thumbnail.arrayBuffer()),
         new Uint8Array(await file.arrayBuffer()),
-        (progress) =>
-          update(session, (current) => ({
-            ...current,
-            pending: current.pending.map((other) =>
-              other.key === entry.key ? { ...other, progress } : other,
-            ),
-          })),
       );
       if (!session.isCurrent) return;
       if (!result.ok) {
@@ -463,7 +445,6 @@ export function useProjectImages({
     const entries: PendingImage[] = files.map((file) => ({
       key: String(session.nextPendingKey++),
       name: file.name,
-      progress: null,
     }));
     session.batchCount++;
     update(session, (current) => ({

@@ -1,4 +1,4 @@
-import { StrictMode, type ComponentProps } from "react";
+import { StrictMode } from "react";
 import {
   act,
   cleanup,
@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleImagesRequest } from "./image-handler.server";
 import { maxCaptionLength } from "./images-api";
-import { makeFetchTransport } from "./images-client";
 import { ImageViewer, ProjectImages, type AddFiles } from "./project-images";
 import { createMemoryImageStore } from "./test-image-store.server";
 import { makeJpeg, makePng } from "./test-images";
@@ -86,12 +85,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// Uploads go by fetch here, as the browser's progress reports are not
-// available.
-function TestImages(props: ComponentProps<typeof ProjectImages>) {
-  return <ProjectImages uploadFn={makeFetchTransport()} {...props} />;
-}
-
 function pngFile(name = "porch.png") {
   return new File([makePng()], name, { type: "image/png" });
 }
@@ -116,7 +109,7 @@ function chooseFiles(files: File[]) {
 
 describe("ProjectImages", () => {
   it("says to sign in, in place of the button, when signed out", () => {
-    render(<TestImages accountId={null} projectId="shed" />);
+    render(<ProjectImages accountId={null} projectId="shed" />);
     expect(screen.getByText("Sign in to add images")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /add image/i })).toBeNull();
     expect(document.querySelector("input[type=file]")).toBeNull();
@@ -125,7 +118,7 @@ describe("ProjectImages", () => {
   it("shows the images oldest first with the time added, and their thumbnails", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry img")).toHaveLength(2),
     );
@@ -142,7 +135,7 @@ describe("ProjectImages", () => {
   it("adds a chosen image to the bottom, using the thumbnail made here", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     await screen.findByRole("button", { name: "Add image" });
     await waitFor(() =>
       expect(
@@ -165,7 +158,7 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     const onMessage = vi.fn();
     render(
-      <TestImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
     );
     await waitFor(() =>
       expect(
@@ -198,7 +191,7 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     const onMessage = vi.fn();
     render(
-      <TestImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
     );
     await waitFor(() =>
       expect(
@@ -218,7 +211,7 @@ describe("ProjectImages", () => {
   it("shows a placeholder with the file's name for each file being added, in the images' place", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     await waitFor(() =>
       expect(
         (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
@@ -247,7 +240,7 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     const onMessage = vi.fn();
     render(
-      <TestImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
     );
     await waitFor(() =>
       expect(
@@ -268,7 +261,11 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     const addFilesRef: { current: AddFiles | null } = { current: null };
     render(
-      <TestImages accountId="ada" projectId="shed" addFilesRef={addFilesRef} />,
+      <ProjectImages
+        accountId="ada"
+        projectId="shed"
+        addFilesRef={addFilesRef}
+      />,
     );
     await waitFor(() => expect(addFilesRef.current).not.toBeNull());
     await waitFor(() =>
@@ -292,7 +289,7 @@ describe("ProjectImages", () => {
   it("gives one image when an upload's answer is lost and it is sent again", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     await waitFor(() =>
       expect(
         (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
@@ -313,7 +310,11 @@ describe("ProjectImages", () => {
     await seed(server, "ada", ["one"]);
     const addFilesRef: { current: AddFiles | null } = { current: null };
     render(
-      <TestImages accountId="ada" projectId="shed" addFilesRef={addFilesRef} />,
+      <ProjectImages
+        accountId="ada"
+        projectId="shed"
+        addFilesRef={addFilesRef}
+      />,
     );
     await waitFor(() => expect(addFilesRef.current).not.toBeNull());
     await waitFor(() =>
@@ -330,13 +331,13 @@ describe("ProjectImages", () => {
       const server = fakeServer();
       await seed(server, "ada", ["one"]);
       const { rerender } = render(
-        <TestImages accountId="ada" projectId="shed" />,
+        <ProjectImages accountId="ada" projectId="shed" />,
       );
       await waitFor(() =>
         expect(document.querySelectorAll(".image-entry img")).toHaveLength(1),
       );
       server.session = "bob";
-      rerender(<TestImages accountId="bob" projectId="shed" />);
+      rerender(<ProjectImages accountId="bob" projectId="shed" />);
       expect(document.querySelectorAll(".image-entry")).toHaveLength(0);
       expect(document.querySelectorAll("img")).toHaveLength(0);
       expect(revokedUrls).toEqual(createdUrls);
@@ -361,7 +362,7 @@ describe("ProjectImages", () => {
         }),
       );
       const { rerender } = render(
-        <TestImages accountId="ada" projectId="shed" />,
+        <ProjectImages accountId="ada" projectId="shed" />,
       );
       await waitFor(() =>
         expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
@@ -374,7 +375,7 @@ describe("ProjectImages", () => {
         ).toBe(true),
       );
       server.session = "bob";
-      rerender(<TestImages accountId="bob" projectId="shed" />);
+      rerender(<ProjectImages accountId="bob" projectId="shed" />);
       release();
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
@@ -402,10 +403,10 @@ describe("ProjectImages", () => {
         }),
       );
       const { rerender } = render(
-        <TestImages accountId="ada" projectId="shed" />,
+        <ProjectImages accountId="ada" projectId="shed" />,
       );
       server.session = "bob";
-      rerender(<TestImages accountId="bob" projectId="shed" />);
+      rerender(<ProjectImages accountId="bob" projectId="shed" />);
       release();
       await waitFor(() =>
         expect(screen.queryByText("Loading images…")).toBeNull(),
@@ -418,7 +419,7 @@ describe("ProjectImages", () => {
     async function renderOne() {
       const server = fakeServer();
       await seed(server, "ada", ["one"]);
-      render(<TestImages accountId="ada" projectId="shed" />);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
       const box = (await screen.findByRole("textbox", {
         name: "Caption",
       })) as HTMLTextAreaElement;
@@ -495,7 +496,7 @@ describe("ProjectImages", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const onLatestImageChange = vi.fn();
     render(
-      <TestImages
+      <ProjectImages
         accountId="ada"
         projectId="shed"
         onLatestImageChange={onLatestImageChange}
@@ -533,7 +534,7 @@ describe("ProjectImages", () => {
     it("steps through the images with previous and next buttons, stopping at the ends", async () => {
       const server = fakeServer();
       await seed(server, "ada", ["one", "two", "three"]);
-      render(<TestImages accountId="ada" projectId="shed" />);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
       const views = await screen.findAllByRole("button", {
         name: /View full size/,
       });
@@ -566,7 +567,7 @@ describe("ProjectImages", () => {
     it("stays closed when dismissed while the next image is still loading", async () => {
       const server = fakeServer();
       await seed(server, "ada", ["one", "two"]);
-      render(<TestImages accountId="ada" projectId="shed" />);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
       const views = await screen.findAllByRole("button", {
         name: /View full size/,
       });
@@ -585,7 +586,7 @@ describe("ProjectImages", () => {
     it("has no step buttons when the project has one image", async () => {
       const server = fakeServer();
       await seed(server, "ada", ["one"]);
-      render(<TestImages accountId="ada" projectId="shed" />);
+      render(<ProjectImages accountId="ada" projectId="shed" />);
       fireEvent.click(
         await screen.findByRole("button", { name: /View full size/ }),
       );
@@ -599,7 +600,7 @@ describe("ProjectImages", () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     const [first] = await screen.findAllByRole("button", {
       name: "Remove image",
     });
@@ -615,7 +616,7 @@ describe("ProjectImages", () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<TestImages accountId="ada" projectId="shed" />);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Remove image" }),
     );
@@ -627,7 +628,7 @@ describe("ProjectImages", () => {
     server.session = null;
     const onFailure = vi.fn();
     render(
-      <TestImages accountId="ada" projectId="shed" onFailure={onFailure} />,
+      <ProjectImages accountId="ada" projectId="shed" onFailure={onFailure} />,
     );
     await waitFor(() => expect(onFailure).toHaveBeenCalledWith("signed-out"));
     expect(await screen.findByText(/cannot reach your images/)).toBeTruthy();

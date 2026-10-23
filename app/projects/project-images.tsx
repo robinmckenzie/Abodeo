@@ -23,7 +23,7 @@ import {
   maxCaptionLength,
   type ImageInfo,
 } from "./images-api";
-import type { ImageFailure, UploadTransport } from "./images-client";
+import type { ImageFailure } from "./images-client";
 import { fitHeightToText } from "./task-list";
 import { useProjectImages, type PendingImage } from "./use-project-images";
 
@@ -44,7 +44,6 @@ export function ProjectImages({
   projectId,
   onFailure,
   onMessage,
-  uploadFn,
   addFilesRef,
   onLatestImageChange,
 }: {
@@ -54,7 +53,6 @@ export function ProjectImages({
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, as a floating message.
   onMessage?: (text: string) => void;
-  uploadFn?: UploadTransport;
   addFilesRef?: RefObject<AddFiles | null>;
   // Given the newest image's id (null when none) once the images have
   // loaded, and again whenever it changes, for the project's bar.
@@ -77,7 +75,6 @@ export function ProjectImages({
       projectId={projectId}
       onFailure={onFailure}
       onMessage={onMessage}
-      uploadFn={uploadFn}
       addFilesRef={addFilesRef}
       onLatestImageChange={onLatestImageChange}
     />
@@ -89,7 +86,6 @@ function SignedInImages({
   projectId,
   onFailure,
   onMessage,
-  uploadFn,
   addFilesRef,
   onLatestImageChange,
 }: {
@@ -97,7 +93,6 @@ function SignedInImages({
   projectId: string;
   onFailure?: (reason: ImageFailure) => void;
   onMessage?: (text: string) => void;
-  uploadFn?: UploadTransport;
   addFilesRef?: RefObject<AddFiles | null>;
   onLatestImageChange?: (imageId: string | null) => void;
 }) {
@@ -106,7 +101,6 @@ function SignedInImages({
     projectId,
     onFailure,
     onMessage,
-    uploadFn,
   });
   const { state } = images;
   const onLatestRef = useRef(onLatestImageChange);
@@ -307,10 +301,8 @@ function SignedInImages({
   );
 }
 
-// A file being added, where its image will be: a spinner, which fills as the
-// upload goes where the browser can tell, and the file's name.
+// A file being added, where its image will be: a spinner and the file's name.
 function PendingEntry({ entry }: { entry: PendingImage }) {
-  const length = 2 * Math.PI * 14;
   return (
     <div
       className="image-pending-entry"
@@ -320,11 +312,7 @@ function PendingEntry({ entry }: { entry: PendingImage }) {
       <div className="image-entry-thumbnail image-entry-pending-thumbnail">
         <svg
           viewBox="0 0 32 32"
-          className={
-            entry.progress === null
-              ? "image-entry-spinner is-spinning"
-              : "image-entry-spinner"
-          }
+          className="image-entry-spinner"
           aria-hidden="true"
         >
           <circle
@@ -338,8 +326,7 @@ function PendingEntry({ entry }: { entry: PendingImage }) {
             cx="16"
             cy="16"
             r="14"
-            strokeDasharray={length}
-            strokeDashoffset={length * (1 - (entry.progress ?? 0.25))}
+            strokeDasharray="22 66"
           />
         </svg>
       </div>

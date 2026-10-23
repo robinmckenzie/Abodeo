@@ -2119,12 +2119,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .image-entry-spinner.is-spinning {
+  .image-entry-spinner {
     animation: image-entry-spin 0.9s linear infinite;
-  }
-
-  .image-entry-spinner-arc {
-    transition: stroke-dashoffset 0.2s linear;
   }
 }
 
