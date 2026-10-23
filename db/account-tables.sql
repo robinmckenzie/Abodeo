@@ -1,6 +1,6 @@
--- Version: v1.51.0
+-- Version: v1.51.1
 --
--- Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
+-- "Create script" for Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
 --
 -- Run this once in the Neon SQL Editor for each account store: production
 -- (the database DATABASE_URL points to) and abodeo-local, used by
