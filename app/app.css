@@ -1836,13 +1836,6 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   font-size: 0.875rem;
 }
 
-.project-images-notices {
-  margin: 0.375rem 0;
-  padding-left: 1.125rem;
-  color: #8a1c1c;
-  font-size: 0.875rem;
-}
-
 .image-timeline {
   display: flex;
   flex-direction: column;
@@ -1858,7 +1851,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   display: none;
 }
 
-.image-entry {
+.image-entry,
+.image-pending-entry {
   display: flex;
   gap: 0.625rem;
   align-items: flex-start;
@@ -2054,19 +2048,137 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   transform: scaleX(-1);
 }
 
-/* Why a drop added nothing, over everything, as a popover in the top layer. */
-.drop-message {
+/* Messages about images, over everything, as a popover in the top layer: a
+   stack at the bottom centre, newest at the bottom. */
+.floating-messages {
   position: fixed;
-  inset: auto auto 1.5rem 50%;
-  margin: 0;
-  padding: 0.5rem 1rem;
+  inset: auto 0 1.5rem 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: min(32rem, calc(100vw - 2rem));
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
   border: 0;
-  border-radius: 8px;
-  background: #1a1a1a;
-  color: #fff;
-  transform: translateX(-50%);
+  background: none;
+  color: #1a1a1a;
+  pointer-events: none;
 }
 
-.drop-message:not(:popover-open) {
+.floating-messages:not(:popover-open) {
+  display: none;
+}
+
+.floating-message {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid #e7e2d6;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgb(26 26 26 / 0.12);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .floating-message {
+    transition: opacity 0.6s ease;
+  }
+}
+
+.floating-message.is-error {
+  border-color: #d9777a;
+  background: #fdecec;
+}
+
+.floating-message.is-fading {
+  opacity: 0;
+}
+
+/* A file being added: the thumbnail's box with a spinner, and its name where
+   the caption goes. */
+.image-entry-pending-thumbnail {
+  cursor: default;
+}
+
+.image-entry-spinner {
+  width: 2rem;
+  height: 2rem;
+  fill: none;
+  stroke-width: 3;
+  /* The arc starts at 12 o'clock. */
+  transform: rotate(-90deg);
+}
+
+.image-entry-spinner-track {
+  stroke: #e0dbcd;
+}
+
+.image-entry-spinner-arc {
+  stroke: #6b665c;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .image-entry-spinner {
+    animation: image-entry-spin 0.9s linear infinite;
+  }
+}
+
+@keyframes image-entry-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+.image-entry-pending-size {
+  margin: 0;
+  color: #7a7568;
+  font-size: 0.8125rem;
+}
+
+.image-entry-pending-name {
+  margin: 0;
+  overflow: hidden;
+  color: #5a5548;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* While files are dragged over the page and a drop would be accepted,
+   everything outside the open project's box dims. */
+@media (prefers-reduced-motion: no-preference) {
+  .project-window::backdrop {
+    transition: background-color 0.15s ease;
+  }
+}
+
+.dashboard.is-drop-target .project-window::backdrop {
+  background: rgb(26 26 26 / 0.55);
+}
+
+.dashboard.is-drop-target::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(26 26 26 / 0.45);
+  pointer-events: none;
+}
+
+.dashboard.is-drop-target .project-bar.is-expanded {
+  position: relative;
+  z-index: 11;
+}
+
+.dashboard.is-drop-target:has(.project-window)::after {
   display: none;
 }

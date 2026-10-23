@@ -1202,6 +1202,76 @@ describe("images on the dashboard (AD #48)", () => {
     ).toBeTruthy();
   });
 
+  const drag = async (type: string, itemTypes: string[] = []) => {
+    const items = itemTypes.map((itemType) => ({
+      kind: "file",
+      type: itemType,
+    }));
+    const dataTransfer = { types: ["Files"], files: [], items, dropEffect: "" };
+    await act(async () => {
+      fireEvent(
+        document.body,
+        Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+          dataTransfer,
+        }),
+      );
+    });
+    return dataTransfer;
+  };
+
+  it("says why a drop would be refused as files are dragged over, once, with a not-allowed cursor", async () => {
+    fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    await drag("dragenter");
+    const dataTransfer = await drag("dragover");
+    await drag("dragover");
+    expect(dataTransfer.dropEffect).toBe("none");
+    expect(
+      screen.getAllByText("Open a project to add an image to it."),
+    ).toHaveLength(1);
+    expect(document.querySelector(".is-drop-target")).toBeNull();
+  });
+
+  it("marks the page as a drop target while files are dragged over an open project", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    await drag("dragenter");
+    const dataTransfer = await drag("dragover");
+    expect(dataTransfer.dropEffect).toBe("copy");
+    expect(document.querySelector(".dashboard.is-drop-target")).not.toBeNull();
+    await drag("dragend");
+    expect(document.querySelector(".is-drop-target")).toBeNull();
+  });
+
+  it("refuses at once, with a not-allowed cursor, a drag of files that are not JPEG or PNG", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    await drag("dragenter", ["text/plain"]);
+    const dataTransfer = await drag("dragover", ["text/plain"]);
+    expect(dataTransfer.dropEffect).toBe("none");
+    const messages = screen.getAllByText(
+      "Sorry, only JPEG and PNG files can be uploaded",
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0].classList.contains("is-error")).toBe(true);
+    expect(document.querySelector(".is-drop-target")).toBeNull();
+  });
+
   it("leaves a drag of something that is not a file alone", async () => {
     fakeServer({ session: ada });
     await renderDashboard();

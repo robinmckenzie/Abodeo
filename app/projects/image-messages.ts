@@ -5,6 +5,8 @@ import { maxCaptionLength } from "./images-api";
 
 export const signInToAddMessage = "Sign in to add images";
 export const noProjectOpenMessage = "Open a project to add an image to it.";
+export const unsupportedFilesMessage =
+  "Sorry, only JPEG and PNG files can be uploaded";
 export const unsavedProjectMessage = "Save the project first to add an image.";
 
 export const captionChangedElsewhereMessage =
@@ -39,6 +41,13 @@ export function describeImageFailure(reason: ImageFailure) {
   }
 }
 
+// A file's size for people, as in "230 KB" or "1.4 MB".
+export function describeFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export type RefusedImage = { name: string; reason: ImageFailure };
 
 // One line for each image that was refused, with its name, so that when
@@ -46,5 +55,21 @@ export type RefusedImage = { name: string; reason: ImageFailure };
 export function describeRefusals(refused: RefusedImage[]) {
   return refused.map(
     ({ name, reason }) => `${name}: ${describeImageFailure(reason)}`,
+  );
+}
+
+// Whether every file is known not to be a JPEG or PNG, going by the media type
+// the browser gives it. A file with no type, or the generic binary type, is not
+// known, and may be one.
+export function areAllTypesUnsupported(fileTypes: string[]) {
+  return (
+    fileTypes.length > 0 &&
+    fileTypes.every(
+      (type) =>
+        type !== "" &&
+        type !== "application/octet-stream" &&
+        type !== "image/jpeg" &&
+        type !== "image/png",
+    )
   );
 }

@@ -156,7 +156,10 @@ describe("ProjectImages", () => {
   it("refuses what is not an image, by its content, and adds the rest", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    render(<ProjectImages accountId="ada" projectId="shed" />);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
     await waitFor(() =>
       expect(
         (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
@@ -168,21 +171,44 @@ describe("ProjectImages", () => {
     });
     const big = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "huge.jpg");
     chooseFiles([renamed, pngFile("good.png"), big]);
-    await waitFor(() =>
-      expect(document.querySelectorAll(".image-entry")).toHaveLength(2),
-    );
-    const notices = await screen.findByRole("status");
-    expect(notices.textContent).toContain(
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(2));
+    expect(document.querySelectorAll(".image-entry")).toHaveLength(2);
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
+    expect(onMessage).toHaveBeenCalledWith(
       "holiday.png: Sorry, only JPEG and PNG images can be added.",
     );
     // The size is checked after the type, so a large non-image is a format
     // problem, and a large image is a size problem.
-    expect(notices.textContent).toContain("huge.jpg");
-    expect(notices.textContent).not.toContain("good.png");
+    expect(onMessage.mock.calls[1][0]).toContain("huge.jpg");
+    expect(onMessage.mock.calls.flat().join()).not.toContain("good.png");
     expect(server.store.accounts.get("ada")).toHaveLength(2);
+    // The messages float, so none is left in the Images section.
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("refuses an image over 4 MiB as too large", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    chooseFiles([new File([makePng(4 * 1024 * 1024 + 1)], "huge.png")]);
+    await waitFor(() =>
+      expect(onMessage).toHaveBeenCalledWith(
+        "huge.png: Sorry, your image is too large.",
+      ),
+    );
+    expect(server.calls.some((call) => call.startsWith("POST"))).toBe(false);
+  });
+
+  it("shows a placeholder with the file's name for each file being added, in the images' place", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
     render(<ProjectImages accountId="ada" projectId="shed" />);
@@ -192,9 +218,73 @@ describe("ProjectImages", () => {
           .disabled,
       ).toBe(false),
     );
-    chooseFiles([new File([makePng(4 * 1024 * 1024 + 1)], "huge.png")]);
-    await screen.findByText("huge.png: Sorry, your image is too large.");
-    expect(server.calls.some((call) => call.startsWith("POST"))).toBe(false);
+    const bad = new File(["GIF89a......"], "bad.png", { type: "image/png" });
+    chooseFiles([pngFile("first.png"), bad, pngFile("second.png")]);
+    // At once, one for every file, in drop order, after the existing image.
+    expect(screen.getByRole("button", { name: "Adding images" })).toBeTruthy();
+    expect(
+      [...document.querySelectorAll(".image-pending-entry")].map((entry) =>
+        entry.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Adding first.png", "Adding bad.png", "Adding second.png"]);
+    expect(screen.getByText("second.png")).toBeTruthy();
+    expect(screen.getAllByText(/^\(\d+ B\)$/)).toHaveLength(3);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(3),
+    );
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
+  });
+
+  it("removes the placeholders and says so when a file cannot be read after it was checked", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const broken = pngFile("broken.png");
+    broken.arrayBuffer = () => Promise.reject(new Error("gone"));
+    chooseFiles([broken, pngFile("after.png")]);
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(1));
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
+  });
+
+  it("runs files added while others are being added after them, in order", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    const addFilesRef: { current: AddFiles | null } = { current: null };
+    render(
+      <ProjectImages
+        accountId="ada"
+        projectId="shed"
+        addFilesRef={addFilesRef}
+      />,
+    );
+    await waitFor(() => expect(addFilesRef.current).not.toBeNull());
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    act(() => {
+      addFilesRef.current!([pngFile("a.png")]);
+      addFilesRef.current!([pngFile("b.png")]);
+    });
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(2);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(3),
+    );
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
+    expect(server.store.accounts.get("ada")).toHaveLength(3);
   });
 
   it("gives one image when an upload's answer is lost and it is sent again", async () => {

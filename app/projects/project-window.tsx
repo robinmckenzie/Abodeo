@@ -2,6 +2,8 @@
 // dashboard, which keeps focus inside it while it is open.
 import { useLayoutEffect, useRef } from "react";
 
+import { raiseFloatingMessages } from "./floating-messages";
+
 export function ProjectWindow({
   onClose,
   children,
@@ -16,6 +18,7 @@ export function ProjectWindow({
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal();
+    raiseFloatingMessages();
     return () => dialog?.close();
   }, []);
 

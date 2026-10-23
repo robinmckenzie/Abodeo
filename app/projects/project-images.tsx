@@ -11,9 +11,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { raiseFloatingMessages } from "./floating-messages";
 import {
   captionChangedElsewhereMessage,
   captionTooLongMessage,
+  describeFileSize,
   describeImageFailure,
   signInToAddMessage,
 } from "./image-messages";
@@ -24,7 +26,7 @@ import {
 } from "./images-api";
 import type { ImageFailure } from "./images-client";
 import { fitHeightToText } from "./task-list";
-import { useProjectImages } from "./use-project-images";
+import { useProjectImages, type PendingImage } from "./use-project-images";
 
 // What the dashboard calls to add files dropped on the page.
 export type AddFiles = (files: File[]) => void;
@@ -42,6 +44,7 @@ export function ProjectImages({
   accountId,
   projectId,
   onFailure,
+  onMessage,
   addFilesRef,
   onLatestImageChange,
 }: {
@@ -49,6 +52,8 @@ export function ProjectImages({
   accountId: string | null;
   projectId: string;
   onFailure?: (reason: ImageFailure) => void;
+  // Says something to the person, as a floating message.
+  onMessage?: (text: string) => void;
   addFilesRef?: RefObject<AddFiles | null>;
   // Given the newest image's id (null when none) once the images have
   // loaded, and again whenever it changes, for the project's bar.
@@ -70,6 +75,7 @@ export function ProjectImages({
       accountId={accountId}
       projectId={projectId}
       onFailure={onFailure}
+      onMessage={onMessage}
       addFilesRef={addFilesRef}
       onLatestImageChange={onLatestImageChange}
     />
@@ -80,16 +86,23 @@ function SignedInImages({
   accountId,
   projectId,
   onFailure,
+  onMessage,
   addFilesRef,
   onLatestImageChange,
 }: {
   accountId: string;
   projectId: string;
   onFailure?: (reason: ImageFailure) => void;
+  onMessage?: (text: string) => void;
   addFilesRef?: RefObject<AddFiles | null>;
   onLatestImageChange?: (imageId: string | null) => void;
 }) {
-  const images = useProjectImages({ accountId, projectId, onFailure });
+  const images = useProjectImages({
+    accountId,
+    projectId,
+    onFailure,
+    onMessage,
+  });
   const { state } = images;
   const onLatestRef = useRef(onLatestImageChange);
   useEffect(() => {
@@ -126,6 +139,17 @@ function SignedInImages({
     isScrolledRef.current = true;
     timeline.scrollTop = timeline.scrollHeight;
   }, [state.status]);
+
+  // New placeholders scroll into view, so that a slow upload can be seen.
+  const pendingCount = state.pending.length;
+  const previousPendingCountRef = useRef(0);
+  useLayoutEffect(() => {
+    const timeline = timelineRef.current;
+    if (timeline && pendingCount > previousPendingCountRef.current) {
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+    previousPendingCountRef.current = pendingCount;
+  }, [pendingCount]);
 
   useLayoutEffect(() => {
     if (!state.lastAddedId) return;
@@ -199,13 +223,6 @@ function SignedInImages({
           }}
         />
       </div>
-      {state.notices.length > 0 && (
-        <ul className="project-images-notices" role="status">
-          {state.notices.map((notice, index) => (
-            <li key={index}>{notice}</li>
-          ))}
-        </ul>
-      )}
       {state.status === "unavailable" && (
         <p className="project-images-note" role="alert">
           Abodeo cannot reach your images right now.{" "}
@@ -217,15 +234,17 @@ function SignedInImages({
       {state.status === "loading" && (
         <p className="project-images-note">Loading images…</p>
       )}
-      {state.status === "ready" && state.images.length === 0 && (
-        <p className="project-images-note">
-          No images yet. Choose Add image, or drop pictures here.
-        </p>
-      )}
+      {state.status === "ready" &&
+        state.images.length === 0 &&
+        state.pending.length === 0 && (
+          <p className="project-images-note">
+            No images yet. Choose Add image, or drop pictures here.
+          </p>
+        )}
       <div
         ref={timelineRef}
         className="image-timeline"
-        hidden={state.images.length === 0}
+        hidden={state.images.length === 0 && state.pending.length === 0}
       >
         {state.hasOlder && (
           <button
@@ -250,6 +269,9 @@ function SignedInImages({
             }}
             onCaption={images.changeCaption}
           />
+        ))}
+        {state.pending.map((entry) => (
+          <PendingEntry key={entry.key} entry={entry} />
         ))}
       </div>
       {viewing &&
@@ -277,6 +299,47 @@ function SignedInImages({
           document.body,
         )}
     </section>
+  );
+}
+
+// A file being added, where its image will be: a spinner and the file's name.
+function PendingEntry({ entry }: { entry: PendingImage }) {
+  return (
+    <div
+      className="image-pending-entry"
+      role="status"
+      aria-label={`Adding ${entry.name}`}
+    >
+      <div className="image-entry-thumbnail image-entry-pending-thumbnail">
+        <svg
+          viewBox="0 0 32 32"
+          className="image-entry-spinner"
+          aria-hidden="true"
+        >
+          <circle
+            className="image-entry-spinner-track"
+            cx="16"
+            cy="16"
+            r="14"
+          />
+          <circle
+            className="image-entry-spinner-arc"
+            cx="16"
+            cy="16"
+            r="14"
+            strokeDasharray="22 66"
+          />
+        </svg>
+      </div>
+      <div className="image-entry-details">
+        <p className="image-entry-pending-name" title={entry.name}>
+          {entry.name}
+        </p>
+        <p className="image-entry-pending-size">
+          ({describeFileSize(entry.bytes)})
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -466,6 +529,7 @@ export function ImageViewer({
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal?.();
+    raiseFloatingMessages();
     return () => dialog?.close?.();
   }, []);
   return (
