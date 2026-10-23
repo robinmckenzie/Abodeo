@@ -30,7 +30,9 @@ import {
   noProjectOpenMessage,
   signInToAddMessage,
   unsavedProjectMessage,
+  unsupportedFilesMessage,
 } from "../projects/image-messages";
+import { areAllTypesUnsupported } from "../projects/image-validation";
 import {
   ExpandedProjectBar,
   ProjectBar,
@@ -343,15 +345,17 @@ export default function Dashboard() {
         : open.id === null
           ? unsavedProjectMessage
           : null;
-  const { isDragging } = useFileDrag({
-    getRefusal: () => dropRefusal,
+  const { isDragging, isRefused } = useFileDrag({
+    getRefusal: (fileTypes) =>
+      dropRefusal ??
+      (areAllTypesUnsupported(fileTypes) ? unsupportedFilesMessage : null),
     onRefusal: showMessage,
     onDrop: (files) => {
       if (addFilesRef.current) addFilesRef.current(files);
       else showMessage(noProjectOpenMessage);
     },
   });
-  const isDropTarget = isDragging && dropRefusal === null;
+  const isDropTarget = isDragging && !isRefused;
 
   const closeProject = () => {
     if (!open) return;

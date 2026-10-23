@@ -4,12 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { staleDragDelay, useFileDrag } from "./use-file-drag";
 
 let refusal: string | null = null;
+let lastFileTypes: string[] = [];
 const onRefusal = vi.fn();
 const onDrop = vi.fn();
 
 function Harness() {
   const { isDragging } = useFileDrag({
-    getRefusal: () => refusal,
+    getRefusal: (fileTypes) => {
+      lastFileTypes = fileTypes;
+      return refusal;
+    },
     onRefusal,
     onDrop,
   });
@@ -19,9 +23,15 @@ function Harness() {
 const isDragging = () =>
   document.querySelector("span")?.getAttribute("data-dragging") === "true";
 
-function fire(type: string, types: string[] = ["Files"], files: File[] = []) {
+function fire(
+  type: string,
+  types: string[] = ["Files"],
+  files: File[] = [],
+  itemTypes: string[] = [],
+) {
   const event = new Event(type, { bubbles: true, cancelable: true });
-  const dataTransfer = { types, files, dropEffect: "" };
+  const items = itemTypes.map((itemType) => ({ kind: "file", type: itemType }));
+  const dataTransfer = { types, files, items, dropEffect: "" };
   Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
   act(() => {
     window.dispatchEvent(event);
@@ -100,6 +110,13 @@ describe("useFileDrag", () => {
     // The next drag says it again.
     fire("dragenter");
     expect(onRefusal).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives the file types known while dragging, and those of the files on a drop", () => {
+    fire("dragenter", ["Files"], [], ["text/plain", "image/png"]);
+    expect(lastFileTypes).toEqual(["text/plain", "image/png"]);
+    fire("drop", ["Files"], [new File(["x"], "a.png", { type: "image/png" })]);
+    expect(lastFileTypes).toEqual(["image/png"]);
   });
 
   it("copies where a drop would be accepted, and says nothing", () => {

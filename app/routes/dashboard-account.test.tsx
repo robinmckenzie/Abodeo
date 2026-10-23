@@ -1202,8 +1202,12 @@ describe("images on the dashboard (AD #48)", () => {
     ).toBeTruthy();
   });
 
-  const drag = async (type: string) => {
-    const dataTransfer = { types: ["Files"], files: [], dropEffect: "" };
+  const drag = async (type: string, itemTypes: string[] = []) => {
+    const items = itemTypes.map((itemType) => ({
+      kind: "file",
+      type: itemType,
+    }));
+    const dataTransfer = { types: ["Files"], files: [], items, dropEffect: "" };
     await act(async () => {
       fireEvent(
         document.body,
@@ -1244,6 +1248,25 @@ describe("images on the dashboard (AD #48)", () => {
     expect(dataTransfer.dropEffect).toBe("copy");
     expect(document.querySelector(".dashboard.is-drop-target")).not.toBeNull();
     await drag("dragend");
+    expect(document.querySelector(".is-drop-target")).toBeNull();
+  });
+
+  it("refuses at once, with a not-allowed cursor, a drag of files that are not JPEG or PNG", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    await drag("dragenter", ["text/plain"]);
+    const dataTransfer = await drag("dragover", ["text/plain"]);
+    expect(dataTransfer.dropEffect).toBe("none");
+    expect(
+      screen.getAllByText("Sorry, only JPEG and PNG files can be uploaded"),
+    ).toHaveLength(1);
     expect(document.querySelector(".is-drop-target")).toBeNull();
   });
 

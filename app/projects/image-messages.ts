@@ -5,6 +5,8 @@ import { maxCaptionLength } from "./images-api";
 
 export const signInToAddMessage = "Sign in to add images";
 export const noProjectOpenMessage = "Open a project to add an image to it.";
+export const unsupportedFilesMessage =
+  "Sorry, only JPEG and PNG files can be uploaded";
 export const unsavedProjectMessage = "Save the project first to add an image.";
 
 export const captionChangedElsewhereMessage =

@@ -151,7 +151,8 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   centre (`floating-messages.tsx`), each fading after `messageDuration` (5 s, with a 0.6 s fade),
   at most 10 at once and one more saying the rest are suppressed. While files are dragged over the
   page (`use-file-drag.ts`), the page dims outside the open project if a drop would be accepted,
-  and otherwise the reason is shown once with a not-allowed cursor. Each file being added shows a
+  and otherwise the reason is shown once with a not-allowed cursor (including when every file dragged is
+  known, by its type, not to be a JPEG or PNG). Each file being added shows a
   spinner placeholder with its name in the timeline until the image replaces it. Batches of files
   run one after another.
 - A project with images shows the thumbnail of its newest one at the right of its bar. The project

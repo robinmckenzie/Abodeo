@@ -9,8 +9,9 @@ import { useEffect, useRef, useState } from "react";
 export const staleDragDelay = 1000;
 
 export type FileDragOptions = {
-  // Why a drop would be refused, or null if it would be accepted.
-  getRefusal: () => string | null;
+  // Why a drop would be refused, or null if it would be accepted. Given the
+  // media type of each file, where the browser says (an empty one where not).
+  getRefusal: (fileTypes: string[]) => string | null;
   // Said once for a drag that would be refused, and for a drop that arrives
   // without one.
   onRefusal: (message: string) => void;
@@ -19,6 +20,7 @@ export type FileDragOptions = {
 
 export function useFileDrag(options: FileDragOptions) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isRefused, setIsRefused] = useState(false);
   const optionsRef = useRef(options);
   useEffect(() => {
     optionsRef.current = options;
@@ -33,22 +35,31 @@ export function useFileDrag(options: FileDragOptions) {
     const hasFiles = (event: DragEvent) =>
       event.dataTransfer?.types.includes("Files") === true;
 
+    // While dragging, the browser tells the types of the files but not their
+    // names.
+    const getFileTypes = (event: DragEvent) =>
+      [...(event.dataTransfer?.items ?? [])]
+        .filter((item) => item.kind === "file")
+        .map((item) => item.type);
+
     const end = () => {
       depth = 0;
       isActive = false;
       hasSaidRefusal = false;
       clearTimeout(staleTimer);
       setIsDragging(false);
+      setIsRefused(false);
     };
     const keepAlive = () => {
       clearTimeout(staleTimer);
       staleTimer = setTimeout(end, staleDragDelay);
     };
-    const start = () => {
+    const start = (event: DragEvent) => {
       if (isActive) return;
       isActive = true;
       setIsDragging(true);
-      const refusal = optionsRef.current.getRefusal();
+      const refusal = optionsRef.current.getRefusal(getFileTypes(event));
+      setIsRefused(refusal !== null);
       if (refusal !== null) {
         hasSaidRefusal = true;
         optionsRef.current.onRefusal(refusal);
@@ -58,7 +69,7 @@ export function useFileDrag(options: FileDragOptions) {
     const onDragEnter = (event: DragEvent) => {
       if (!hasFiles(event)) return;
       depth++;
-      start();
+      start(event);
       keepAlive();
     };
     const onDragOver = (event: DragEvent) => {
@@ -66,11 +77,13 @@ export function useFileDrag(options: FileDragOptions) {
       // Without this the browser would open a dropped file in place of the
       // page.
       event.preventDefault();
-      start();
+      start(event);
       keepAlive();
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect =
-          optionsRef.current.getRefusal() === null ? "copy" : "none";
+          optionsRef.current.getRefusal(getFileTypes(event)) === null
+            ? "copy"
+            : "none";
       }
     };
     const onDragLeave = (event: DragEvent) => {
@@ -83,12 +96,15 @@ export function useFileDrag(options: FileDragOptions) {
       event.preventDefault();
       const hadSaidRefusal = hasSaidRefusal;
       end();
-      const refusal = optionsRef.current.getRefusal();
+      const files = [...(event.dataTransfer?.files ?? [])];
+      const refusal = optionsRef.current.getRefusal(
+        files.map((file) => file.type),
+      );
       if (refusal !== null) {
         if (!hadSaidRefusal) optionsRef.current.onRefusal(refusal);
         return;
       }
-      optionsRef.current.onDrop([...(event.dataTransfer?.files ?? [])]);
+      optionsRef.current.onDrop(files);
     };
 
     window.addEventListener("dragenter", onDragEnter);
@@ -106,5 +122,5 @@ export function useFileDrag(options: FileDragOptions) {
     };
   }, []);
 
-  return { isDragging };
+  return { isDragging, isRefused };
 }
