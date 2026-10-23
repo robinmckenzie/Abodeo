@@ -65,7 +65,10 @@ describe("createHistoryStore", () => {
     expect(calls[1][1]).toEqual(["ada", "Andrew"]);
     const [text, values] = calls[2];
     expect(values).toEqual(["ada", "Andrew", visitGapMinutes]);
-    expect(text).toContain("update account_visit set last_active_at = now()");
+    expect(text).toContain(
+      "update account_visit set last_active_at = clock_timestamp()",
+    );
+    expect(text).not.toContain("now()");
     expect(text).toContain("user_id = $1 and label = $2");
     expect(text).toContain("make_interval(mins => $3)");
     expect(text).not.toMatch(/ip|agent|device/i);
@@ -78,10 +81,12 @@ describe("createHistoryStore", () => {
     const { database, query } = createFakeDatabase();
     await createHistoryStore(database).recordActivity("ada", "");
 
-    expect(query).toHaveBeenCalledWith(
-      "insert into account_visit (user_id, label) values ($1, $2)",
-      ["ada", ""],
+    const insert = query.mock.calls.find(([text]) =>
+      text.includes("insert into account_visit (user_id, label"),
     );
+    expect(insert?.[1]).toEqual(["ada", ""]);
+    expect(insert?.[0]).toContain("clock_timestamp()");
+    expect(insert?.[0]).not.toContain("now()");
   });
 
   it("locks per account and label, so two labels do not wait for or merge into each other", async () => {

@@ -48,24 +48,27 @@ export function createHistoryStore(database: HistoryDatabase): HistoryStore {
       try {
         await client.query("begin", []);
         // Two reports at once for one account and label wait for each other,
-        // so that only one starts a visit.
+        // so that only one starts a visit. Times are taken with
+        // clock_timestamp(), after the lock, because now() is the start of the
+        // transaction and a report that waited could move a time backwards.
         await client.query(
           "select pg_advisory_xact_lock(hashtext($1 || ':' || $2))",
           [userId, label],
         );
         const { rows } = await client.query(
-          `update account_visit set last_active_at = now()
+          `update account_visit set last_active_at = clock_timestamp()
            where id = (
              select id from account_visit where user_id = $1 and label = $2
              order by last_active_at desc limit 1
            )
-           and last_active_at > now() - make_interval(mins => $3)
+           and last_active_at > clock_timestamp() - make_interval(mins => $3)
            returning id`,
           [userId, label, visitGapMinutes],
         );
         if (rows.length === 0) {
           await client.query(
-            "insert into account_visit (user_id, label) values ($1, $2)",
+            `insert into account_visit (user_id, label, started_at, last_active_at)
+             values ($1, $2, clock_timestamp(), clock_timestamp())`,
             [userId, label],
           );
         }
