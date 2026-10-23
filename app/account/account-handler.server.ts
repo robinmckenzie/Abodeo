@@ -71,11 +71,26 @@ export type AccountRuntime = {
   close(): Promise<void>;
 };
 
+function reportPoolFailure(code: string | undefined) {
+  console.error(JSON.stringify({ type: "account_pool_failed", code }));
+}
+
+// Neon can close a connection at any time, and the pool then emits "error".
+// With no listener Node ends the process, so the code is logged and nothing
+// else happens: a query on the dropped connection fails by itself.
+export function listenForPoolErrors(
+  pool: Pick<Pool, "on">,
+  reportFailure: (code: string | undefined) => void = reportPoolFailure,
+) {
+  pool.on("error", (error: unknown) => reportFailure(readErrorCode(error)));
+}
+
 // A runtime over a Neon pool. A serverless function may be frozen between
 // requests, so the pool is made for one request and closed after it. Nothing
 // connects until the first query.
 export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const pool = new Pool({ connectionString: config.databaseUrl });
+  listenForPoolErrors(pool);
   const history = createHistoryStore(pool);
   const auth = createAccountAuth(config, pool, history);
   return {
