@@ -145,6 +145,17 @@ function SignedInImages({
     timeline.scrollTop = timeline.scrollHeight;
   }, [state.status]);
 
+  // New placeholders scroll into view, so that a slow upload can be seen.
+  const pendingCount = state.pending.length;
+  const previousPendingCountRef = useRef(0);
+  useLayoutEffect(() => {
+    const timeline = timelineRef.current;
+    if (timeline && pendingCount > previousPendingCountRef.current) {
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+    previousPendingCountRef.current = pendingCount;
+  }, [pendingCount]);
+
   useLayoutEffect(() => {
     if (!state.lastAddedId) return;
     timelineRef.current

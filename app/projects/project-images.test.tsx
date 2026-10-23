@@ -242,6 +242,27 @@ describe("ProjectImages", () => {
     expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
   });
 
+  it("removes the placeholders and says so when a file cannot be read after it was checked", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    const onMessage = vi.fn();
+    render(
+      <TestImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const broken = pngFile("broken.png");
+    broken.arrayBuffer = () => Promise.reject(new Error("gone"));
+    chooseFiles([broken, pngFile("after.png")]);
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(1));
+    expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
+  });
+
   it("runs files added while others are being added after them, in order", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);

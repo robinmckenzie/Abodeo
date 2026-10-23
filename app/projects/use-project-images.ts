@@ -475,11 +475,19 @@ export function useProjectImages({
     session.batches = batch.catch(() => {});
     try {
       await batch;
+    } catch {
+      // Something unexpected, such as a file that could not be read: the
+      // files not yet added are not added.
+      if (session.isCurrent) say(describeImageFailure("unreachable"));
     } finally {
       session.batchCount--;
-      if (session.batchCount === 0) {
-        update(session, (current) => ({ ...current, isAdding: false }));
-      }
+      update(session, (current) => ({
+        ...current,
+        isAdding: session.batchCount > 0,
+        pending: current.pending.filter(
+          ({ key }) => !entries.some((entry) => entry.key === key),
+        ),
+      }));
     }
   };
 
