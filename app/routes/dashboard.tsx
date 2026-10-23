@@ -27,12 +27,12 @@ import {
   useFloatingMessages,
 } from "../projects/floating-messages";
 import {
+  areAllTypesUnsupported,
   noProjectOpenMessage,
   signInToAddMessage,
   unsavedProjectMessage,
   unsupportedFilesMessage,
 } from "../projects/image-messages";
-import { areAllTypesUnsupported } from "../projects/image-validation";
 import {
   ExpandedProjectBar,
   ProjectBar,
