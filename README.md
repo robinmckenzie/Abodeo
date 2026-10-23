@@ -334,7 +334,7 @@ Vercel previews have no sign-in, and report it as unavailable.
 In the Neon SQL Editor for the right database:
 
 ```sql
--- Version: v1.51.0
+-- Version: v1.41.0
 --
 -- Every account, with what is kept about it and how many projects it has.
 select u.id, u.name, u.email, u.created_at, a.account_id as google_id, p.preferred_name,
@@ -344,6 +344,8 @@ left join auth_account a on a.user_id = u.id
 left join user_profile p on p.user_id = u.id
 left join calendar_link c on c.user_id = u.id;
 
+-- Version: v1.51.0
+--
 -- Each account's sign-ins and visits, newest first, with the usage label ('' if none) and each
 -- visit's length.
 select u.email, s.label, 'sign-in' as kind, s.signed_in_at as at, null::interval as length
@@ -355,6 +357,8 @@ from account_visit v
 join auth_user u on u.id = v.user_id
 order by email, at desc;
 
+-- Version: v1.48.0
+--
 -- How much each account uses of its 100 MB of images, and the total, in MB.
 select u.email, count(*) as images,
     round(sum(i.original_size + i.thumbnail_size) / 1048576.0, 1) as mb
@@ -365,6 +369,8 @@ union all
 select 'total', count(*), round(coalesce(sum(original_size + thumbnail_size), 0) / 1048576.0, 1)
 from project_image;
 
+-- Version: v1.48.0
+--
 -- Removes an account, with its sessions, Google link, profile, calendar link, history,
 -- projects and images.
 delete from auth_user where email = 'someone@example.com';
