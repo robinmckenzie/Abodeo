@@ -147,6 +147,14 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   A person adds JPEG or PNG images with the Add image button, or by dropping them on the page,
   which adds them to the open project (and says why when none is open, or the open one is new and
   not yet saved).
+- AD #54 Change UX While Dropped Images Are Added. Messages about images float at the bottom
+  centre (`floating-messages.tsx`), each fading after `messageDuration` (5 s, with a 0.6 s fade),
+  at most 10 at once and one more saying the rest are suppressed. While files are dragged over the
+  page (`use-file-drag.ts`), the page dims outside the open project if a drop would be accepted,
+  and otherwise the reason is shown once with a not-allowed cursor. Each file being added shows a
+  spinner placeholder with its name in the timeline, filling as the upload goes (the upload uses
+  `XMLHttpRequest`, as `fetch` cannot report upload progress). Batches of files run one after
+  another.
 - A project with images shows the thumbnail of its newest one at the right of its bar. The project
   list answer carries the newest image id of each project (`latestImageIds`, one query), and the
   browser fetches those thumbnails with the same checks as any image, holding them in memory only
