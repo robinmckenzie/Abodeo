@@ -20,6 +20,7 @@ describe("areAllTypesUnsupported", () => {
     expect(areAllTypesUnsupported(["text/plain", "image/png"])).toBe(false);
     expect(areAllTypesUnsupported(["text/plain", ""])).toBe(false);
     expect(areAllTypesUnsupported([""])).toBe(false);
+    expect(areAllTypesUnsupported(["application/octet-stream"])).toBe(false);
     expect(areAllTypesUnsupported([])).toBe(false);
   });
 });

@@ -59,12 +59,17 @@ export function describeRefusals(refused: RefusedImage[]) {
 }
 
 // Whether every file is known not to be a JPEG or PNG, going by the media type
-// the browser gives it. A file with no type is not known, and may be one.
+// the browser gives it. A file with no type, or the generic binary type, is not
+// known, and may be one.
 export function areAllTypesUnsupported(fileTypes: string[]) {
   return (
     fileTypes.length > 0 &&
     fileTypes.every(
-      (type) => type !== "" && type !== "image/jpeg" && type !== "image/png",
+      (type) =>
+        type !== "" &&
+        type !== "application/octet-stream" &&
+        type !== "image/jpeg" &&
+        type !== "image/png",
     )
   );
 }

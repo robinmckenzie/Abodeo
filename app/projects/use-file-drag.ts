@@ -79,11 +79,12 @@ export function useFileDrag(options: FileDragOptions) {
       event.preventDefault();
       start(event);
       keepAlive();
+      // Asked again, as what the drop needs can change during a long drag.
+      const isNowRefused =
+        optionsRef.current.getRefusal(getFileTypes(event)) !== null;
+      setIsRefused(isNowRefused);
       if (event.dataTransfer) {
-        event.dataTransfer.dropEffect =
-          optionsRef.current.getRefusal(getFileTypes(event)) === null
-            ? "copy"
-            : "none";
+        event.dataTransfer.dropEffect = isNowRefused ? "none" : "copy";
       }
     };
     const onDragLeave = (event: DragEvent) => {

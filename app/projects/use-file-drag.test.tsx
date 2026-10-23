@@ -9,7 +9,7 @@ const onRefusal = vi.fn();
 const onDrop = vi.fn();
 
 function Harness() {
-  const { isDragging } = useFileDrag({
+  const { isDragging, isRefused } = useFileDrag({
     getRefusal: (fileTypes) => {
       lastFileTypes = fileTypes;
       return refusal;
@@ -17,11 +17,13 @@ function Harness() {
     onRefusal,
     onDrop,
   });
-  return <span data-dragging={isDragging} />;
+  return <span data-dragging={isDragging} data-refused={isRefused} />;
 }
 
 const isDragging = () =>
   document.querySelector("span")?.getAttribute("data-dragging") === "true";
+const isRefusedNow = () =>
+  document.querySelector("span")?.getAttribute("data-refused") === "true";
 
 function fire(
   type: string,
@@ -124,6 +126,19 @@ describe("useFileDrag", () => {
     const { dataTransfer } = fire("dragover");
     expect(dataTransfer.dropEffect).toBe("copy");
     expect(onRefusal).not.toHaveBeenCalled();
+  });
+
+  it("follows a change in whether a drop would be accepted during a drag", () => {
+    refusal = "Save the project first.";
+    fire("dragenter");
+    expect(isRefusedNow()).toBe(true);
+    refusal = null;
+    const { dataTransfer } = fire("dragover");
+    expect(isRefusedNow()).toBe(false);
+    expect(dataTransfer.dropEffect).toBe("copy");
+    refusal = "Sign in to add images";
+    fire("dragover");
+    expect(isRefusedNow()).toBe(true);
   });
 
   it("says why a drop is refused when it arrives with no drag before it", () => {
