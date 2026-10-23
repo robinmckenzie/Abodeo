@@ -62,7 +62,7 @@
 
 - Preserve compatibility with data that users have already saved. A change to where or how data is stored must account for existing data.
 - Do not change established behaviour that a ticket does not mention. If a change would alter it, bring that back for a decision.
-- Every SQL file in `db/`, and every SQL script in the README meant to be pasted into Neon, starts with a `-- Version: v1.<ticket number>.<n>` line, so that Robin can check which version is in Neon. Change it whenever the script changes: `.0` for the first change under a ticket, then `.1`, `.2`. Mention the new version where Robin must run the script.
+- Every SQL file in `db/`, and every separate query in the README meant to be pasted into Neon, starts with a `-- Version: v1.<ticket number>.<n>` line, so that Robin can check which version is in Neon. Change it only when that file or query changes: `.0` for the first change under a ticket, then `.1`, `.2`. Mention the new version where Robin must run it.
 ## Codex review rounds
 
 - For review rounds, run Codex non-interactively and read-only using `codex exec` on the relevant material. Use one round by default. Run a second round only when substantial findings were fixed and verification is warranted. Never exceed two rounds per review. A draft ticket, the plan, the implementation and changes made during pull request testing are separate reviews. Fix findings within the ticket's scope. Record each round's findings and fixes, the overall change, any findings left open, and whether an optional review was skipped. Tell Robin the outcome and what remains to decide. If Codex cannot be run, say so and provide Robin with the prompt instead.
