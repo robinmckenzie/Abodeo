@@ -1,3 +1,5 @@
+-- Version: v51.0
+--
 -- Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
 --
 -- Run this once in the Neon SQL Editor for each account store: production
