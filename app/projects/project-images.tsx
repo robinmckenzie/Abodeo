@@ -15,6 +15,7 @@ import { raiseFloatingMessages } from "./floating-messages";
 import {
   captionChangedElsewhereMessage,
   captionTooLongMessage,
+  describeFileSize,
   describeImageFailure,
   signInToAddMessage,
 } from "./image-messages";
@@ -333,6 +334,9 @@ function PendingEntry({ entry }: { entry: PendingImage }) {
       <div className="image-entry-details">
         <p className="image-entry-pending-name" title={entry.name}>
           {entry.name}
+        </p>
+        <p className="image-entry-pending-size">
+          ({describeFileSize(entry.bytes)})
         </p>
       </div>
     </div>

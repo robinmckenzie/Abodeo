@@ -2138,6 +2138,12 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   }
 }
 
+.image-entry-pending-size {
+  margin: 0;
+  color: #7a7568;
+  font-size: 0.8125rem;
+}
+
 .image-entry-pending-name {
   margin: 0;
   overflow: hidden;

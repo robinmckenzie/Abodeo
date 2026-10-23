@@ -41,6 +41,13 @@ export function describeImageFailure(reason: ImageFailure) {
   }
 }
 
+// A file's size for people, as in "230 KB" or "1.4 MB".
+export function describeFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export type RefusedImage = { name: string; reason: ImageFailure };
 
 // One line for each image that was refused, with its name, so that when

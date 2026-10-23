@@ -59,6 +59,7 @@ export type ProjectImagesState = {
 export type PendingImage = {
   key: string;
   name: string;
+  bytes: number;
 };
 
 type Session = {
@@ -445,6 +446,7 @@ export function useProjectImages({
     const entries: PendingImage[] = files.map((file) => ({
       key: String(session.nextPendingKey++),
       name: file.name,
+      bytes: file.size,
     }));
     session.batchCount++;
     update(session, (current) => ({

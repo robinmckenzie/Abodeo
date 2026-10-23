@@ -228,6 +228,7 @@ describe("ProjectImages", () => {
       ),
     ).toEqual(["Adding first.png", "Adding bad.png", "Adding second.png"]);
     expect(screen.getByText("second.png")).toBeTruthy();
+    expect(screen.getAllByText(/^\(\d+ B\)$/)).toHaveLength(3);
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry")).toHaveLength(3),
     );
