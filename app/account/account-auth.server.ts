@@ -11,6 +11,7 @@ import {
   recordSignInQuietly,
   type HistoryStore,
 } from "./account-history.server";
+import { readLabel } from "./usage-label.server";
 
 // The only Better Auth endpoints served. Requests for any other path are
 // refused before they reach Better Auth, which also covers endpoints a later
@@ -186,16 +187,29 @@ export function logAccountAuthMessage(level: string) {
 // adapter.
 export type AccountDatabase = BetterAuthOptions["database"];
 
+// The part of Better Auth's endpoint context that carries the sign-in
+// request's headers, including the label cookie.
+type SignInContext = { request?: Request; headers?: Headers };
+
 // The hooks above, plus recording each sign-in once its session is saved.
-function buildDatabaseHooks(history: HistoryStore | undefined) {
+export function buildDatabaseHooks(history: HistoryStore | undefined) {
   return {
     ...accountDatabaseHooks,
     session: {
       ...accountDatabaseHooks.session,
       create: {
         ...accountDatabaseHooks.session.create,
-        after: async (session: { userId: string }) => {
-          if (history) await recordSignInQuietly(history, session.userId);
+        after: async (
+          session: { userId: string },
+          context?: SignInContext | null,
+        ) => {
+          if (!history) return;
+          const headers = context?.request?.headers ?? context?.headers;
+          await recordSignInQuietly(
+            history,
+            session.userId,
+            readLabel(headers),
+          );
         },
       },
     },

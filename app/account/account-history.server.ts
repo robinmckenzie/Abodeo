@@ -1,7 +1,8 @@
 // The sign-in and visit history (AD #46 Sign-in History), in the
 // account_sign_in and account_visit tables of db/account-tables.sql. Only the
-// account and the server's own times are kept: nothing from the browser, its
-// clock, its address or its details.
+// account, the server's own times and the self-declared usage label (AD #51
+// Label Account Usage) are kept: nothing from the browser, its clock, its
+// address or its details.
 import {
   accountStoreTimeout,
   readErrorCode,
@@ -10,6 +11,7 @@ import {
   type Queryable,
   type ReadSessionUserId,
 } from "./account-profile.server";
+import { readLabel } from "./usage-label.server";
 
 // A visit ends after this long without a click or keypress, so that later
 // activity starts a new one. A provisional default.
@@ -20,35 +22,60 @@ export const visitGapMinutes = 10;
 export const signInRecordTimeout = 3000;
 
 export type HistoryStore = {
-  recordSignIn(userId: string): Promise<void>;
-  // Extends the account's latest visit, or starts a new one if it has been
-  // idle for visitGapMinutes or more.
-  recordActivity(userId: string): Promise<void>;
+  // The label is the usage label from the request (AD #51), or "".
+  recordSignIn(userId: string, label: string): Promise<void>;
+  // Extends the latest visit of the account and label, or starts a new one if
+  // it has been idle for visitGapMinutes or more. People using one account
+  // under different labels at once each have their own running visit.
+  recordActivity(userId: string, label: string): Promise<void>;
 };
 
-export function createHistoryStore(database: Queryable): HistoryStore {
+// A Postgres pool: a visit is recorded in a transaction on one connection.
+export type HistoryDatabase = Queryable & {
+  connect(): Promise<Queryable & { release(): void }>;
+};
+
+export function createHistoryStore(database: HistoryDatabase): HistoryStore {
   return {
-    async recordSignIn(userId) {
+    async recordSignIn(userId, label) {
       await database.query(
-        "insert into account_sign_in (user_id) values ($1)",
-        [userId],
+        "insert into account_sign_in (user_id, label) values ($1, $2)",
+        [userId, label],
       );
     },
-    async recordActivity(userId) {
-      await database.query(
-        `with extended as (
-           update account_visit set last_active_at = now()
+    async recordActivity(userId, label) {
+      const client = await database.connect();
+      try {
+        await client.query("begin", []);
+        // Two reports at once for one account and label wait for each other,
+        // so that only one starts a visit.
+        await client.query(
+          "select pg_advisory_xact_lock(hashtext($1 || ':' || $2))",
+          [userId, label],
+        );
+        const { rows } = await client.query(
+          `update account_visit set last_active_at = now()
            where id = (
-             select id from account_visit where user_id = $1
+             select id from account_visit where user_id = $1 and label = $2
              order by last_active_at desc limit 1
            )
-           and last_active_at > now() - make_interval(mins => $2)
-           returning id
-         )
-         insert into account_visit (user_id)
-         select $1 where not exists (select 1 from extended)`,
-        [userId, visitGapMinutes],
-      );
+           and last_active_at > now() - make_interval(mins => $3)
+           returning id`,
+          [userId, label, visitGapMinutes],
+        );
+        if (rows.length === 0) {
+          await client.query(
+            "insert into account_visit (user_id, label) values ($1, $2)",
+            [userId, label],
+          );
+        }
+        await client.query("commit", []);
+      } catch (error) {
+        await client.query("rollback", []).catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }
@@ -62,6 +89,7 @@ function reportHistoryFailure(code: string | undefined) {
 export async function recordSignInQuietly(
   history: HistoryStore,
   userId: string,
+  label: string,
   {
     timeout = signInRecordTimeout,
     reportFailure = reportHistoryFailure,
@@ -71,7 +99,7 @@ export async function recordSignInQuietly(
   } = {},
 ) {
   try {
-    await withTimeout(history.recordSignIn(userId), timeout);
+    await withTimeout(history.recordSignIn(userId, label), timeout);
   } catch (error) {
     reportFailure(readErrorCode(error));
   }
@@ -108,7 +136,10 @@ export async function handleActivityRequest(
       timeout,
     );
     if (userId === undefined) return respondWithError(401, "not_signed_in");
-    await withTimeout(history.recordActivity(userId), timeout);
+    await withTimeout(
+      history.recordActivity(userId, readLabel(request.headers)),
+      timeout,
+    );
     return new Response(null, {
       status: 204,
       headers: { "Cache-Control": "no-store" },

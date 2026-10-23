@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { useUsageLabel } from "./account/use-usage-label";
 import { fadeTuningScript } from "./fade-tuning-panel";
 import { hasProjectsScript } from "./projects/project-storage";
 import { sizeTuningScript } from "./size-sliders";
@@ -41,6 +42,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useUsageLabel();
   return <Outlet />;
 }
 

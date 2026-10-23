@@ -25,6 +25,14 @@
 -- see when and for how long testers used Abodeo. Only the account and the
 -- server's times are kept: no IP address, browser or device details.
 --
+-- label (AD #51 Label Account Usage) is the self-declared name a person gave
+-- their browser with ?label=NAME, or '' if none. It is stored on every usage
+-- record, so that Robin can tell who used an account. It is not used for
+-- access. A visit belongs to one label: people using one account at once under
+-- different labels each have their own visit. Records from before the label
+-- have ''. The alter table statements below add the column to tables created
+-- before it, and the visit index is replaced by one that includes it.
+--
 -- project and project_defaults_received (AD #41 Access Projects Across
 -- Devices) keep a signed-in account's projects and their tasks, so that they
 -- can be used on every device where the person signs in. data is a project's
@@ -113,8 +121,12 @@ create table if not exists calendar_link (
 create table if not exists account_sign_in (
     id bigint generated always as identity primary key,
     user_id text not null references auth_user (id) on delete cascade,
-    signed_in_at timestamptz not null default now()
+    signed_in_at timestamptz not null default now(),
+    label text not null default '' check (char_length(label) <= 30)
 );
+
+alter table account_sign_in
+    add column if not exists label text not null default '' check (char_length(label) <= 30);
 
 create index if not exists account_sign_in_user_id_idx
     on account_sign_in (user_id, signed_in_at);
@@ -123,11 +135,17 @@ create table if not exists account_visit (
     id bigint generated always as identity primary key,
     user_id text not null references auth_user (id) on delete cascade,
     started_at timestamptz not null default now(),
-    last_active_at timestamptz not null default now()
+    last_active_at timestamptz not null default now(),
+    label text not null default '' check (char_length(label) <= 30)
 );
 
-create index if not exists account_visit_user_id_idx
-    on account_visit (user_id, last_active_at desc);
+alter table account_visit
+    add column if not exists label text not null default '' check (char_length(label) <= 30);
+
+drop index if exists account_visit_user_id_idx;
+
+create index if not exists account_visit_user_label_idx
+    on account_visit (user_id, label, last_active_at desc);
 
 create table if not exists project (
     user_id text not null references auth_user (id) on delete cascade,
