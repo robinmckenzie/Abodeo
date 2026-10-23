@@ -65,6 +65,15 @@ requirements, commitments, or scheduled work.
   the user untick the permission. Google shows tick boxes only when several
   permissions are asked for at once; reword it when that code is next changed.
 
+## Journal
+
+- Text-only journal entries: AD #48 Add Images To Projects shows a project's
+  images in a journal-style timeline, each with a date and time and an
+  optional caption. Robin plans a ticket soon to add a short piece of text to
+  the journal without an image. When AD #48 is planned, keep an entry's date,
+  time, caption and ordering independent of its image, so that a text-only
+  entry can share them.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
