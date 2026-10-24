@@ -64,6 +64,10 @@ requirements, commitments, or scheduled work.
   `app/calendar/calendar-handler.server.ts` says Google's consent screen lets
   the user untick the permission. Google shows tick boxes only when several
   permissions are asked for at once; reword it when that code is next changed.
+- Parked from AD #65 Appointments In Projects, not ticketed: reading changes
+  made in Google Calendar back into Abodeo, background sync between the two,
+  and appointment reminders. Two-way sync and background work need Google
+  tokens stored, which AD #73 Store Encrypted Refresh Token would decide.
 
 ## Journal
 
