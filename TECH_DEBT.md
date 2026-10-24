@@ -18,3 +18,12 @@ entry says what the shortcut is and what to do about it.
   and the account would then never reload when moving between screens, the
   toolbar and title would be one component, and the screen-specific
   `onBeforeLeave` would be registered with the layout instead of passed down.
+
+## Shared code
+
+- `app/projects/floating-messages.tsx` (the messages that float at the bottom
+  of the screen, then fade) lives in the projects folder, but the People screen
+  now uses it too, along with its CSS in `app.css`. Move it to a common
+  folder, such as `app/ui/`, and update the imports in the dashboard, the
+  project window, the project images code and People. Added in AD #61 Manage
+  People.
