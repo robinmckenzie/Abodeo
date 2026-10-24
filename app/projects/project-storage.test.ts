@@ -30,7 +30,7 @@ import { addTasks, deleteTask, setTaskDone } from "./tasks";
 const fields = {
   title: "Kitchen",
   notes: "Tiles\nGrout",
-  assignee: "andy" as const,
+  assignee: "unassigned",
   dueDate: null,
   tasks: [],
 };

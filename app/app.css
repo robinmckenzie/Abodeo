@@ -2182,3 +2182,223 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .dashboard.is-drop-target:has(.project-window)::after {
   display: none;
 }
+
+/* The application menu, below the account area (AD #61 Manage People). Plain
+   text like the account area, so that it is not mistaken for a project. */
+.app-menu {
+  position: relative;
+  width: 11.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #3a3833;
+}
+
+.app-menu-button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #8a857a;
+  border-radius: 999px;
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+}
+
+.app-menu-button:hover {
+  background: #ece9e1;
+}
+
+.app-menu-list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  border: 1px solid #8a857a;
+  border-radius: 12px;
+  background: #fdfcf8;
+}
+
+.app-menu-list a {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-menu-list a:hover {
+  background: #ece9e1;
+}
+
+.app-menu-list a[aria-current="page"] {
+  font-weight: 600;
+}
+
+/* The people in Assigned To scroll when there are many, and the box to add
+   someone sits below them. */
+.assignee-options {
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.assignee-add {
+  margin-top: 0.5rem;
+}
+
+.assignee-add-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  color: #6b665c;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.assignee-add-row {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.assignee-add-row input {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #8a857a;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.assignee-add-row button {
+  padding: 0.3rem 0.625rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.assignee-add-error,
+.people-error {
+  margin: 0.25rem 0 0;
+  color: #9b2c1f;
+  font-size: 0.8125rem;
+}
+
+/* The People screen. */
+.people-page main {
+  max-width: 36rem;
+  padding: 0 1.5rem 3rem;
+}
+
+.people-page h2 {
+  margin: 0 0 0.5rem;
+}
+
+.people-hint,
+.people-empty {
+  color: #6b665c;
+}
+
+.people-list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.people-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 8px;
+}
+
+.people-row:hover {
+  background: #f7f5ef;
+}
+
+.people-name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.people-row input,
+.people-add input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #8a857a;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.people-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.people-row button,
+.people-add button,
+.people-confirm button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.people-edit-label {
+  flex-basis: 100%;
+  margin: 0;
+  color: #6b665c;
+  font-size: 0.8125rem;
+}
+
+.people-row .people-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.people-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.people-add label {
+  flex-basis: 100%;
+  color: #6b665c;
+  font-size: 0.8125rem;
+}
+
+.people-add input {
+  flex: 1;
+}
+
+.people-add .people-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.people-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.people-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}

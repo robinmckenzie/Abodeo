@@ -267,6 +267,93 @@ describe("the projects endpoints", () => {
   });
 });
 
+describe("naming someone in a project request (AD #61)", () => {
+  const refusing = {
+    create: async () => ({ kind: "unknown-assignee" as const }),
+    saveChanges: async () => ({ kind: "unknown-assignee" as const }),
+  };
+
+  it("answers a create or a save naming someone not in the list with unknown_assignee", async () => {
+    const memory = createMemoryProjectStore();
+    const { handle } = createHandler({
+      store: { ...memory.store, ...refusing },
+    });
+    const created = await create(handle, "ada", "p1");
+    expect(created.status).toBe(400);
+    expect(await created.json()).toEqual({ error: "unknown_assignee" });
+    const saved = await handle(
+      send("/api/projects/p1", {
+        method: "PATCH",
+        body: {
+          base: { assignee: "unassigned" },
+          changes: { assignee: "zed" },
+        },
+      }),
+    );
+    expect(saved.status).toBe(400);
+    expect(await saved.json()).toEqual({ error: "unknown_assignee" });
+  });
+
+  it("passes the browser's people on with an import", async () => {
+    const memory = createMemoryProjectStore();
+    const importProjects = vi.fn(memory.store.importProjects);
+    const { handle } = createHandler({
+      store: { ...memory.store, importProjects },
+    });
+    const sent = { ...project("p1"), version: 3 };
+    const people = [{ id: "x1", name: "Anders" }];
+    const response = await handle(
+      send("/api/projects/import", {
+        method: "POST",
+        body: { projects: [sent], people },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(importProjects).toHaveBeenCalledWith(
+      "ada",
+      [expect.objectContaining({ id: "p1" })],
+      people,
+    );
+  });
+
+  it("imports without people when none are sent, and refuses invalid ones", async () => {
+    const memory = createMemoryProjectStore();
+    const importProjects = vi.fn(memory.store.importProjects);
+    const { handle } = createHandler({
+      store: { ...memory.store, importProjects },
+    });
+    const sent = { ...project("p1"), version: 3 };
+    await handle(
+      send("/api/projects/import", {
+        method: "POST",
+        body: { projects: [sent] },
+      }),
+    );
+    expect(importProjects).toHaveBeenCalledWith(
+      "ada",
+      expect.any(Array),
+      undefined,
+    );
+    for (const people of [
+      "Anders",
+      [{ id: "x1" }],
+      [
+        { id: "x1", name: "Anders" },
+        { id: "x2", name: "anders" },
+      ],
+    ]) {
+      const response = await handle(
+        send("/api/projects/import", {
+          method: "POST",
+          body: { projects: [sent], people },
+        }),
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(importProjects).toHaveBeenCalledTimes(1);
+  });
+});
+
 function project(id: string): Project {
   return {
     ...fields,

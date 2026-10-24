@@ -13,11 +13,14 @@ import {
   type DefaultProjects,
   type DefaultsRecord,
 } from "./default-projects";
+import { isKnownAssignee } from "./people";
+import { readStoredPeople, withPeopleLock } from "./people-storage";
 import {
   hasTitle,
   parseProject,
   serialiseProject,
   sortProjects,
+  unassignedId,
   type Project,
   type ProjectFields,
 } from "./projects";
@@ -38,7 +41,13 @@ const accountHintKey = "abodeo-account-has-projects";
 // projects in, until they next sign in or out.
 const moveDeclinedKey = "abodeo-move-declined";
 
-export type SaveFailure = "unavailable" | "full" | "unreadable" | "no-title";
+export type SaveFailure =
+  | "unavailable"
+  | "full"
+  | "unreadable"
+  | "no-title"
+  // The person chosen is not in the list, such as when removed in another tab.
+  | "unknown-assignee";
 
 export type SaveResult = { ok: true } | { ok: false; reason: SaveFailure };
 
@@ -67,6 +76,9 @@ export async function createProject(
   { ok: true; project: Project } | { ok: false; reason: SaveFailure }
 > {
   if (!hasTitle(fields.title)) return { ok: false, reason: "no-title" };
+  if (!isAssigneeInList(fields.assignee)) {
+    return { ok: false, reason: "unknown-assignee" };
+  }
   const now = new Date().toISOString();
   const project: Project = {
     ...fields,
@@ -80,13 +92,37 @@ export async function createProject(
 
 // Saves only the fields given, onto the project as it is saved now, so that
 // fields changed elsewhere, such as in another tab, are kept. A project whose
-// saved form cannot be read is left as it is.
+// saved form cannot be read is left as it is. Assigning someone takes its
+// turn with removing people (AD #61 Manage People), and is refused if they
+// are not in the list as it is saved now.
 export async function saveProjectChanges(
   id: string,
   changes: Partial<ProjectFields>,
 ): Promise<SaveResult> {
   if (changes.title !== undefined && !hasTitle(changes.title)) {
     return { ok: false, reason: "no-title" };
+  }
+  if (changes.assignee !== undefined && changes.assignee !== unassignedId) {
+    return withPeopleLock(async () => writeProjectChanges(id, changes));
+  }
+  return writeProjectChanges(id, changes);
+}
+
+// Whether the person is Unassigned or in the list as it is saved now.
+function isAssigneeInList(assignee: string) {
+  if (assignee === unassignedId) return true;
+  const stored = readStoredPeople();
+  return stored.state === "found" && isKnownAssignee(stored.people, assignee);
+}
+
+// Reads the list, the project and then writes in one step, so that nothing
+// can come between them in this tab.
+function writeProjectChanges(
+  id: string,
+  changes: Partial<ProjectFields>,
+): SaveResult {
+  if (changes.assignee !== undefined && !isAssigneeInList(changes.assignee)) {
+    return { ok: false, reason: "unknown-assignee" };
   }
   const saved = readProject(id);
   if (!saved.ok) return saved;

@@ -23,10 +23,17 @@ import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
 import { handleImagesRequest } from "../projects/image-handler.server";
+import { handlePeopleRequest } from "../projects/people-handler.server";
+import {
+  createPeopleStore,
+  type PeopleStore,
+} from "../projects/people-store.server";
 import { handleProjectsRequest } from "../projects/project-handler.server";
+import { createFakeDatabase } from "../projects/test-database.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { makeJpeg, makePng } from "../projects/test-images";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
+import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 
 // The browser's own picture decoding is not available here.
@@ -51,6 +58,7 @@ beforeAll(() => {
 beforeEach(() => {
   localStorage.clear();
   refreshProjects();
+  refreshPeople();
   forgetPresentation();
 });
 
@@ -74,6 +82,8 @@ type Server = {
   projects: ReturnType<typeof createMemoryProjectStore>;
   // Its images, behind the real images endpoints.
   images: ReturnType<typeof createMemoryImageStore>;
+  // Its list of people, behind the real people endpoints (AD #61).
+  people: PeopleStore;
   // Answers every projects request with this status instead, when set.
   projectsStatus: number | null;
   // Handles this many projects requests, then answers 503, as if lost.
@@ -94,6 +104,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
     hang: false,
     projects: createMemoryProjectStore(),
     images: createMemoryImageStore(),
+    people: createPeopleStore(createFakeDatabase().database),
     projectsStatus: null,
     lostAnswers: 0,
     ...overrides,
@@ -116,6 +127,20 @@ function fakeServer(overrides: Partial<Server> = {}) {
             readSessionUserId: async (given) =>
               given.get("cookie") ?? undefined,
             store: server.images.store,
+            reportFailure: () => {},
+          },
+        );
+      }
+      if (path === "/api/people") {
+        return handlePeopleRequest(
+          new Request(`http://localhost${path}`, {
+            method: init.method,
+            headers: init.headers,
+            body: init.body,
+          }),
+          {
+            readSessionUserId: async () => (server.session ? "ada" : undefined),
+            store: server.people,
             reportFailure: () => {},
           },
         );
@@ -1283,5 +1308,158 @@ describe("images on the dashboard (AD #48)", () => {
       document.body.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
+  });
+});
+
+describe("a signed-in account's people (AD #61)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await act(async () => {});
+  };
+  const accountProject = (server: Server, id: string) =>
+    server.projects.accounts.get("ada")?.get(id);
+  const sentPeople = (server: Server) =>
+    server.calls.filter((call) => call === "POST /api/people");
+  const project = (id: string, assignee = "unassigned") => ({
+    id,
+    title: "Shed",
+    notes: "",
+    assignee,
+    dueDate: null,
+    tasks: [],
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  });
+  const browserProject = (assignee: string) =>
+    localStorage.setItem(
+      "abodeo-project:b1",
+      JSON.stringify({
+        version: 3,
+        title: "Browser shed",
+        notes: "",
+        assignee,
+        dueDate: null,
+        tasks: [],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+
+  it("shows the names of the account's people on its projects, and offers them", async () => {
+    const server = fakeServer({ session: ada });
+    await server.people.apply("ada", { op: "add", id: "d1", name: "Dora" });
+    await server.projects.store.create("ada", "p1", project("p1", "d1"));
+    await renderDashboard();
+    await settle();
+
+    await click(screen.getByRole("button", { name: "Shed, Dora" }));
+    await settle();
+    const group = screen.getByRole("group", { name: "Assigned to" });
+    expect(
+      [...group.querySelectorAll("label")].map((label) => label.textContent),
+    ).toEqual(["Unassigned", "Dora", "Add a person"]);
+    expect(
+      (screen.getByRole("radio", { name: "Dora" }) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("adds a person from Assigned To to the account and assigns them to the open project", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "p1", project("p1"));
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /^Shed/ }));
+    await settle();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
+      target: { value: "Dora" },
+    });
+    await click(screen.getByRole("button", { name: "Add" }));
+    await settle();
+
+    const read = await server.people.read("ada");
+    expect(read).toMatchObject({ people: [{ name: "Dora" }] });
+    const id = (read as { people: { id: string }[] }).people[0].id;
+    expect(accountProject(server, "p1")?.assignee).toBe(id);
+    expect(
+      (screen.getByRole("radio", { name: "Dora" }) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("saves the account's list once there is no move to offer, and not before", async () => {
+    browserProject("unassigned");
+    refreshProjects();
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    // The offer is pending, so the account's list is left unsaved.
+    expect(sentPeople(server)).toEqual([]);
+
+    await click(screen.getByRole("button", { name: "Not now" }));
+    await settle();
+    expect(sentPeople(server)).toHaveLength(1);
+    expect(await server.people.read("ada")).toMatchObject({
+      established: true,
+    });
+  });
+
+  it("saves the account's list at once when the browser has nothing to move", async () => {
+    const server = fakeServer({ session: ada });
+    await renderDashboard();
+    await settle();
+    expect(sentPeople(server)).toHaveLength(1);
+  });
+
+  it("moves the browser's people in with its projects, and clears its own list", async () => {
+    browserProject("andy");
+    refreshProjects();
+    refreshPeople();
+    const server = fakeServer({ session: ada });
+    const importProjects = vi.spyOn(server.projects.store, "importProjects");
+    await renderDashboard();
+    await settle();
+
+    await click(screen.getByRole("button", { name: "Move" }));
+    await settle();
+
+    expect(importProjects).toHaveBeenCalledWith("ada", expect.any(Array), [
+      { id: "andy", name: "Andy" },
+    ]);
+    expect(localStorage.getItem("abodeo-people")).toBeNull();
+  });
+
+  it("loads the list again when a save names someone removed on another device", async () => {
+    const server = fakeServer({ session: ada });
+    await server.people.apply("ada", { op: "add", id: "d1", name: "Dora" });
+    await server.projects.store.create("ada", "p1", project("p1"));
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /^Shed/ }));
+    await settle();
+
+    // Removed elsewhere, then a save naming her is refused.
+    await server.people.apply("ada", { op: "remove", id: "d1" });
+    vi.spyOn(server.projects.store, "saveChanges").mockResolvedValue({
+      kind: "unknown-assignee",
+    });
+    await click(screen.getByRole("radio", { name: "Dora" }));
+    await settle();
+
+    expect(
+      screen.getAllByRole("alert").map((alert) => alert.textContent),
+    ).toContainEqual(expect.stringMatching(/no longer in the list/));
+    expect(screen.queryByRole("radio", { name: "Dora" })).toBeNull();
+  });
+
+  it("shows no names, and no box to add, while the people cannot be loaded", async () => {
+    const server = fakeServer({ session: ada });
+    vi.spyOn(server.people, "read").mockRejectedValue(new Error("down"));
+    await server.projects.store.create("ada", "p1", project("p1", "andy"));
+    await renderDashboard();
+    await settle();
+
+    await click(screen.getByRole("button", { name: /^Shed/ }));
+    await settle();
+    expect(screen.queryByRole("textbox", { name: "Add a person" })).toBeNull();
   });
 });

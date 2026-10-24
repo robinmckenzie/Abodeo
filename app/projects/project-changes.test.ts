@@ -88,7 +88,7 @@ describe("reading a save from a request", () => {
 
   it("refuses an invalid value", () => {
     expect(readProjectFields({ title: " " })).toBeUndefined();
-    expect(readProjectFields({ assignee: "nobody" })).toBeUndefined();
+    expect(readProjectFields({ assignee: "not an id!" })).toBeUndefined();
     expect(readProjectFields({ dueDate: "tomorrow" })).toBeUndefined();
     expect(readProjectFields({ tasks: [{ id: "t" }] })).toBeUndefined();
   });

@@ -4,7 +4,8 @@ import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { describeDueDate } from "./due-date";
 import { DueDateIcon } from "./due-date-icon";
-import { findAssigneeName, type Project } from "./projects";
+import { findAssigneeName, type Person } from "./people";
+import type { Project } from "./projects";
 import { describeTaskCount } from "./tasks";
 
 // Expanding starts at about the speed of a plain 0.3-second ease-out, then
@@ -38,12 +39,16 @@ function easeExpanding(t: number) {
 
 export function ProjectBar({
   project,
+  people,
   hasUnsavedChanges,
   isInert = false,
   thumbnailUrl,
   onOpen,
 }: {
   project: Project;
+  // Who the project can be assigned to, or null while the list is not
+  // available, when no name is shown rather than a wrong one.
+  people: readonly Person[] | null;
   hasUnsavedChanges: boolean;
   // The thumbnail of the project's newest image, if it has one (AD #48 Add
   // Images To Projects). Decoration: the bar's label does not mention it.
@@ -54,7 +59,7 @@ export function ProjectBar({
   // Given the bar's height, so that an expanded bar can grow from it.
   onOpen: (barHeight: number) => void;
 }) {
-  const assigneeName = findAssigneeName(project.assignee);
+  const assigneeName = people ? findAssigneeName(people, project.assignee) : "";
   const taskCount = describeTaskCount(project.tasks);
   // Screen readers hear the title first, and not the notes preview, whose
   // notes they read once the project is opened.

@@ -20,7 +20,13 @@ import {
 } from "./test-account.server";
 import { createFakeCalendarDependencies } from "../calendar/test-calendar.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
+import { createPeopleStore } from "../projects/people-store.server";
+import { createFakeDatabase } from "../projects/test-database.server";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
+
+function createMemoryPeopleStore() {
+  return createPeopleStore(createFakeDatabase().database);
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -63,6 +69,7 @@ function createTestHandler() {
     profiles: store,
     history,
     projects: projectStore.store,
+    people: createMemoryPeopleStore(),
     images: createMemoryImageStore().store,
     calendar: calendar.dependencies,
     close,
@@ -141,6 +148,7 @@ describe("createAccountRequestHandler", () => {
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
           projects: createMemoryProjectStore().store,
+          people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: async () => {},
@@ -171,6 +179,7 @@ describe("createAccountRequestHandler", () => {
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
         projects: createMemoryProjectStore().store,
+        people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
@@ -473,6 +482,47 @@ describe("createAccountRequestHandler", () => {
     expect(after.status).toBe(401);
   });
 
+  it("reaches only the signed-in account's people, and none after signing out", async () => {
+    const { auth, handle } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const grace = await signInTestAccount(auth, {
+      name: "Grace Hopper",
+      email: "grace@example.com",
+      sub: "google-sub-2",
+    });
+    const peopleRequest = (who: typeof ada, init: RequestInit = {}) =>
+      request("/api/people", {
+        ...init,
+        headers: {
+          cookie: who.cookie,
+          "X-Abodeo-Account": who.user.id,
+          "Content-Type": "application/json",
+        },
+      });
+
+    const added = await handle(
+      peopleRequest(ada, {
+        method: "POST",
+        body: JSON.stringify({ op: "add", id: "dora-1", name: "Dora" }),
+      }),
+    );
+    expect(added.status).toBe(200);
+    const adaList = await handle(peopleRequest(ada));
+    expect((await adaList.json()).people).toEqual([
+      { id: "dora-1", name: "Dora" },
+    ]);
+    const graceList = await handle(peopleRequest(grace));
+    expect((await graceList.json()).people).toEqual([]);
+
+    await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    expect((await handle(peopleRequest(ada))).status).toBe(401);
+  });
+
   it("refuses a profile change that is not JSON or not a valid name", async () => {
     const { auth, handle } = createTestHandler();
     const ada = await signInTestAccount(auth);
@@ -561,6 +611,7 @@ describe("createAccountRequestHandler", () => {
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
         projects: createMemoryProjectStore().store,
+        people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
         close: async () => {},
@@ -586,6 +637,7 @@ describe("createAccountRequestHandler", () => {
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
           projects: createMemoryProjectStore().store,
+          people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
           close: () => new Promise(() => {}),

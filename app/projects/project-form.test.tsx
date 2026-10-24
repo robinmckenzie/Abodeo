@@ -3,21 +3,40 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectForm, type FormMessage } from "./project-form";
+import type { Person } from "./people";
+import { ProjectForm, type AddPerson, type FormMessage } from "./project-form";
 import { newProjectFields } from "./projects";
 
-function renderForm(isNew = true, message: FormMessage = null) {
+const people: Person[] = [
+  { id: "andy", name: "Andy" },
+  { id: "boris", name: "Boris" },
+  { id: "clement", name: "Clement" },
+];
+
+function renderForm(
+  isNew = true,
+  message: FormMessage = null,
+  extra: {
+    people?: Person[];
+    onAddPerson?: AddPerson;
+    onChange?: () => void;
+    assignee?: string;
+  } = {},
+) {
   render(
     <ProjectForm
-      values={{ ...newProjectFields, assignee: "boris" }}
+      values={{ ...newProjectFields, assignee: extra.assignee ?? "boris" }}
       isNew={isNew}
+      people={extra.people ?? people}
+      onAddPerson={extra.onAddPerson}
       message={message}
       getFocusField={() => "title"}
-      onChange={vi.fn()}
+      onChange={extra.onChange ?? vi.fn()}
       onFieldFocus={vi.fn()}
       onFieldBlur={vi.fn()}
       onCreate={vi.fn()}
@@ -29,7 +48,7 @@ function renderForm(isNew = true, message: FormMessage = null) {
 describe("ProjectForm", () => {
   afterEach(cleanup);
 
-  it("offers the four assignees, before the title and notes", () => {
+  it("offers Unassigned and then the people, before the title and notes", () => {
     renderForm();
     const group = screen.getByRole("group", { name: "Assigned to" });
     const options = within(group).getAllByRole("radio");
@@ -53,6 +72,34 @@ describe("ProjectForm", () => {
     const arrows = document.querySelectorAll(".assignee-arrow");
     expect(arrows).toHaveLength(1);
     expect(arrows[0].closest("label")?.textContent).toBe("Boris");
+  });
+
+  it("offers only Unassigned when there are no people", () => {
+    renderForm(true, null, { people: [], assignee: "unassigned" });
+    const group = screen.getByRole("group", { name: "Assigned to" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((o) => o.closest("label")?.textContent),
+    ).toEqual(["Unassigned"]);
+  });
+
+  it("shows someone no longer in the list as Unassigned", () => {
+    renderForm(true, null, { assignee: "zed" });
+    const unassigned = screen.getByRole("radio", { name: "Unassigned" });
+    expect((unassigned as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("does not delay the form by the length of the list", () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({
+      id: `p${i}`,
+      name: `Person ${i}`,
+    }));
+    renderForm(true, null, { people: many });
+    const arrivals = [
+      ...document.querySelectorAll<HTMLElement>(".assignee-option"),
+    ].map((label) => Number(label.style.getPropertyValue("--arrival")));
+    expect(Math.max(...arrivals)).toBeLessThanOrEqual(4);
   });
 
   it("starts with the title focused", () => {
@@ -102,6 +149,7 @@ describe("ProjectForm's due date", () => {
       <ProjectForm
         values={{ ...newProjectFields, dueDate }}
         isNew={false}
+        people={people}
         message={null}
         getFocusField={() => "start"}
         onChange={onChange}
@@ -213,5 +261,56 @@ describe("ProjectForm's due date", () => {
     fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
     expect(screen.getByRole("group", { name: "January 0" })).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProjectForm's box to add a person (AD #61)", () => {
+  afterEach(cleanup);
+
+  const box = () => screen.getByRole("textbox", { name: "Add a person" });
+
+  it("has no box without a way to add someone", () => {
+    renderForm();
+    expect(screen.queryByRole("textbox", { name: "Add a person" })).toBeNull();
+  });
+
+  it("sits below the people, inside Assigned to", () => {
+    renderForm(true, null, { onAddPerson: vi.fn() });
+    const group = screen.getByRole("group", { name: "Assigned to" });
+    expect(group.contains(box())).toBe(true);
+    const last = within(group).getByRole("radio", { name: "Clement" });
+    expect(
+      last.compareDocumentPosition(box()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("adds the person on Enter and chooses them, without creating the project", async () => {
+    const person = { id: "new-id", name: "Dora" };
+    const onAddPerson = vi.fn().mockResolvedValue({ ok: true, person });
+    const onChange = vi.fn();
+    renderForm(true, null, { onAddPerson, onChange });
+    fireEvent.change(box(), { target: { value: "Dora" } });
+    fireEvent.keyDown(box(), { key: "Enter" });
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith({ assignee: "new-id" }),
+    );
+    expect(onAddPerson).toHaveBeenCalledWith("Dora");
+    expect((box() as HTMLInputElement).value).toBe("");
+  });
+
+  it("shows why a name was refused, and chooses no one", async () => {
+    const onAddPerson = vi
+      .fn()
+      .mockResolvedValue({ ok: false, reason: "duplicate" });
+    const onChange = vi.fn();
+    renderForm(true, null, { onAddPerson, onChange });
+    fireEvent.change(box(), { target: { value: "Andy" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Someone with that name is already in the list.",
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(box(), { target: { value: "Andy 2" } });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

@@ -13,6 +13,14 @@ import {
   type DefaultsRecord,
 } from "./default-projects";
 import {
+  isKnownAssignee,
+  mapAssigneesByName,
+  readPeople,
+  serialisePeople,
+  type Person,
+} from "./people";
+import { deriveAccountPeople, readAccountPeople } from "./people-store.server";
+import {
   applyProjectChanges,
   findConflictingFields,
   type ProjectField,
@@ -21,23 +29,30 @@ import {
   parseProject,
   serialiseProject,
   sortProjects,
+  unassignedId,
   type Project,
   type ProjectFields,
 } from "./projects";
 import type { ImportOutcome, ProjectListResponse } from "./projects-api";
+import {
+  inTransaction,
+  transactionTimeout,
+  type TransactionalDatabase,
+} from "./transaction.server";
 
-// A database that can also give one connection for a transaction, as the
-// Neon pool does.
-export type TransactionalDatabase = Queryable & {
-  connect(): Promise<Queryable & { release(): void }>;
-};
+export type { TransactionalDatabase };
 
 export type ReadOutcome =
   | { kind: "found"; project: Project }
   | { kind: "not-found" }
   | { kind: "unreadable" };
 
+// A create or save naming someone who is not in the account's list, such as
+// removed on another device.
+export type UnknownAssignee = { kind: "unknown-assignee" };
+
 export type SaveOutcome =
+  | UnknownAssignee
   | { kind: "saved"; project: Project }
   | { kind: "not-found" }
   | { kind: "unreadable" }
@@ -46,6 +61,8 @@ export type SaveOutcome =
   | { kind: "busy" };
 
 export type ProjectStore = {
+  // Brings the account's default projects up to date, if they have changed.
+  receiveDefaults(userId: string): Promise<unknown>;
   // Receives the default projects first, if they have changed.
   list(userId: string): Promise<ProjectListResponse>;
   read(userId: string, id: string): Promise<ReadOutcome>;
@@ -54,26 +71,26 @@ export type ProjectStore = {
     userId: string,
     id: string,
     fields: ProjectFields,
-  ): Promise<ReadOutcome>;
+  ): Promise<ReadOutcome | UnknownAssignee>;
   saveChanges(
     userId: string,
     id: string,
     base: Partial<ProjectFields>,
     changes: Partial<ProjectFields>,
   ): Promise<SaveOutcome>;
+  // people is the browser's list, which goes with its projects (AD #61
+  // Manage People): it becomes the account's if the account has none, and
+  // otherwise each project's person is matched to the account's by name.
   importProjects(
     userId: string,
     projects: Project[],
+    people?: Person[],
   ): Promise<Record<string, ImportOutcome>>;
 };
 
 // How many times a save reads and tries again when another save lands
 // between its read and its write. Provisional.
 export const saveAttempts = 3;
-
-// How long each statement of the defaults' transaction may wait, including
-// for the lock that stops two devices applying the defaults at once.
-const transactionTimeout = "4s";
 
 function readStoredProject(id: string, data: unknown) {
   return parseProject(id, JSON.stringify(data ?? null));
@@ -96,6 +113,15 @@ function readRecord(row: Record<string, unknown> | undefined) {
 // the same copy again finds the copy already made.
 export function buildCopyId(project: Project) {
   return `${project.id.slice(0, 60)}-copy-${hashText(serialiseProject(project))}`;
+}
+
+// Whether two copies of a project differ only in who is assigned, as a
+// project does after a move whose answer was lost and a person was renamed.
+function isSameIgnoringAssignee(a: Project, b: Project) {
+  return (
+    serialiseProject({ ...a, assignee: "" }) ===
+    serialiseProject({ ...b, assignee: "" })
+  );
 }
 
 export function createProjectStore(
@@ -132,6 +158,24 @@ export function createProjectStore(
       [userId, JSON.stringify(entries)],
     );
     return new Set(rows.map((row) => String(row.id)));
+  };
+
+  // A project already saved with someone who is not in the list is kept as
+  // it is, but a write never newly names them: that is dropped to Unassigned.
+  const dropUnknownAssignees = async (
+    query: Queryable,
+    userId: string,
+    projects: Project[],
+  ) => {
+    if (projects.every(({ assignee }) => assignee === unassignedId)) {
+      return projects;
+    }
+    const people = await readAccountPeople(query, userId);
+    return projects.map((project) =>
+      isKnownAssignee(people, project.assignee)
+        ? project
+        : { ...project, assignee: unassignedId },
+    );
   };
 
   const readRows = async (query: Queryable, userId: string, ids: string[]) => {
@@ -190,7 +234,12 @@ export function createProjectStore(
         (id) => stored.has(id) && !readStoredProject(id, stored.get(id)),
       );
       if (receipt) {
-        await insertMany(client, userId, receipt.write, { overwrite: true });
+        await insertMany(
+          client,
+          userId,
+          await dropUnknownAssignees(client, userId, receipt.write),
+          { overwrite: true },
+        );
         if (receipt.remove.length > 0) {
           await client.query(
             `delete from project where user_id = $1
@@ -214,8 +263,12 @@ export function createProjectStore(
     }
   };
 
-  const read = async (userId: string, id: string): Promise<ReadOutcome> => {
-    const { rows } = await database.query(
+  const read = async (
+    userId: string,
+    id: string,
+    query: Queryable = database,
+  ): Promise<ReadOutcome> => {
+    const { rows } = await query.query(
       "select data from project where user_id = $1 and id = $2",
       [userId, id],
     );
@@ -225,6 +278,8 @@ export function createProjectStore(
   };
 
   return {
+    receiveDefaults,
+
     async list(userId) {
       const record = await receiveDefaults(userId);
       const { rows } = await database.query(
@@ -273,76 +328,169 @@ export function createProjectStore(
         createdAt: time,
         updatedAt: time,
       };
-      const inserted = await insertMany(database, userId, [project], {
-        overwrite: false,
+      const insert = async (query: Queryable): Promise<ReadOutcome> => {
+        const inserted = await insertMany(query, userId, [project], {
+          overwrite: false,
+        });
+        return inserted.has(id)
+          ? { kind: "found", project }
+          : read(userId, id, query);
+      };
+      if (fields.assignee === unassignedId) return insert(database);
+      return inTransaction(database, async (client) => {
+        const people = await readAccountPeople(client, userId, { lock: true });
+        if (!isKnownAssignee(people, fields.assignee)) {
+          return { kind: "unknown-assignee" };
+        }
+        return insert(client);
       });
-      return inserted.has(id) ? { kind: "found", project } : read(userId, id);
     },
 
     async saveChanges(userId, id, base, changes) {
-      for (let attempt = 0; attempt < saveAttempts; attempt++) {
-        const { rows } = await database.query(
-          "select data, revision from project where user_id = $1 and id = $2",
-          [userId, id],
-        );
-        if (rows.length === 0) return { kind: "not-found" };
-        const saved = readStoredProject(id, rows[0].data);
-        if (!saved) return { kind: "unreadable" };
-        const fields = findConflictingFields(saved, base, changes);
-        if (fields.length > 0)
-          return { kind: "conflict", project: saved, fields };
-        const project = applyProjectChanges(saved, changes, now());
-        const updated = await database.query(
-          `update project set data = $3::jsonb, revision = revision + 1
-           where user_id = $1 and id = $2 and revision = $4
-           returning id`,
-          [userId, id, JSON.stringify(toStoredData(project)), rows[0].revision],
-        );
-        if (updated.rows.length > 0) return { kind: "saved", project };
+      const trySave = async (query: Queryable): Promise<SaveOutcome> => {
+        for (let attempt = 0; attempt < saveAttempts; attempt++) {
+          const { rows } = await query.query(
+            "select data, revision from project where user_id = $1 and id = $2",
+            [userId, id],
+          );
+          if (rows.length === 0) return { kind: "not-found" };
+          const saved = readStoredProject(id, rows[0].data);
+          if (!saved) return { kind: "unreadable" };
+          const fields = findConflictingFields(saved, base, changes);
+          if (fields.length > 0)
+            return { kind: "conflict", project: saved, fields };
+          const project = applyProjectChanges(saved, changes, now());
+          const updated = await query.query(
+            `update project set data = $3::jsonb, revision = revision + 1
+             where user_id = $1 and id = $2 and revision = $4
+             returning id`,
+            [
+              userId,
+              id,
+              JSON.stringify(toStoredData(project)),
+              rows[0].revision,
+            ],
+          );
+          if (updated.rows.length > 0) return { kind: "saved", project };
+        }
+        return { kind: "busy" };
+      };
+      const assignee = changes.assignee;
+      if (assignee === undefined || assignee === unassignedId) {
+        return trySave(database);
       }
-      return { kind: "busy" };
+      // Choosing someone is checked against the list, held until the save is
+      // done, so that a removal cannot come between.
+      return inTransaction(database, async (client) => {
+        const people = await readAccountPeople(client, userId, { lock: true });
+        if (!isKnownAssignee(people, assignee)) {
+          return { kind: "unknown-assignee" };
+        }
+        return trySave(client);
+      });
     },
 
     // Each project goes in under its own id. Where the account already has
-    // that id, an identical copy counts as moved before, as when the
-    // browser's clean-up after a move failed. A different one goes in as a
-    // copy, so that neither is lost.
-    async importProjects(userId, projects) {
-      const outcomes: Record<string, ImportOutcome> = {};
-      const moved = await insertMany(database, userId, projects, {
-        overwrite: false,
-      });
-      const rest = projects.filter(({ id }) => !moved.has(id));
-      moved.forEach((id) => (outcomes[id] = "moved"));
-      const stored = await readRows(
-        database,
-        userId,
-        rest.map(({ id }) => id),
-      );
-      const copies: Project[] = [];
-      for (const project of rest) {
-        const existing = readStoredProject(project.id, stored.get(project.id));
-        if (
-          existing &&
-          serialiseProject(existing) === serialiseProject(project)
-        ) {
-          outcomes[project.id] = "already-moved";
-        } else {
-          copies.push({ ...project, id: buildCopyId(project) });
+    // that id, a copy that is the same but for who is assigned counts as
+    // moved before, as when the browser's clean-up after a move failed. A
+    // different one goes in as a copy, so that neither is lost. Who is
+    // assigned is applied only as each is written, so that sending the same
+    // move again after someone was renamed finds what it made before.
+    async importProjects(userId, projects, browserPeople) {
+      return inTransaction(database, async (client) => {
+        const remap = await settleImportPeople(client, userId, browserPeople);
+        const withAssignee = (project: Project): Project => ({
+          ...project,
+          assignee: remap(project.assignee),
+        });
+        const outcomes: Record<string, ImportOutcome> = {};
+        const moved = await insertMany(
+          client,
+          userId,
+          projects.map(withAssignee),
+          { overwrite: false },
+        );
+        const rest = projects.filter(({ id }) => !moved.has(id));
+        moved.forEach((id) => (outcomes[id] = "moved"));
+        const stored = await readRows(
+          client,
+          userId,
+          rest.map(({ id }) => id),
+        );
+        const copies: Project[] = [];
+        for (const project of rest) {
+          const existing = readStoredProject(
+            project.id,
+            stored.get(project.id),
+          );
+          if (existing && isSameIgnoringAssignee(existing, project)) {
+            outcomes[project.id] = "already-moved";
+          } else {
+            copies.push({
+              ...withAssignee(project),
+              id: buildCopyId(project),
+            });
+          }
         }
-      }
-      const copied = await insertMany(database, userId, copies, {
-        overwrite: false,
+        const copied = await insertMany(client, userId, copies, {
+          overwrite: false,
+        });
+        for (const copy of copies) {
+          const originalId = rest.find(
+            (project) => buildCopyId(project) === copy.id,
+          )!.id;
+          outcomes[originalId] = copied.has(copy.id)
+            ? "moved-as-copy"
+            : "already-moved";
+        }
+        return outcomes;
       });
-      for (const copy of copies) {
-        const originalId = rest.find(
-          (project) => buildCopyId(project) === copy.id,
-        )!.id;
-        outcomes[originalId] = copied.has(copy.id)
-          ? "moved-as-copy"
-          : "already-moved";
-      }
-      return outcomes;
     },
   };
+
+  // Gives who each moved project is assigned to: where the account has no
+  // list, the browser's becomes the account's and people carry by id; where
+  // it has, people are matched by name, and those without a match are
+  // Unassigned. The row is locked until the move is done.
+  async function settleImportPeople(
+    client: Queryable,
+    userId: string,
+    browserPeople: Person[] | undefined,
+  ): Promise<(assignee: string) => string> {
+    const select = () =>
+      client.query(
+        "select data from account_people where user_id = $1 for update",
+        [userId],
+      );
+    let { rows } = await select();
+    if (rows.length === 0 && browserPeople !== undefined) {
+      const derived = (await deriveAccountPeople(client, userId)).filter(
+        (person) =>
+          !browserPeople.some(
+            (other) =>
+              other.id === person.id ||
+              other.name.toLocaleLowerCase() ===
+                person.name.toLocaleLowerCase(),
+          ),
+      );
+      const list = [...browserPeople, ...derived];
+      const inserted = await client.query(
+        `insert into account_people (user_id, data) values ($1, $2::jsonb)
+         on conflict (user_id) do nothing returning user_id`,
+        [userId, serialisePeople(list)],
+      );
+      if (inserted.rows.length > 0) {
+        return (assignee) =>
+          browserPeople.some(({ id }) => id === assignee)
+            ? assignee
+            : unassignedId;
+      }
+      // Another device saved a list first, which wins.
+      ({ rows } = await select());
+    }
+    if (rows.length === 0) return () => unassignedId;
+    const accountPeople = readPeople(rows[0].data) ?? [];
+    const matches = mapAssigneesByName(browserPeople ?? [], accountPeople);
+    return (assignee) => matches.get(assignee) ?? unassignedId;
+  }
 }
