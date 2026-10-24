@@ -244,7 +244,7 @@ describe("ProjectForm's due date", () => {
     );
     fireEvent.change(
       screen.getByRole("textbox", { name: "Add tasks, one per line" }),
-      { target: { value: "Buy paint\n\n  Fetch ladder  \n" } },
+      { target: { value: "Buy paint\n\n  Fetch ladder  \n- [x] Hang door" } },
     );
     const { tasks } = onChange.mock.calls.at(-1)![0];
     expect(
@@ -252,6 +252,7 @@ describe("ProjectForm's due date", () => {
     ).toEqual([
       ["Buy paint", false],
       ["Fetch ladder", false],
+      ["Hang door", false],
     ]);
   });
 });

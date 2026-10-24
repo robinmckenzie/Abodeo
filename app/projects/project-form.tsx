@@ -276,9 +276,7 @@ function NewProjectTasks({
 }) {
   const id = useId();
   const [text, setText] = useState(() =>
-    tasks
-      .map((task) => (task.isDone ? `[x] ${task.title}` : task.title))
-      .join("\n"),
+    tasks.map((task) => task.title).join("\n"),
   );
   return (
     <section className="task-section" aria-labelledby={`${id}-heading`}>
@@ -294,7 +292,16 @@ function NewProjectTasks({
         aria-label="Add tasks, one per line"
         onChange={(event) => {
           setText(event.target.value);
-          onChange(createTasks(readTaskEntries(event.target.value)));
+          // A new project's tasks all start not done, even if a line is
+          // written as a checked box.
+          onChange(
+            createTasks(
+              readTaskEntries(event.target.value).map(({ title }) => ({
+                title,
+                isDone: false,
+              })),
+            ),
+          );
         }}
       />
     </section>
