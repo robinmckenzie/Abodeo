@@ -35,6 +35,10 @@ Run these from the repository root.
 
 ## Default projects
 
+The default projects are currently empty (AD #75), so new visitors start with a blank dashboard and
+anyone who received the earlier defaults has them removed. The rest of this section describes the
+mechanism, which still works if projects are saved as defaults again.
+
 Every visitor receives the default projects in `app/projects/default-projects.json`, which each
 deployment includes. When a visitor loads a version whose defaults differ from those their browser
 last received, the defaults are added or replaced, overwriting any edits to them, and defaults the
