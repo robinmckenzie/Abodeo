@@ -60,4 +60,8 @@ describe("default projects", () => {
   it("reads the bundled file", () => {
     expect(bundledDefaultProjects).not.toBeNull();
   });
+
+  it("bundles no default projects, so a new visitor starts blank", () => {
+    expect(bundledDefaultProjects?.projects).toEqual([]);
+  });
 });
