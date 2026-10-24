@@ -320,6 +320,9 @@ body:has(.dashboard) {
   position: relative;
   width: 11.25rem;
   margin-top: 1rem;
+  /* Room for the signed-in button while the lookup runs, so the menu below
+     does not move when it appears. */
+  min-height: 3.2rem;
   font-size: 0.85rem;
   color: #3a3833;
 }
