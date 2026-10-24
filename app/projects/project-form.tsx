@@ -32,6 +32,7 @@ export function ProjectForm({
   isReadOnly = false,
   people,
   onAddPerson,
+  projectKey,
   message,
   messageActions,
   getFocusField,
@@ -55,6 +56,9 @@ export function ProjectForm({
   // People). Without onAddPerson, there is no box to add someone.
   people: readonly Person[];
   onAddPerson?: AddPerson;
+  // Tells which project is open, so that a person added while another project
+  // is opened is not assigned to it.
+  projectKey?: string;
   message: FormMessage;
   // Buttons beside the message, such as for choosing which version to keep.
   messageActions?: React.ReactNode;
@@ -80,6 +84,12 @@ export function ProjectForm({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
+  const onChangeRef = useRef(onChange);
+  const projectKeyRef = useRef(projectKey);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    projectKeyRef.current = projectKey;
+  });
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
   const options = [{ id: unassignedId, name: unassignedName }, ...people];
   // Someone no longer in the list shows as Unassigned.
@@ -209,8 +219,13 @@ export function ProjectForm({
               <AddPersonBox
                 place={options.length}
                 onAdd={async (name) => {
+                  const startedFor = projectKeyRef.current;
                   const result = await onAddPerson(name);
-                  if (result.ok) onChange({ assignee: result.person.id });
+                  // The latest onChange, as the form may have changed while
+                  // the person was being added.
+                  if (result.ok && projectKeyRef.current === startedFor) {
+                    onChangeRef.current({ assignee: result.person.id });
+                  }
                   return result;
                 }}
               />

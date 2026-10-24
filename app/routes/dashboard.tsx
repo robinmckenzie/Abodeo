@@ -839,6 +839,7 @@ export default function Dashboard() {
       isReadOnly={open.isLoading}
       people={readyPeople?.people ?? noPeople}
       onAddPerson={readyPeople ? people.addPerson : undefined}
+      projectKey={open.key}
       message={open.message}
       messageActions={
         open.hasConflict && (

@@ -333,6 +333,12 @@ describe("the project store", () => {
           text.includes("from account_people where user_id = $1 for share"),
         ),
       ).toBe(true);
+      // Taken first, as the row may not exist yet.
+      expect(
+        fake.statements.some(({ text }) =>
+          text.includes("pg_advisory_xact_lock"),
+        ),
+      ).toBe(true);
       expect(fake.released()).toBe(1);
     });
 
@@ -455,6 +461,34 @@ describe("the project store", () => {
         expect(
           (fake.people.get("ada")?.data as { people: unknown[] }).people,
         ).toEqual([...browser, andy]);
+      });
+
+      it("keeps an account project's person who has the browser person's name", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        fake.projects.push({
+          user_id: "ada",
+          id: "old",
+          data: savedForm(project("old", "Old", { assignee: "andy" })),
+          revision: 1,
+        });
+        await store.importProjects("ada", sent, [
+          { id: "u1", name: "Andy" },
+          { id: "x2", name: "Boris" },
+        ]);
+        expect(
+          (fake.people.get("ada")?.data as { people: unknown[] }).people,
+        ).toEqual([
+          { id: "u1", name: "Andy" },
+          { id: "x2", name: "Boris" },
+        ]);
+        expect(
+          (fake.projects.find((row) => row.id === "old")?.data as Project)
+            .assignee,
+        ).toBe("u1");
       });
 
       it("matches people by name where the account has a list", async () => {

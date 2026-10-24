@@ -143,6 +143,9 @@ export function usePeople(
     account.kind === "signed-out" || account.kind === "not-configured";
   const [state, setState] = useState<AccountState | null>(null);
   const reloadRef = useRef(() => {});
+  // Counts the loads started and the changes shown, so that a list read
+  // before a change is not shown over it.
+  const loadsRef = useRef(0);
   const onAccountFailureRef = useRef(onAccountFailure);
   useEffect(() => {
     onAccountFailureRef.current = onAccountFailure;
@@ -152,12 +155,11 @@ export function usePeople(
     if (!accountId) return;
     let isCurrent = true;
     let lastLoad = 0;
-    let loads = 0;
     const load = async () => {
-      const thisLoad = ++loads;
+      const thisLoad = ++loadsRef.current;
       lastLoad = Date.now();
       const result = await loadAccountPeople(accountId);
-      if (!isCurrent || thisLoad !== loads) return;
+      if (!isCurrent || thisLoad !== loadsRef.current) return;
       if (result.ok) {
         setState({
           accountId,
@@ -217,11 +219,13 @@ export function usePeople(
   const showChange = (
     forAccountId: string,
     result: Extract<AccountPeopleChange, { ok: true }>,
-  ) =>
+  ) => {
+    loadsRef.current++;
     setState({
       accountId: forAccountId,
       view: { status: "ready", people: result.people, isEstablished: true },
     });
+  };
 
   const accountView = view.status === "ready" ? view : null;
   const shouldEstablish =

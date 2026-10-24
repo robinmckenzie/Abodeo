@@ -76,6 +76,17 @@ export async function createProject(
   { ok: true; project: Project } | { ok: false; reason: SaveFailure }
 > {
   if (!hasTitle(fields.title)) return { ok: false, reason: "no-title" };
+  // Choosing someone takes its turn with removing people, so that a removal
+  // that has begun clearing its assignments cannot miss this one.
+  if (fields.assignee !== unassignedId) {
+    return withPeopleLock(async () => makeProject(fields));
+  }
+  return makeProject(fields);
+}
+
+function makeProject(
+  fields: ProjectFields,
+): { ok: true; project: Project } | { ok: false; reason: SaveFailure } {
   if (!isAssigneeInList(fields.assignee)) {
     return { ok: false, reason: "unknown-assignee" };
   }

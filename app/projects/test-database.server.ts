@@ -147,6 +147,19 @@ export function createFakeDatabase() {
           .map(({ id, data }) => ({ id, data })),
       };
     }
+    if (sql.startsWith("select pg_advisory_xact_lock")) return { rows: [] };
+    if (sql.includes("to_jsonb($3::text)")) {
+      for (const row of projects) {
+        if (
+          row.user_id === userId &&
+          (row.data as { assignee?: string })?.assignee === values[1]
+        ) {
+          row.data = { ...(row.data as object), assignee: values[2] };
+          row.revision++;
+        }
+      }
+      return { rows: [] };
+    }
     if (sql.includes("data->>'assignee' = $2")) {
       return {
         rows: projects

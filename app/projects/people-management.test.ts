@@ -162,6 +162,21 @@ describe("the browser's list of people", () => {
       });
     });
 
+    it("makes creating an assigned project take its turn with removing people", async () => {
+      const names: string[] = [];
+      vi.stubGlobal("navigator", {
+        locks: {
+          request: (name: string, work: () => unknown) => {
+            names.push(name);
+            return work();
+          },
+        },
+      });
+      loadPeople();
+      await createProject({ ...fields, assignee: "andy" });
+      expect(names).toEqual(["abodeo-people"]);
+    });
+
     it("changes nothing when the count is no longer the one confirmed", async () => {
       await createAssigned("One", "andy");
       loadPeople();

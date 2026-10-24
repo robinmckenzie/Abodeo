@@ -68,11 +68,21 @@ export async function deriveAccountPeople(query: Queryable, userId: string) {
 // those the projects are already assigned to. A list that cannot be read has
 // nobody. With lock, the row is held until the transaction ends, so that the
 // list cannot be changed between this and the write that follows.
+// Held until the transaction ends. It is taken before the people row, which
+// may not exist yet, so that making the first list and anything that depends
+// on the list being absent take their turns.
+export async function lockAccountPeople(query: Queryable, userId: string) {
+  await query.query("select pg_advisory_xact_lock(hashtext($1 || ':people'))", [
+    userId,
+  ]);
+}
+
 export async function readAccountPeople(
   query: Queryable,
   userId: string,
   { lock = false }: { lock?: boolean } = {},
 ): Promise<Person[]> {
+  if (lock) await lockAccountPeople(query, userId);
   const { rows } = await query.query(
     `select data from account_people where user_id = $1${lock ? " for share" : ""}`,
     [userId],
@@ -90,6 +100,7 @@ async function lockList(
   client: Queryable,
   userId: string,
 ): Promise<LockedList> {
+  await lockAccountPeople(client, userId);
   const select = () =>
     client.query(
       `select data, revision from account_people

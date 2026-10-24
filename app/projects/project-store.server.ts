@@ -19,7 +19,11 @@ import {
   serialisePeople,
   type Person,
 } from "./people";
-import { deriveAccountPeople, readAccountPeople } from "./people-store.server";
+import {
+  deriveAccountPeople,
+  lockAccountPeople,
+  readAccountPeople,
+} from "./people-store.server";
 import {
   applyProjectChanges,
   findConflictingFields,
@@ -457,6 +461,7 @@ export function createProjectStore(
     userId: string,
     browserPeople: Person[] | undefined,
   ): Promise<(assignee: string) => string> {
+    await lockAccountPeople(client, userId);
     const select = () =>
       client.query(
         "select data from account_people where user_id = $1 for update",
@@ -464,15 +469,25 @@ export function createProjectStore(
       );
     let { rows } = await select();
     if (rows.length === 0 && browserPeople !== undefined) {
-      const derived = (await deriveAccountPeople(client, userId)).filter(
-        (person) =>
-          !browserPeople.some(
-            (other) =>
-              other.id === person.id ||
-              other.name.toLocaleLowerCase() ===
-                person.name.toLocaleLowerCase(),
-          ),
-      );
+      const derived: Person[] = [];
+      for (const person of await deriveAccountPeople(client, userId)) {
+        const same = browserPeople.find(
+          (other) =>
+            other.id === person.id ||
+            other.name.toLocaleLowerCase() === person.name.toLocaleLowerCase(),
+        );
+        if (!same) derived.push(person);
+        else if (same.id !== person.id) {
+          // The account's project named them by another id, so it follows
+          // the browser's person rather than becoming Unassigned.
+          await client.query(
+            `update project set data = jsonb_set(data, '{assignee}', to_jsonb($3::text)),
+             revision = revision + 1
+             where user_id = $1 and data->>'assignee' = $2`,
+            [userId, person.id, same.id],
+          );
+        }
+      }
       const list = [...browserPeople, ...derived];
       const inserted = await client.query(
         `insert into account_people (user_id, data) values ($1, $2::jsonb)
