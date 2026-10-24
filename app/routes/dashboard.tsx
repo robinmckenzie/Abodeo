@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
-import { AccountControl } from "../account/account-control";
 import { useAccount } from "../account/use-account";
 import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
@@ -951,8 +950,11 @@ export default function Dashboard() {
             height={868}
           />
         </h1>
-        <AccountControl account={account} onBeforeLeave={prepareToLeave} />
-        <AppMenu current="/dashboard" onBeforeLeave={prepareToLeave} />
+        <AppMenu
+          current="/dashboard"
+          account={account}
+          onBeforeLeave={prepareToLeave}
+        />
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>

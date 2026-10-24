@@ -2183,44 +2183,19 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   display: none;
 }
 
-/* The application menu, below the account area (AD #61 Manage People). Plain
+/* The common menu, below the account area (AD #61 Manage People). Plain
    text like the account area, so that it is not mistaken for a project. */
 .app-menu {
-  position: relative;
   width: 11.25rem;
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
+  margin-top: 0.75rem;
+  font-size: 1.1rem;
   color: #3a3833;
 }
 
-.app-menu-button {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #8a857a;
-  border-radius: 999px;
-  background: transparent;
-  text-align: center;
-  cursor: pointer;
-}
-
-.app-menu-button:hover {
-  background: #ece9e1;
-}
-
 .app-menu-list {
-  position: absolute;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  z-index: 5;
-  box-sizing: border-box;
-  width: 100%;
   margin: 0;
-  padding: 0.25rem;
+  padding: 0;
   list-style: none;
-  border: 1px solid #8a857a;
-  border-radius: 12px;
-  background: #fdfcf8;
 }
 
 .app-menu-list a {

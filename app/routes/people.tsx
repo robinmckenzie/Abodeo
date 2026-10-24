@@ -43,7 +43,9 @@ export function describeRemoval({ person, count, unreadable }: Removal) {
 }
 
 export default function People() {
-  const account = useAccount({ onBeforeLeave: async () => true });
+  // Nothing on this screen is left unsaved.
+  const leavePeople = async () => true;
+  const account = useAccount({ onBeforeLeave: leavePeople });
   const source = usePeople(account.view, { onAccountFailure: account.recheck });
   const { view } = source;
   const isSignedIn = account.view.kind === "signed-in";
@@ -108,7 +110,11 @@ export default function People() {
             />
           </Link>
         </h1>
-        <AppMenu current="/people" />
+        <AppMenu
+          current="/people"
+          account={account}
+          onBeforeLeave={leavePeople}
+        />
       </header>
       <main>
         <h2>People</h2>

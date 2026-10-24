@@ -1346,7 +1346,6 @@ describe("Dashboard people (AD #61)", () => {
     // Earlier tests can leave typed tasks behind, which the check before
     // leaving asks about.
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     await act(async () => {
       fireEvent.click(screen.getByRole("link", { name: "People" }));
     });
@@ -1355,16 +1354,14 @@ describe("Dashboard people (AD #61)", () => {
     expect(savedProjects()[0].title).toBe("Shed, painted");
   });
 
-  it("closes the application menu with Escape, leaving a project open", async () => {
+  it("always shows the application menu links, with Projects as the current screen", async () => {
     await renderDashboard();
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    expect(screen.getByRole("link", { name: "Projects" })).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("link", { name: "Projects" }), {
-      key: "Escape",
-    });
-    expect(screen.queryByRole("link", { name: "Projects" })).toBeNull();
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Menu" }),
-    );
+    expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Projects" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("link", { name: "People" })).toBeTruthy();
   });
 });

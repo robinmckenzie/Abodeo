@@ -145,7 +145,8 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
 AD #61 Manage People. The code is in `app/projects/people*.ts`, `account-people.ts`,
 `use-people.ts` and `app/routes/people.tsx`.
 
-- The application menu (the Menu button below the account area) has a People entry, which opens
+- The application menu (the Projects and People links below the account area, shown on every
+  screen with the sign-in button) has a People entry, which opens
   the People screen at `/people`. There people are added, renamed and removed. A project saves
   only a person's id, so a rename changes no project. Unassigned is always the first option in
   Assigned To, and is not a person: it cannot be added, renamed or removed.

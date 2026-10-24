@@ -252,7 +252,7 @@ describe("the People screen", () => {
 
   it("has the application menu, with People as the current screen", async () => {
     await renderPeople();
-    await press("Menu");
+    expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
     expect(
       screen.getByRole("link", { name: "People" }).getAttribute("aria-current"),
     ).toBe("page");
