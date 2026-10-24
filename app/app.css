@@ -541,6 +541,13 @@ body:has(.dashboard) {
   flex-shrink: 0;
 }
 
+/* The screen's title, level with Add project and at the left edge of the
+   project boxes. */
+.dashboard-toolbar h2 {
+  align-self: center;
+  margin: 0 auto 0 0;
+}
+
 /* While the account's projects are unavailable, Add project is disabled, and
    it and the development panel, which has nothing to act on, are hidden. */
 .dashboard-toolbar .add-project:disabled,

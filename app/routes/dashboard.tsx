@@ -958,6 +958,7 @@ export default function Dashboard() {
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
+          <h2>Projects</h2>
           {/* Replaced by false when the app is built for deployment, which
               leaves the panel out. */}
           {import.meta.env.DEV && (
