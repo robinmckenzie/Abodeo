@@ -499,11 +499,14 @@ export function createProjectStore(
       const derived: Person[] = [];
       const renamed = new Map<string, string>();
       for (const person of await deriveAccountPeople(client, userId)) {
-        const same = browserPeople.find(
-          (other) =>
-            other.id === person.id ||
-            other.name.toLocaleLowerCase() === person.name.toLocaleLowerCase(),
-        );
+        // The name decides first, so that browser people whose ids and names
+        // are crossed over do not all match the one with the same id.
+        const same =
+          browserPeople.find(
+            (other) =>
+              other.name.toLocaleLowerCase() ===
+              person.name.toLocaleLowerCase(),
+          ) ?? browserPeople.find((other) => other.id === person.id);
         if (!same) derived.push(person);
         else if (same.id !== person.id) renamed.set(person.id, same.id);
       }

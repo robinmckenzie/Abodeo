@@ -181,6 +181,7 @@ export default function Dashboard() {
   // Saves of tasks and new projects on their way, and whether the opened
   // project has changes not yet saved, for the warning on leaving the page.
   const sendingRef = useRef(0);
+  const browserCreatingKeyRef = useRef<string | null>(null);
   // The openings, current or closed, whose changes are not yet saved.
   const pendingKeysRef = useRef(new Set<string>());
   const unsavedIdsRef = useRef(unsavedIds);
@@ -627,7 +628,15 @@ export default function Dashboard() {
       | { ok: true; project: Project }
       | { ok: false; reason: ProjectSaveFailure | "changed-since-added" };
     if (view.kind === "browser") {
-      result = await createProject(open.values);
+      // Choosing someone can wait for another tab, so a second Create for
+      // the same form must not queue a second project.
+      if (browserCreatingKeyRef.current === key) return;
+      browserCreatingKeyRef.current = key;
+      try {
+        result = await createProject(open.values);
+      } finally {
+        browserCreatingKeyRef.current = null;
+      }
       refreshProjects();
     } else if (view.kind === "account" && view.state === "ready") {
       const { generation, accountId } = view;

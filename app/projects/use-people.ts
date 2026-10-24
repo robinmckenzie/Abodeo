@@ -226,7 +226,8 @@ export function usePeople(
   ) => {
     // Only for the account shown, so that an earlier account's answer does
     // not cancel the load of this one.
-    if (forAccountId === accountIdRef.current) loadsRef.current++;
+    if (forAccountId !== accountIdRef.current) return;
+    loadsRef.current++;
     setState({
       accountId: forAccountId,
       view: { status: "ready", people: result.people, isEstablished: true },

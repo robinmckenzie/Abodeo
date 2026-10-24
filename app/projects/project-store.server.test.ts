@@ -515,8 +515,8 @@ describe("the project store", () => {
           revision: 1,
         });
         await store.importProjects("ada", sent, [
-          { id: "boris", name: "Clement" },
           { id: "clement", name: "Andy" },
+          { id: "boris", name: "Clement" },
         ]);
         const assignee = (id: string) =>
           (fake.projects.find((row) => row.id === id)?.data as Project)
