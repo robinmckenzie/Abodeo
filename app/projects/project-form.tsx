@@ -86,10 +86,17 @@ export function ProjectForm({
   const id = useId();
   const onChangeRef = useRef(onChange);
   const projectKeyRef = useRef(projectKey);
+  const isMountedRef = useRef(true);
   useEffect(() => {
     onChangeRef.current = onChange;
     projectKeyRef.current = projectKey;
   });
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
   const options = [{ id: unassignedId, name: unassignedName }, ...people];
   // Someone no longer in the list shows as Unassigned.
@@ -223,7 +230,11 @@ export function ProjectForm({
                   const result = await onAddPerson(name);
                   // The latest onChange, as the form may have changed while
                   // the person was being added.
-                  if (result.ok && projectKeyRef.current === startedFor) {
+                  if (
+                    result.ok &&
+                    isMountedRef.current &&
+                    projectKeyRef.current === startedFor
+                  ) {
                     onChangeRef.current({ assignee: result.person.id });
                   }
                   return result;

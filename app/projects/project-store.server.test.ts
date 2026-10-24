@@ -491,6 +491,41 @@ describe("the project store", () => {
         ).toBe("u1");
       });
 
+      it("follows swapped names once and leaves unreadable projects alone", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        for (const [id, assignee] of [
+          ["a", "andy"],
+          ["c", "clement"],
+        ]) {
+          fake.projects.push({
+            user_id: "ada",
+            id,
+            data: savedForm(project(id, id, { assignee })),
+            revision: 1,
+          });
+        }
+        fake.projects.push({
+          user_id: "ada",
+          id: "future",
+          data: { version: 999, assignee: "andy" },
+          revision: 1,
+        });
+        await store.importProjects("ada", sent, [
+          { id: "boris", name: "Clement" },
+          { id: "clement", name: "Andy" },
+        ]);
+        const assignee = (id: string) =>
+          (fake.projects.find((row) => row.id === id)?.data as Project)
+            .assignee;
+        expect(assignee("a")).toBe("clement");
+        expect(assignee("c")).toBe("boris");
+        expect(assignee("future")).toBe("andy");
+      });
+
       it("matches people by name where the account has a list", async () => {
         const fake = createFakeDatabase();
         saveList(fake, [

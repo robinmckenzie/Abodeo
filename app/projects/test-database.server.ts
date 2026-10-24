@@ -149,14 +149,10 @@ export function createFakeDatabase() {
     }
     if (sql.startsWith("select pg_advisory_xact_lock")) return { rows: [] };
     if (sql.includes("to_jsonb($3::text)")) {
-      for (const row of projects) {
-        if (
-          row.user_id === userId &&
-          (row.data as { assignee?: string })?.assignee === values[1]
-        ) {
-          row.data = { ...(row.data as object), assignee: values[2] };
-          row.revision++;
-        }
+      const row = find(userId, values[1] as string);
+      if (row) {
+        row.data = { ...(row.data as object), assignee: values[2] };
+        row.revision++;
       }
       return { rows: [] };
     }

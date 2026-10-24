@@ -139,6 +139,9 @@ export function usePeople(
 ): PeopleSource {
   const browser = useBrowserPeople();
   const accountId = account.kind === "signed-in" ? account.id : null;
+  useEffect(() => {
+    accountIdRef.current = accountId;
+  });
   const isBrowser =
     account.kind === "signed-out" || account.kind === "not-configured";
   const [state, setState] = useState<AccountState | null>(null);
@@ -146,6 +149,7 @@ export function usePeople(
   // Counts the loads started and the changes shown, so that a list read
   // before a change is not shown over it.
   const loadsRef = useRef(0);
+  const accountIdRef = useRef<string | null>(null);
   const onAccountFailureRef = useRef(onAccountFailure);
   useEffect(() => {
     onAccountFailureRef.current = onAccountFailure;
@@ -220,7 +224,9 @@ export function usePeople(
     forAccountId: string,
     result: Extract<AccountPeopleChange, { ok: true }>,
   ) => {
-    loadsRef.current++;
+    // Only for the account shown, so that an earlier account's answer does
+    // not cancel the load of this one.
+    if (forAccountId === accountIdRef.current) loadsRef.current++;
     setState({
       accountId: forAccountId,
       view: { status: "ready", people: result.people, isEstablished: true },

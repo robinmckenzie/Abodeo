@@ -452,6 +452,33 @@ export function createProjectStore(
     },
   };
 
+  // The account's projects named a person by another id than the browser's
+  // person of the same name, so they follow the browser's person rather than
+  // becoming Unassigned. Each is changed once, from what it was, and only if
+  // it can be read.
+  async function followRenamedPeople(
+    client: Queryable,
+    userId: string,
+    renamed: Map<string, string>,
+  ) {
+    if (renamed.size === 0) return;
+    const { rows } = await client.query(
+      `select id, data from project
+       where user_id = $1 and data->>'assignee' = any($2::text[]) for update`,
+      [userId, [...renamed.keys()]],
+    );
+    for (const row of rows) {
+      const saved = readStoredProject(String(row.id), row.data);
+      if (!saved) continue;
+      await client.query(
+        `update project set data = jsonb_set(data, '{assignee}', to_jsonb($3::text)),
+         revision = revision + 1
+         where user_id = $1 and id = $2`,
+        [userId, String(row.id), renamed.get(saved.assignee)],
+      );
+    }
+  }
+
   // Gives who each moved project is assigned to: where the account has no
   // list, the browser's becomes the account's and people carry by id; where
   // it has, people are matched by name, and those without a match are
@@ -470,6 +497,7 @@ export function createProjectStore(
     let { rows } = await select();
     if (rows.length === 0 && browserPeople !== undefined) {
       const derived: Person[] = [];
+      const renamed = new Map<string, string>();
       for (const person of await deriveAccountPeople(client, userId)) {
         const same = browserPeople.find(
           (other) =>
@@ -477,17 +505,9 @@ export function createProjectStore(
             other.name.toLocaleLowerCase() === person.name.toLocaleLowerCase(),
         );
         if (!same) derived.push(person);
-        else if (same.id !== person.id) {
-          // The account's project named them by another id, so it follows
-          // the browser's person rather than becoming Unassigned.
-          await client.query(
-            `update project set data = jsonb_set(data, '{assignee}', to_jsonb($3::text)),
-             revision = revision + 1
-             where user_id = $1 and data->>'assignee' = $2`,
-            [userId, person.id, same.id],
-          );
-        }
+        else if (same.id !== person.id) renamed.set(person.id, same.id);
       }
+      await followRenamedPeople(client, userId, renamed);
       const list = [...browserPeople, ...derived];
       const inserted = await client.query(
         `insert into account_people (user_id, data) values ($1, $2::jsonb)
