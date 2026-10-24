@@ -609,25 +609,20 @@ describe("Dashboard", () => {
     ["a tall opened project only to its top", false, 800, 1200, 2500, 784],
     ["a new project to the page's end", true, 800, 600, 1500, 600],
     ["a long page's new project only to its top", true, 1000, 600, 3000, 984],
-  ])(
-    "scrolls %s",
-    async (_, isNew, barTop, height, pageHeight, scrolled) => {
-      await renderDashboard();
-      await addProject("Kitchen");
-      pressKey("e");
-      const layout = fakeLayout({ barTop, height, pageHeight });
-      try {
-        fireEvent.click(
-          isNew
-            ? screen.getByRole("button", { name: "Add project" })
-            : bars()[0],
-        );
-        expect(layout.scrollTop).toBe(scrolled);
-      } finally {
-        layout.restore();
-      }
-    },
-  );
+  ])("scrolls %s", async (_, isNew, barTop, height, pageHeight, scrolled) => {
+    await renderDashboard();
+    await addProject("Kitchen");
+    pressKey("e");
+    const layout = fakeLayout({ barTop, height, pageHeight });
+    try {
+      fireEvent.click(
+        isNew ? screen.getByRole("button", { name: "Add project" }) : bars()[0],
+      );
+      expect(layout.scrollTop).toBe(scrolled);
+    } finally {
+      layout.restore();
+    }
+  });
 
   it("scrolls back up to an opened project that moves up as another closes", async () => {
     await renderDashboard();
@@ -950,10 +945,40 @@ describe("tasks", () => {
     });
   }
 
-  it("are not part of the Add project form", async () => {
+  const newTasksBox = () =>
+    screen.getByRole("textbox", { name: "Add tasks, one per line" });
+
+  it("typed in the Add project form become the new project's tasks", async () => {
     await renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(screen.queryByRole("heading", { name: "Tasks" })).toBeNull();
+    fireEvent.change(titleField(), { target: { value: "Shed" } });
+    fireEvent.change(newTasksBox(), {
+      target: { value: "Paint\n\nOil hinges\nFit lock" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+    expect(
+      savedProjects()[0].tasks.map((t: { title: string }) => t.title),
+    ).toEqual(["Paint", "Oil hinges", "Fit lock"]);
+  });
+
+  it("create a project with no tasks when the Add project form's box is empty", async () => {
+    await renderDashboard();
+    await addProject("Shed");
+    expect(savedProjects()[0].tasks).toEqual([]);
+  });
+
+  it("typed in the Add project form are discarded by Cancel", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(newTasksBox(), { target: { value: "Paint" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    });
+    expect(savedProjects()).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(newTasksBox()).toHaveProperty("value", "");
   });
 
   it("adds a task per line with Enter, after the notes, and keeps them", async () => {
@@ -982,9 +1007,7 @@ describe("tasks", () => {
     ]);
     // Counted on the dashboard's bar.
     await closeForm();
-    expect(bars()[0].textContent).toBe(
-      "UnassignedKitchen3 tasks, 1 completed",
-    );
+    expect(bars()[0].textContent).toBe("UnassignedKitchen3 tasks, 1 completed");
     expect(bars()[0].getAttribute("aria-label")).toBe(
       "Kitchen, Unassigned, 3 tasks, 1 completed",
     );

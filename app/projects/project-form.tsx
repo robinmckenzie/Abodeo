@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { DueDatePicker } from "./due-date-picker";
 import { assignees, hasTitle, type ProjectFields } from "./projects";
+import { createTasks, readTaskEntries, type Task } from "./tasks";
 
 export type FormMessage = { text: string; isError: boolean } | null;
 
@@ -224,6 +225,12 @@ export function ProjectForm({
             value={values.notes}
             onChange={(event) => onChange({ notes: event.target.value })}
           />
+          {isNew && (
+            <NewProjectTasks
+              tasks={values.tasks}
+              onChange={(tasks) => onChange({ tasks })}
+            />
+          )}
           {tasks}
           {images}
         </div>
@@ -252,6 +259,45 @@ export function ProjectForm({
         )}
       </div>
     </form>
+  );
+}
+
+// The Add project form's box for tasks, one per line. The project has no
+// saved form yet, so the lines only become its tasks when Create saves it.
+// The text is kept here, as a line cannot be read back from a task without
+// losing what was typed, and starts from the form's tasks so that switching
+// presentation keeps it.
+function NewProjectTasks({
+  tasks,
+  onChange,
+}: {
+  tasks: Task[];
+  onChange: (tasks: Task[]) => void;
+}) {
+  const id = useId();
+  const [text, setText] = useState(() =>
+    tasks
+      .map((task) => (task.isDone ? `[x] ${task.title}` : task.title))
+      .join("\n"),
+  );
+  return (
+    <section className="task-section" aria-labelledby={`${id}-heading`}>
+      <h3 id={`${id}-heading`} className="task-heading">
+        Tasks
+      </h3>
+      <textarea
+        className="task-entry"
+        name="tasks"
+        rows={3}
+        value={text}
+        placeholder="Add tasks, one per line"
+        aria-label="Add tasks, one per line"
+        onChange={(event) => {
+          setText(event.target.value);
+          onChange(createTasks(readTaskEntries(event.target.value)));
+        }}
+      />
+    </section>
   );
 }
 
