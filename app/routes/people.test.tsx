@@ -68,6 +68,8 @@ const names = () =>
   within(screen.getByRole("list", { name: "People" }))
     .getAllByRole("listitem")
     .map((row) => row.querySelector(".people-name")?.textContent);
+const floatingMessage = () =>
+  document.querySelector(".floating-message")?.textContent;
 const addBox = () => screen.getByRole("textbox", { name: "Add a person" });
 
 async function press(name: string | RegExp) {
@@ -111,7 +113,7 @@ describe("the People screen", () => {
     await renderPeople();
     await add("  Dora   Lee ");
     expect(names()).toEqual(["Dora Lee"]);
-    expect(screen.getByRole("status").textContent).toBe("Dora Lee was added.");
+    expect(floatingMessage()).toBe("Dora Lee was added.");
     expect((addBox() as HTMLInputElement).value).toBe("");
     expect(readStoredPeople()).toMatchObject({
       people: [{ name: "Dora Lee" }],
@@ -212,7 +214,7 @@ describe("the People screen", () => {
     expect(
       loaded.ok && loaded.projects.map((project) => project.assignee).sort(),
     ).toEqual(["boris", "unassigned", "unassigned"]);
-    expect(screen.getByRole("status").textContent).toBe("Andy was removed.");
+    expect(floatingMessage()).toBe("Andy was removed.");
   });
 
   it("keeps everything when the removal is cancelled", async () => {

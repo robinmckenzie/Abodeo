@@ -5,6 +5,10 @@ import type { Route } from "./+types/people";
 import { useAccount } from "../account/use-account";
 import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
+import {
+  FloatingMessages,
+  useFloatingMessages,
+} from "../projects/floating-messages";
 import { personNameMaxLength, type Person } from "../projects/people";
 import {
   describePersonFailure,
@@ -52,6 +56,7 @@ export default function People() {
   const [removal, setRemoval] = useState<Removal | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { boxes: messageBoxes, showMessage } = useFloatingMessages();
 
   const fail = (reason: PersonFailure) =>
     setMessage(describePersonFailure(reason));
@@ -83,7 +88,7 @@ export default function People() {
     setBusyId(null);
     if (result.ok) {
       setRemoval(null);
-      setMessage(`${confirmed.person.name} was removed.`);
+      showMessage(`${confirmed.person.name} was removed.`);
     } else if (result.reason === "count-changed") {
       setRemoval({
         person: confirmed.person,
@@ -185,10 +190,15 @@ export default function People() {
                 ))}
               </ul>
             )}
-            <AddPersonForm source={source} onMessage={setMessage} />
+            <AddPersonForm
+              source={source}
+              onMessage={setMessage}
+              showMessage={showMessage}
+            />
           </>
         )}
       </main>
+      <FloatingMessages boxes={messageBoxes} />
     </div>
   );
 }
@@ -295,9 +305,11 @@ function PersonRow({
 function AddPersonForm({
   source,
   onMessage,
+  showMessage,
 }: {
   source: PeopleSource;
   onMessage: (message: string | null) => void;
+  showMessage: (message: string) => void;
 }) {
   const id = useId();
   const [name, setName] = useState("");
@@ -318,7 +330,7 @@ function AddPersonForm({
         if (result.ok) {
           setName("");
           setProblem(null);
-          onMessage(`${result.person.name} was added.`);
+          showMessage(`${result.person.name} was added.`);
         } else {
           setProblem(result.reason);
         }
