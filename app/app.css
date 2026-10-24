@@ -483,6 +483,9 @@ body:has(.dashboard) {
   align-items: flex-start;
   gap: 1rem;
   justify-content: flex-end;
+  /* The height of Add project, so that a screen without it has its title in
+     the same place. */
+  min-height: 2.6rem;
   margin-bottom: 1.25rem;
 }
 
@@ -2278,16 +2281,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   font-size: 0.8125rem;
 }
 
-/* The People screen. */
-.people-page main {
-  max-width: 36rem;
-  padding: 0 1.5rem 3rem;
-}
-
-.people-page h2 {
-  margin: 0 0 0.5rem;
-}
-
+/* The People screen. Its title is in the same toolbar as the Projects title,
+   in the same place. */
 .people-hint,
 .people-empty {
   color: #6b665c;

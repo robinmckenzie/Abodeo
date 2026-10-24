@@ -117,7 +117,9 @@ export default function People() {
         />
       </header>
       <main>
-        <h2>People</h2>
+        <div className="dashboard-toolbar">
+          <h2>People</h2>
+        </div>
         <p className="people-hint">
           Projects can be assigned to the people listed here.{" "}
           {isSignedIn
