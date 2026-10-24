@@ -216,6 +216,16 @@ export function ProjectForm({
                     value={assignee.id}
                     checked={assigned === assignee.id}
                     onChange={() => onChange({ assignee: assignee.id })}
+                    // Unassigned shows as chosen for someone no longer in the
+                    // list, so choosing it again changes nothing by itself.
+                    onClick={() => {
+                      if (
+                        assigned === assignee.id &&
+                        values.assignee !== assignee.id
+                      ) {
+                        onChange({ assignee: assignee.id });
+                      }
+                    }}
                   />
                   <AssigneeIcon isSelected={assigned === assignee.id} />
                   <span>{assignee.name}</span>

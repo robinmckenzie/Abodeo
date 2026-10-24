@@ -141,9 +141,11 @@ export function useAccount({
       );
       const { id, name, email } = session;
       const shown = viewRef.current;
-      // The same account: its profile is already shown.
+      // The same account: its profile is already shown. One still loading
+      // may have been started by a screen that has gone, so it is looked up
+      // again.
       if (shown.kind === "signed-in" && shown.id === id) {
-        if (shown.profile !== "unavailable") return;
+        if (shown.profile === "ready") return;
       } else {
         setView({
           kind: "signed-in",

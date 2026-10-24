@@ -780,6 +780,14 @@ export default function Dashboard() {
     setMoveOffer({ ...moveOffer, status: "moving" });
     // The browser's people go with its projects.
     const stored = readStoredPeople();
+    // A damaged list stops the move, so that no one loses who they were
+    // assigned to and the browser's copies are kept.
+    if (stored.state === "unreadable" || stored.state === "unavailable") {
+      setMoveOffer((current) =>
+        current?.key === key ? { ...current, status: "failed" } : current,
+      );
+      return;
+    }
     const result = await whileSending(
       importProjects(
         view.accountId,

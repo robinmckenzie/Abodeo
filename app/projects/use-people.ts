@@ -150,6 +150,9 @@ export function usePeople(
   // before a change is not shown over it.
   const loadsRef = useRef(0);
   const accountIdRef = useRef<string | null>(null);
+  // The newest revision shown for each account, so that an answer that
+  // arrives late does not replace a newer list.
+  const revisionsRef = useRef(new Map<string, number>());
   const onAccountFailureRef = useRef(onAccountFailure);
   useEffect(() => {
     onAccountFailureRef.current = onAccountFailure;
@@ -165,6 +168,9 @@ export function usePeople(
       const result = await loadAccountPeople(accountId);
       if (!isCurrent || thisLoad !== loadsRef.current) return;
       if (result.ok) {
+        const newest = revisionsRef.current.get(accountId) ?? -1;
+        if (result.revision < newest) return;
+        revisionsRef.current.set(accountId, result.revision);
         setState({
           accountId,
           view: {
@@ -227,6 +233,9 @@ export function usePeople(
     // Only for the account shown, so that an earlier account's answer does
     // not cancel the load of this one.
     if (forAccountId !== accountIdRef.current) return;
+    const newest = revisionsRef.current.get(forAccountId) ?? -1;
+    if (result.revision < newest) return;
+    revisionsRef.current.set(forAccountId, result.revision);
     loadsRef.current++;
     setState({
       accountId: forAccountId,

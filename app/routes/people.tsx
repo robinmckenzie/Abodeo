@@ -23,6 +23,9 @@ export const meta: Route.MetaFunction = () => [
 
 // Removing someone assigned to projects, waiting for a confirmation.
 type Removal = {
+  // Where the count was taken, so that it is not confirmed against another
+  // list if the account changes.
+  storeKey: string;
   person: Person;
   count: number;
   unreadable: number;
@@ -30,7 +33,11 @@ type Removal = {
   notice?: string;
 };
 
-export function describeRemoval({ person, count, unreadable }: Removal) {
+export function describeRemoval({
+  person,
+  count,
+  unreadable,
+}: Pick<Removal, "person" | "count" | "unreadable">) {
   const assigned =
     count === 0
       ? `${person.name} is not assigned to any project.`
@@ -53,7 +60,10 @@ export default function People() {
   const source = usePeople(account.view, { onAccountFailure: account.recheck });
   const { view } = source;
   const isSignedIn = account.view.kind === "signed-in";
-  const [removal, setRemoval] = useState<Removal | null>(null);
+  const storeKey =
+    account.view.kind === "signed-in" ? account.view.id : "browser";
+  const [shownRemoval, setRemoval] = useState<Removal | null>(null);
+  const removal = shownRemoval?.storeKey === storeKey ? shownRemoval : null;
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const { boxes: messageBoxes, showMessage } = useFloatingMessages();
@@ -72,14 +82,15 @@ export default function People() {
       return;
     }
     if (counted.count === 0) {
-      await finishRemoval({ person, ...counted });
+      await finishRemoval({ storeKey, person, ...counted });
       return;
     }
     setBusyId(null);
-    setRemoval({ person, ...counted });
+    setRemoval({ storeKey, person, ...counted });
   };
 
   const finishRemoval = async (confirmed: Removal) => {
+    if (confirmed.storeKey !== storeKey) return;
     setBusyId(confirmed.person.id);
     const result = await source.removePerson(
       confirmed.person.id,
@@ -91,6 +102,7 @@ export default function People() {
       showMessage(`${confirmed.person.name} was removed.`);
     } else if (result.reason === "count-changed") {
       setRemoval({
+        storeKey: confirmed.storeKey,
         person: confirmed.person,
         count: result.count,
         unreadable: result.unreadable,

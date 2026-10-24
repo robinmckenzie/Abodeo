@@ -37,6 +37,16 @@ export function AppMenu({
                 to={path}
                 aria-current={path === current ? "page" : undefined}
                 onClick={async (event) => {
+                  // Opening in another tab or window is left to the browser.
+                  if (
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
                   // Staying on the screen needs no leave.
                   if (path === current) {
                     event.preventDefault();

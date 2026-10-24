@@ -429,6 +429,20 @@ describe("the project store", () => {
         { id: "x2", name: "Boris" },
       ];
 
+      it("stops the move when the account's list is damaged", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", [], browser);
+        fake.people.get("ada")!.data = { version: 99 };
+        await expect(
+          store.importProjects("ada", sent, browser),
+        ).rejects.toThrow("account-people-unreadable");
+        expect(fake.projects).toEqual([]);
+      });
+
       it("makes the browser's list the account's, carrying people by id", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {

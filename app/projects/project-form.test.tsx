@@ -90,6 +90,13 @@ describe("ProjectForm", () => {
     expect((unassigned as HTMLInputElement).checked).toBe(true);
   });
 
+  it("lets Unassigned be chosen for someone no longer in the list", () => {
+    const onChange = vi.fn();
+    renderForm(true, null, { assignee: "zed", onChange });
+    fireEvent.click(screen.getByRole("radio", { name: "Unassigned" }));
+    expect(onChange).toHaveBeenCalledWith({ assignee: "unassigned" });
+  });
+
   it("does not delay the form by the length of the list", () => {
     const many = Array.from({ length: 15 }, (_, i) => ({
       id: `p${i}`,

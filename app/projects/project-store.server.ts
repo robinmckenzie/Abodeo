@@ -527,7 +527,10 @@ export function createProjectStore(
       ({ rows } = await select());
     }
     if (rows.length === 0) return () => unassignedId;
-    const accountPeople = readPeople(rows[0].data) ?? [];
+    // A damaged list stops the move, so that no one loses who they were
+    // assigned to.
+    const accountPeople = readPeople(rows[0].data);
+    if (!accountPeople) throw new Error("account-people-unreadable");
     const matches = mapAssigneesByName(browserPeople ?? [], accountPeople);
     return (assignee) => matches.get(assignee) ?? unassignedId;
   }
