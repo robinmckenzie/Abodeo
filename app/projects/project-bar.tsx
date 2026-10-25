@@ -60,12 +60,16 @@ export function ProjectBar({
   onOpen: (barHeight: number) => void;
 }) {
   const assigneeName = people ? findAssigneeName(people, project.assignee) : "";
+  const assigneeJobTitle = people
+    ? people.find(({ id }) => id === project.assignee)?.jobTitle
+    : undefined;
   const taskCount = describeTaskCount(project.tasks);
   // Screen readers hear the title first, and not the notes preview, whose
   // notes they read once the project is opened.
   const label = [
     project.title,
     assigneeName,
+    assigneeJobTitle,
     project.dueDate && `due ${describeDueDate(project.dueDate)}`,
     taskCount,
     hasUnsavedChanges && "last changes not saved",
@@ -82,7 +86,12 @@ export function ProjectBar({
         onClick={(event) => onOpen(event.currentTarget.offsetHeight)}
       >
         <span className="project-bar-side">
-          <span className="project-bar-assignee">{assigneeName}</span>
+          <span className="project-bar-assignee">
+            {assigneeName}
+            {assigneeJobTitle && (
+              <span className="project-bar-job-title">{assigneeJobTitle}</span>
+            )}
+          </span>
           {project.dueDate && <DueDateIcon dueDate={project.dueDate} />}
         </span>
         <span className="project-bar-text">

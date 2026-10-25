@@ -681,9 +681,14 @@ body:has(.dashboard) {
   gap: 0.625rem;
 }
 
+/* The sizes of the name and job title in the Assigned To list. */
 .project-bar-assignee {
   color: #6b665c;
-  font-size: 0.9rem;
+}
+
+.project-bar-job-title {
+  display: block;
+  font-size: 0.8125rem;
 }
 
 /* A calendar page whose spiral's rings stand above its top edge, with the
