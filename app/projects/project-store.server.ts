@@ -32,7 +32,7 @@ import {
 import {
   parseProject,
   serialiseProject,
-  sortProjects,
+  sortProjectsByDueDate,
   unassignedId,
   type Project,
   type ProjectFields,
@@ -315,7 +315,7 @@ export function createProjectStore(
         latestRows.map((row) => [String(row.project_id), String(row.id)]),
       );
       return {
-        projects: sortProjects(projects),
+        projects: sortProjectsByDueDate(projects),
         unreadableCount,
         defaultIds: record?.ids ?? [],
         latestImageIds,

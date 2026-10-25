@@ -258,8 +258,8 @@ describe("the project store", () => {
       const listed = await store.list("ada");
 
       expect(listed.projects.map((p) => [p.id, p.title, p.notes])).toEqual([
-        ["d1", "Welcome back", ""],
         ["mine", "Mine", ""],
+        ["d1", "Welcome back", ""],
       ]);
     });
 

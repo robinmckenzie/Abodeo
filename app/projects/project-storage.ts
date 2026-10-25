@@ -19,7 +19,7 @@ import {
   hasTitle,
   parseProject,
   serialiseProject,
-  sortProjects,
+  sortProjectsByDueDate,
   unassignedId,
   type Project,
   type ProjectFields,
@@ -64,7 +64,11 @@ export function loadProjects(): LoadResult {
       if (project) projects.push(project);
       else unreadableCount++;
     }
-    return { ok: true, projects: sortProjects(projects), unreadableCount };
+    return {
+      ok: true,
+      projects: sortProjectsByDueDate(projects),
+      unreadableCount,
+    };
   } catch {
     return { ok: false };
   }
