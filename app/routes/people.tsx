@@ -75,6 +75,31 @@ export default function People() {
   const fail = (reason: PersonFailure) =>
     setMessage(describePersonFailure(reason));
 
+  // The person being dragged, and where they would go: before the person at
+  // this index, or at the end.
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  const movePerson = async (id: string, toIndex: number) => {
+    setMessage(null);
+    const result = await source.movePerson(id, toIndex);
+    if (!result.ok) fail(result.reason);
+  };
+
+  const endDrag = () => {
+    setDraggedId(null);
+    setDropIndex(null);
+  };
+
+  const dropPerson = () => {
+    if (view.status === "ready" && draggedId && dropIndex !== null) {
+      const from = view.people.findIndex(({ id }) => id === draggedId);
+      const to = dropIndex > from ? dropIndex - 1 : dropIndex;
+      if (from !== -1 && to !== from) void movePerson(draggedId, to);
+    }
+    endDrag();
+  };
+
   const startRemoval = async (person: Person) => {
     setMessage(null);
     setRemoval(null);
@@ -193,11 +218,42 @@ export default function People() {
             {view.people.length === 0 ? (
               <p className="people-empty">No people added yet.</p>
             ) : (
-              <ul className="people-list" aria-label="People">
-                {view.people.map((person) => (
+              <ul
+                className="people-list"
+                aria-label="People"
+                onDragOver={(event) => {
+                  if (!draggedId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  if (!draggedId) return;
+                  event.preventDefault();
+                  dropPerson();
+                }}
+              >
+                {view.people.map((person, index) => (
                   <PersonRow
                     key={person.id}
                     person={person}
+                    index={index}
+                    count={view.people.length}
+                    isDragged={person.id === draggedId}
+                    dropEdge={
+                      dropIndex === index
+                        ? "before"
+                        : dropIndex === view.people.length &&
+                            index === view.people.length - 1
+                          ? "after"
+                          : null
+                    }
+                    isDragging={draggedId !== null}
+                    onDragStart={() => setDraggedId(person.id)}
+                    onDragOver={(isLowerHalf) =>
+                      setDropIndex(isLowerHalf ? index + 1 : index)
+                    }
+                    onDragEnd={endDrag}
+                    onMove={(step) => void movePerson(person.id, index + step)}
                     isBusy={busyId !== null}
                     source={source}
                     onMessage={setMessage}
@@ -221,12 +277,30 @@ export default function People() {
 
 function PersonRow({
   person,
+  index,
+  count,
+  isDragged,
+  dropEdge,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onMove,
   isBusy,
   source,
   onMessage,
   onRemove,
 }: {
   person: Person;
+  index: number;
+  count: number;
+  isDragged: boolean;
+  dropEdge: "before" | "after" | null;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragOver: (isLowerHalf: boolean) => void;
+  onDragEnd: () => void;
+  onMove: (step: -1 | 1) => void;
   isBusy: boolean;
   source: PeopleSource;
   onMessage: (message: string | null) => void;
@@ -266,12 +340,80 @@ function PersonRow({
 
   if (draft === null) {
     return (
-      <li className="people-row">
+      <li
+        className={[
+          "people-row",
+          isDragged && "is-dragged",
+          dropEdge === "before" && "drops-before",
+          dropEdge === "after" && "drops-after",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        onDragOver={(event) => {
+          if (!isDragging) return;
+          const box = event.currentTarget.getBoundingClientRect();
+          onDragOver(event.clientY > box.top + box.height / 2);
+        }}
+      >
+        <span
+          className="task-drag"
+          draggable
+          aria-hidden="true"
+          title="Drag to reorder"
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+              "application/x-abodeo-person",
+              person.id,
+            );
+            const row = event.currentTarget.closest("li");
+            if (row) event.dataTransfer.setDragImage(row, 12, 12);
+            onDragStart();
+          }}
+          onDragEnd={onDragEnd}
+        >
+          <svg viewBox="0 0 10 16">
+            <circle cx="3" cy="3" r="1.25" />
+            <circle cx="7" cy="3" r="1.25" />
+            <circle cx="3" cy="8" r="1.25" />
+            <circle cx="7" cy="8" r="1.25" />
+            <circle cx="3" cy="13" r="1.25" />
+            <circle cx="7" cy="13" r="1.25" />
+          </svg>
+        </span>
         <span className="people-name">
           {person.name}
           {person.jobTitle && (
             <span className="people-job-title">{person.jobTitle}</span>
           )}
+        </span>
+        <span className="task-controls">
+          <button
+            type="button"
+            className="task-button"
+            aria-label={`Move ${person.name} up`}
+            aria-disabled={index === 0 || undefined}
+            onClick={() => {
+              if (index > 0) onMove(-1);
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 13V3M4 7l4-4 4 4" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="task-button"
+            aria-label={`Move ${person.name} down`}
+            aria-disabled={index === count - 1 || undefined}
+            onClick={() => {
+              if (index < count - 1) onMove(1);
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 3v10M4 9l4 4 4-4" />
+            </svg>
+          </button>
         </span>
         <button
           ref={editButtonRef}

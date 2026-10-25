@@ -124,6 +124,21 @@ export function renamePerson(
   };
 }
 
+// Moves the person to the place in the list, counted after taking them out.
+// Sending the same move again changes nothing more.
+export function movePerson(
+  people: readonly Person[],
+  id: string,
+  toIndex: number,
+): ListChange {
+  const from = people.findIndex((person) => person.id === id);
+  if (from === -1) return { ok: false, problem: "not-found" };
+  const next = [...people];
+  const [person] = next.splice(from, 1);
+  next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, person);
+  return { ok: true, people: next };
+}
+
 export function removePerson(people: readonly Person[], id: string) {
   return people.filter((person) => person.id !== id);
 }

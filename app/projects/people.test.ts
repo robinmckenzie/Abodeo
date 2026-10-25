@@ -8,6 +8,7 @@ import {
   findAssigneeName,
   isKnownAssignee,
   mapAssigneesByName,
+  movePerson,
   normalisePersonName,
   parsePeople,
   removePerson,
@@ -249,5 +250,26 @@ describe("job titles", () => {
   it("keeps a job title through saving and reading", () => {
     const titled = [{ ...andy, jobTitle: "Plumber" }, boris];
     expect(parsePeople(serialisePeople(titled))).toEqual(titled);
+  });
+});
+
+describe("moving a person", () => {
+  it("moves them to a place in the list", () => {
+    expect(movePerson(people, "andy", 1)).toEqual({
+      ok: true,
+      people: [boris, andy],
+    });
+    expect(movePerson(people, "boris", 0)).toEqual({
+      ok: true,
+      people: [boris, andy],
+    });
+  });
+
+  it("keeps a move to the same place as it is, and refuses someone not in the list", () => {
+    expect(movePerson(people, "andy", 0)).toEqual({ ok: true, people });
+    expect(movePerson(people, "nobody", 0)).toEqual({
+      ok: false,
+      problem: "not-found",
+    });
   });
 });

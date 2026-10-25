@@ -274,7 +274,8 @@ describe("the people store", () => {
       people: [{ id: "b", name: "Dora" }],
     });
     for (const { text, values } of fake.statements) {
-      if (/^(begin|commit|rollback|set local|select pg_advisory)/.test(text)) continue;
+      if (/^(begin|commit|rollback|set local|select pg_advisory)/.test(text))
+        continue;
       expect(text).toMatch(/user_id = \$1|values \(\$1/);
       expect(["ada", "bob"]).toContain(values[0]);
     }

@@ -119,6 +119,15 @@ export function renameAccountPerson(
   return change(accountId, { op: "rename", id, name, jobTitle }, fetchFn);
 }
 
+export function moveAccountPerson(
+  accountId: string,
+  id: string,
+  toIndex: number,
+  fetchFn: Fetch = fetch,
+) {
+  return change(accountId, { op: "move", id, toIndex }, fetchFn);
+}
+
 // Saves the list as it is, once the move of the browser's projects is
 // settled.
 export function establishAccountPeople(

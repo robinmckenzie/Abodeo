@@ -5,6 +5,7 @@
 import {
   addPerson,
   countAssignedProjects,
+  movePerson,
   derivePeopleFromProjects,
   removePerson,
   renamePerson,
@@ -75,6 +76,10 @@ export function renameStoredPerson(
   jobTitle?: string,
 ) {
   return changeList((people) => renamePerson(people, id, name, jobTitle));
+}
+
+export function moveStoredPerson(id: string, toIndex: number) {
+  return changeList((people) => movePerson(people, id, toIndex));
 }
 
 // How many readable projects are assigned to the person.
