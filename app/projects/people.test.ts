@@ -11,8 +11,10 @@ import {
   isKnownAssignee,
   mapAssigneesByName,
   movePerson,
+  normalisePersonJobTitle,
   normalisePersonName,
   parsePeople,
+  readPeople,
   removePerson,
   renamePerson,
   serialisePeople,
@@ -27,6 +29,19 @@ const people: Person[] = [andy, boris];
 describe("person names", () => {
   it("drops surrounding spaces and joins runs of spaces", () => {
     expect(normalisePersonName("  Mary   Ann \t Lee ")).toBe("Mary Ann Lee");
+  });
+
+  it("keeps a cut job title loadable when the cut falls on a space", () => {
+    const title = normalisePersonJobTitle(
+      "Senior heating and ventilation engineer trainee",
+    );
+    expect(title).toBe(title.trimEnd());
+    expect(
+      readPeople({
+        version: 1,
+        people: [{ id: "p1", name: "", jobTitle: title }],
+      }),
+    ).not.toBeNull();
   });
 
   it("accepts a name as it would be kept", () => {

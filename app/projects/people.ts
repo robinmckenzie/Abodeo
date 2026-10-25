@@ -37,7 +37,9 @@ export function normalisePersonName(name: string) {
 
 // A job title is tidied like a name and cut to its length. Empty is none.
 export function normalisePersonJobTitle(jobTitle: string | undefined) {
-  return normalisePersonName(jobTitle ?? "").slice(0, personJobTitleMaxLength);
+  return normalisePersonName(jobTitle ?? "")
+    .slice(0, personJobTitleMaxLength)
+    .trimEnd();
 }
 
 function withJobTitle(person: Person, jobTitle: string | undefined): Person {
