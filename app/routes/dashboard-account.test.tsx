@@ -452,6 +452,23 @@ describe("leaving to sign in or out", () => {
     expect(signInStarted(server)).toBe(true);
   });
 
+  it("asks before losing tasks typed in a new project not yet added", async () => {
+    const server = fakeServer();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "Paint" } },
+    );
+
+    await click(signInButton());
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(confirm.mock.calls[0][0]).toMatch(/the new project/);
+    expect(signInStarted(server)).toBe(false);
+  });
+
   it("asks before losing a new project not yet added, and stays if asked to", async () => {
     const server = fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);

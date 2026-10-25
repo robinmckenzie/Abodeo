@@ -214,4 +214,45 @@ describe("ProjectForm's due date", () => {
     expect(screen.getByRole("group", { name: "January 0" })).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("offers a box for tasks in a new project only", () => {
+    renderForm();
+    expect(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+    ).toBeTruthy();
+    cleanup();
+    renderForm(false);
+    expect(
+      screen.queryByRole("textbox", { name: "Add tasks, one per line" }),
+    ).toBeNull();
+  });
+
+  it("turns the lines typed into tasks, ignoring blank lines", () => {
+    const onChange = vi.fn();
+    render(
+      <ProjectForm
+        values={newProjectFields}
+        isNew
+        message={null}
+        getFocusField={() => "title"}
+        onChange={onChange}
+        onFieldFocus={vi.fn()}
+        onFieldBlur={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "Buy paint\n\n  Fetch ladder  \n- [x] Hang door" } },
+    );
+    const { tasks } = onChange.mock.calls.at(-1)![0];
+    expect(
+      tasks.map((t: { title: string; isDone: boolean }) => [t.title, t.isDone]),
+    ).toEqual([
+      ["Buy paint", false],
+      ["Fetch ladder", false],
+      ["Hang door", false],
+    ]);
+  });
 });
