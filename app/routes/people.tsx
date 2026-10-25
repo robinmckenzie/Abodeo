@@ -10,6 +10,8 @@ import {
   useFloatingMessages,
 } from "../projects/floating-messages";
 import {
+  describePerson,
+  findSubtitle,
   personJobTitleMaxLength,
   personNameMaxLength,
   type Person,
@@ -42,12 +44,13 @@ export function describeRemoval({
   count,
   unreadable,
 }: Pick<Removal, "person" | "count" | "unreadable">) {
+  const name = describePerson(person);
   const assigned =
     count === 0
-      ? `${person.name} is not assigned to any project.`
+      ? `${name} is not assigned to any project.`
       : count === 1
-        ? `${person.name} is assigned to 1 project. Removing ${person.name} sets it to Unassigned.`
-        : `${person.name} is assigned to ${count} projects. Removing ${person.name} sets them to Unassigned.`;
+        ? `${name} is assigned to 1 project. Removing ${name} sets it to Unassigned.`
+        : `${name} is assigned to ${count} projects. Removing ${name} sets them to Unassigned.`;
   const left =
     unreadable === 0
       ? ""
@@ -124,7 +127,7 @@ export default function People() {
     setBusyId(null);
     if (result.ok) {
       setRemoval(null);
-      showMessage(`${confirmed.person.name} was removed.`);
+      showMessage(`${describePerson(confirmed.person)} was removed.`);
     } else if (result.reason === "count-changed") {
       setRemoval({
         storeKey: confirmed.storeKey,
@@ -189,7 +192,7 @@ export default function People() {
           <div
             className="people-confirm dashboard-notice"
             role="alertdialog"
-            aria-label={`Remove ${removal.person.name}`}
+            aria-label={`Remove ${describePerson(removal.person)}`}
           >
             {removal.notice && <p>{removal.notice}</p>}
             <p>{describeRemoval(removal)}</p>
@@ -378,16 +381,16 @@ function PersonRow({
           </svg>
         </span>
         <span className="people-name">
-          {person.name}
-          {person.jobTitle && (
-            <span className="people-job-title">{person.jobTitle}</span>
+          {describePerson(person)}
+          {findSubtitle(person) && (
+            <span className="people-job-title">{findSubtitle(person)}</span>
           )}
         </span>
         <span className="task-controls">
           <button
             type="button"
             className="task-button"
-            aria-label={`Move ${person.name} up`}
+            aria-label={`Move ${describePerson(person)} up`}
             aria-disabled={index === 0 || undefined}
             onClick={() => {
               if (index > 0) onMove(-1);
@@ -400,7 +403,7 @@ function PersonRow({
           <button
             type="button"
             className="task-button"
-            aria-label={`Move ${person.name} down`}
+            aria-label={`Move ${describePerson(person)} down`}
             aria-disabled={index === count - 1 || undefined}
             onClick={() => {
               if (index < count - 1) onMove(1);
@@ -414,7 +417,7 @@ function PersonRow({
         <button
           ref={editButtonRef}
           type="button"
-          aria-label={`Rename ${person.name}`}
+          aria-label={`Rename ${describePerson(person)}`}
           disabled={isBusy}
           onClick={() => {
             setDraft(person.name);
@@ -425,7 +428,7 @@ function PersonRow({
         </button>
         <button
           type="button"
-          aria-label={`Remove ${person.name}`}
+          aria-label={`Remove ${describePerson(person)}`}
           disabled={isBusy}
           onClick={onRemove}
         >
@@ -438,7 +441,7 @@ function PersonRow({
   return (
     <li className="people-row is-editing">
       <label htmlFor={inputId} className="people-edit-label">
-        Name for {person.name}
+        Name for {describePerson(person)}
       </label>
       <input
         id={inputId}
@@ -454,7 +457,7 @@ function PersonRow({
         onKeyDown={onKeyDown}
       />
       <label htmlFor={jobTitleInputId} className="people-edit-label">
-        Job title for {person.name} (optional)
+        Job title for {describePerson(person)} (optional)
       </label>
       <input
         id={jobTitleInputId}
@@ -510,7 +513,7 @@ function AddPersonForm({
           setName("");
           setJobTitle("");
           setProblem(null);
-          showMessage(`${result.person.name} was added.`);
+          showMessage(`${describePerson(result.person)} was added.`);
         } else {
           setProblem(result.reason);
         }

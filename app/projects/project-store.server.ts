@@ -504,8 +504,9 @@ export function createProjectStore(
         const same =
           browserPeople.find(
             (other) =>
+              person.name !== "" &&
               other.name.toLocaleLowerCase() ===
-              person.name.toLocaleLowerCase(),
+                person.name.toLocaleLowerCase(),
           ) ?? browserPeople.find((other) => other.id === person.id);
         if (!same) derived.push(person);
         else if (same.id !== person.id) renamed.set(person.id, same.id);

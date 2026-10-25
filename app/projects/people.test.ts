@@ -5,6 +5,8 @@ import {
   checkPersonName,
   countAssignedProjects,
   derivePeopleFromProjects,
+  describePerson,
+  findSubtitle,
   findAssigneeName,
   isKnownAssignee,
   mapAssigneesByName,
@@ -271,5 +273,53 @@ describe("moving a person", () => {
       ok: false,
       problem: "not-found",
     });
+  });
+});
+
+describe("a person with only a job title", () => {
+  it("is added and renamed with an empty name when there is a job title", () => {
+    const added = addPerson(people, "c1", " ", "Plumber");
+    expect(added).toEqual({
+      ok: true,
+      people: [andy, boris, { id: "c1", name: "", jobTitle: "Plumber" }],
+    });
+    expect(renamePerson(people, "andy", "", "Plumber")).toEqual({
+      ok: true,
+      people: [{ id: "andy", name: "", jobTitle: "Plumber" }, boris],
+    });
+  });
+
+  it("needs a name or a job title", () => {
+    expect(addPerson(people, "c1", " ", " ")).toEqual({
+      ok: false,
+      problem: "blank",
+    });
+    expect(renamePerson(people, "andy", "")).toEqual({
+      ok: false,
+      problem: "blank",
+    });
+  });
+
+  it("does not clash with another person who has no name", () => {
+    const first = { id: "x1", name: "", jobTitle: "Plumber" };
+    expect(addPerson([first], "x2", "", "Electrician").ok).toBe(true);
+  });
+
+  it("is called by the job title, with no subtitle", () => {
+    const person = { id: "x1", name: "", jobTitle: "Plumber" };
+    expect(describePerson(person)).toBe("Plumber");
+    expect(findSubtitle(person)).toBeUndefined();
+    expect(findSubtitle({ ...andy, jobTitle: "Plumber" })).toBe("Plumber");
+    expect(findAssigneeName([person], "x1")).toBe("Plumber");
+  });
+
+  it("keeps an empty name through saving and reading, only with a job title", () => {
+    const titled = [{ id: "x1", name: "", jobTitle: "Plumber" }];
+    expect(parsePeople(serialisePeople(titled))).toEqual(titled);
+    expect(
+      parsePeople(
+        JSON.stringify({ version: 1, people: [{ id: "x1", name: "" }] }),
+      ),
+    ).toBeNull();
   });
 });

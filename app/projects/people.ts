@@ -4,7 +4,8 @@
 // offered first, and cannot be added, renamed or removed.
 import { isPersonId, unassignedId, type Project } from "./projects";
 
-// The job title is optional, and is left out when there is none.
+// A person has a name, a job title or both: the name is empty when only the
+// job title is known, and the job title is left out when there is none.
 export type Person = { id: string; name: string; jobTitle?: string };
 
 export const unassignedName = "Unassigned";
@@ -24,7 +25,7 @@ export const peopleVersion = 1;
 export type PersonNameProblem = "blank" | "too-long" | "duplicate";
 
 export const personNameMessages: Record<PersonNameProblem, string> = {
-  blank: "Enter a name.",
+  blank: "Enter a name or a job title.",
   "too-long": `Use ${personNameMaxLength} characters or fewer.`,
   duplicate: "Someone with that name is already in the list.",
 };
@@ -49,13 +50,19 @@ function isSameName(a: string, b: string) {
 }
 
 // The name as it would be kept, or what is wrong with it. "Unassigned" counts
-// as taken, as it is always in the list.
+// as taken, as it is always in the list. With a job title, the name may be
+// empty, and an empty name is never taken.
 export function checkPersonName(
   name: string,
   others: readonly Person[],
+  hasJobTitle = false,
 ): { ok: true; name: string } | { ok: false; problem: PersonNameProblem } {
   const normalised = normalisePersonName(name);
-  if (normalised === "") return { ok: false, problem: "blank" };
+  if (normalised === "") {
+    return hasJobTitle
+      ? { ok: true, name: "" }
+      : { ok: false, problem: "blank" };
+  }
   if (normalised.length > personNameMaxLength) {
     return { ok: false, problem: "too-long" };
   }
@@ -92,7 +99,11 @@ export function addPerson(
       ? { ok: true, people: [...people] }
       : { ok: false, problem: "duplicate" };
   }
-  const checked = checkPersonName(name, people);
+  const checked = checkPersonName(
+    name,
+    people,
+    normalisePersonJobTitle(jobTitle) !== "",
+  );
   if (!checked.ok) return checked;
   return {
     ok: true,
@@ -112,6 +123,7 @@ export function renamePerson(
   const checked = checkPersonName(
     name,
     people.filter((person) => person.id !== id),
+    normalisePersonJobTitle(jobTitle) !== "",
   );
   if (!checked.ok) return checked;
   return {
@@ -143,9 +155,22 @@ export function removePerson(people: readonly Person[], id: string) {
   return people.filter((person) => person.id !== id);
 }
 
+// What a person is called where one line is needed: the name, or the job
+// title when the name is not known.
+export function describePerson(person: Person) {
+  return person.name || person.jobTitle || "";
+}
+
 // A project assigned to someone not in the list shows as Unassigned.
 export function findAssigneeName(people: readonly Person[], id: string) {
-  return people.find((person) => person.id === id)?.name ?? unassignedName;
+  const person = people.find((other) => other.id === id);
+  return person ? describePerson(person) : unassignedName;
+}
+
+// The job title shown under the name, which is none when the job title is
+// itself shown as the name.
+export function findSubtitle(person: Person) {
+  return person.name ? person.jobTitle : undefined;
 }
 
 // Whether the id is Unassigned or someone in the list.
@@ -206,7 +231,11 @@ export function readPeople(saved: unknown): Person[] | null {
       jobTitle?: unknown;
     };
     if (!isPersonId(id) || typeof name !== "string") return null;
-    const checked = checkPersonName(name, people);
+    const checked = checkPersonName(
+      name,
+      people,
+      typeof jobTitle === "string" && jobTitle !== "",
+    );
     if (!checked.ok || checked.name !== name) return null;
     if (people.some((person) => person.id === id)) return null;
     if (jobTitle === undefined) {
@@ -233,6 +262,7 @@ export function mapAssigneesByName(
 ) {
   const mapped = new Map<string, string>();
   for (const person of source) {
+    if (person.name === "") continue;
     const match = target.find((other) => isSameName(other.name, person.name));
     if (match) mapped.set(person.id, match.id);
   }

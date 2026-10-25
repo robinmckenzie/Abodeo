@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { DueDatePicker } from "./due-date-picker";
 import {
+  describePerson,
+  findSubtitle,
   isKnownAssignee,
   personNameMaxLength,
   unassignedName,
@@ -236,10 +238,10 @@ export function ProjectForm({
                   />
                   <AssigneeIcon isSelected={assigned === assignee.id} />
                   <span>
-                    {assignee.name}
-                    {assignee.jobTitle && (
+                    {describePerson(assignee)}
+                    {findSubtitle(assignee) && (
                       <span className="assignee-job-title">
-                        {assignee.jobTitle}
+                        {findSubtitle(assignee)}
                       </span>
                     )}
                   </span>

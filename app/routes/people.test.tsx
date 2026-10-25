@@ -121,7 +121,7 @@ describe("the People screen", () => {
   });
 
   it.each([
-    ["a blank name", " ", "Enter a name."],
+    ["a blank name", " ", "Enter a name or a job title."],
     ["a name that is too long", "x".repeat(41), "Use 40 characters or fewer."],
     [
       "a name already in the list",

@@ -4,7 +4,7 @@ import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { describeDueDate } from "./due-date";
 import { DueDateIcon } from "./due-date-icon";
-import { findAssigneeName, type Person } from "./people";
+import { findAssigneeName, findSubtitle, type Person } from "./people";
 import type { Project } from "./projects";
 import { describeTaskCount } from "./tasks";
 
@@ -61,7 +61,12 @@ export function ProjectBar({
 }) {
   const assigneeName = people ? findAssigneeName(people, project.assignee) : "";
   const assigneeJobTitle = people
-    ? people.find(({ id }) => id === project.assignee)?.jobTitle
+    ? findSubtitle(
+        people.find(({ id }) => id === project.assignee) ?? {
+          id: "",
+          name: "",
+        },
+      )
     : undefined;
   const taskCount = describeTaskCount(project.tasks);
   // Screen readers hear the title first, and not the notes preview, whose
