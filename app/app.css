@@ -2350,6 +2350,18 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   bottom: -1px;
 }
 
+/* The people row's pill buttons would otherwise restyle the task buttons. */
+.people-row .task-button {
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+}
+
+.people-row .task-button:hover:not([aria-disabled]) {
+  background: #ebe6da;
+}
+
 .people-row:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
   opacity: 0;
 }
