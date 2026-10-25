@@ -102,7 +102,10 @@ export function ProjectForm({
     };
   }, []);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
-  const options = [{ id: unassignedId, name: unassignedName }, ...people];
+  const options: Person[] = [
+    { id: unassignedId, name: unassignedName },
+    ...people,
+  ];
   // Someone no longer in the list shows as Unassigned.
   const assigned = isKnownAssignee(people, values.assignee)
     ? values.assignee
@@ -232,7 +235,14 @@ export function ProjectForm({
                     }}
                   />
                   <AssigneeIcon isSelected={assigned === assignee.id} />
-                  <span>{assignee.name}</span>
+                  <span>
+                    {assignee.name}
+                    {assignee.jobTitle && (
+                      <span className="assignee-job-title">
+                        {assignee.jobTitle}
+                      </span>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>

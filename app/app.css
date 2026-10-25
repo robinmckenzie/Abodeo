@@ -989,6 +989,13 @@ body:has(.dashboard) {
   cursor: pointer;
 }
 
+/* The job title is a smaller line under the name. */
+.assignee-job-title {
+  display: block;
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
 /* Lighter text and icon, darker on hover, and fully dark when selected. */
 .assignee-option:is(:hover, :has(input:checked)) {
   color: #1a1a1a;
