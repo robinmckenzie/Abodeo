@@ -44,22 +44,13 @@ requirements, commitments, or scheduled work.
 
 ## Calendar
 
-- Calendar access without a redirect each time: AD #10 Prove Calendar Access
-  uses Google's Calendar token once and never stores it, as AD #6 Sign In With
-  Google decided. Project appointments built the same way would send the user
-  through Google for each appointment. Google skips its permission screen after
-  the first grant, and AD #10 names the account, so there is no account
-  chooser either: the redirect is a quick round trip. Background work, such as keeping appointments in sync, would not
-  be possible. The options are storing an encrypted refresh token, which
-  reverses the AD #6 decision, or keeping the short-lived token for about an
-  hour, so one redirect covers a sitting. Decide when appointment features are
-  drafted.
 - Deleted Abodeo calendar: with `calendar.app.created`, a calendar the user
   deletes in Google Calendar is still returned by Google and still accepts
   events, which are then not shown (found in AD #10 testing, accepted by Robin
-  as a limitation). Appointment features may need a way for the user to start
-  a new Abodeo calendar, or `calendar.calendarlist.readonly`, which shows every
-  calendar the user has.
+  as a limitation). Robin also accepted it for appointments in AD #65
+  Appointments In Projects (2026-10-25). Revisit if it matters: the user would
+  need a way to start a new Abodeo calendar, or
+  `calendar.calendarlist.readonly`, which shows every calendar the user has.
 - The comment above the granted-scope check in
   `app/calendar/calendar-handler.server.ts` says Google's consent screen lets
   the user untick the permission. Google shows tick boxes only when several
@@ -67,7 +58,8 @@ requirements, commitments, or scheduled work.
 - Parked from AD #65 Appointments In Projects, not ticketed: Abodeo acting on
   Google with nobody in the app (reading Google changes back, automatic sync,
   reminders). Needs a stored Google token, which AD #73 Store Encrypted Google
-  Refresh Token closed as not planned. Google sends its own reminders.
+  Refresh Token closed as not planned: AD #65 keeps Google's token in an
+  encrypted cookie for about an hour instead. Google sends its own reminders.
 
 ## Journal
 
