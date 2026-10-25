@@ -441,7 +441,7 @@ function PersonRow({
   return (
     <li className="people-row is-editing">
       <label htmlFor={inputId} className="people-edit-label">
-        Name for {describePerson(person)}
+        Name for {describePerson(person)} (required unless only job title known)
       </label>
       <input
         id={inputId}
@@ -519,7 +519,9 @@ function AddPersonForm({
         }
       }}
     >
-      <label htmlFor={id}>Add a person</label>
+      <label htmlFor={id}>
+        Add a person (required unless only job title known)
+      </label>
       <input
         id={id}
         value={name}

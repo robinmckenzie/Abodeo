@@ -70,7 +70,10 @@ const names = () =>
     .map((row) => row.querySelector(".people-name")?.textContent);
 const floatingMessage = () =>
   document.querySelector(".floating-message")?.textContent;
-const addBox = () => screen.getByRole("textbox", { name: "Add a person" });
+const addBox = () =>
+  screen.getByRole("textbox", {
+    name: "Add a person (required unless only job title known)",
+  });
 
 async function press(name: string | RegExp) {
   await act(async () => {
@@ -148,14 +151,18 @@ describe("the People screen", () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Rename Andy");
-    let box = screen.getByRole("textbox", { name: "Name for Andy" });
+    let box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     expect((box as HTMLInputElement).value).toBe("Andy");
     fireEvent.change(box, { target: { value: "Anders" } });
     fireEvent.keyDown(box, { key: "Escape" });
     expect(names()).toEqual(["Andy", "Boris"]);
 
     await press("Rename Andy");
-    box = screen.getByRole("textbox", { name: "Name for Andy" });
+    box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "Anders" } });
     await act(async () => {
       fireEvent.keyDown(box, { key: "Enter" });
@@ -167,7 +174,9 @@ describe("the People screen", () => {
     await saveAssignedProject("Shed", "andy");
     await renderPeople();
     await press("Rename Andy");
-    const box = screen.getByRole("textbox", { name: "Name for Andy" });
+    const box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "Anders" } });
     await press("Save");
     const loaded = loadProjects();
@@ -178,13 +187,19 @@ describe("the People screen", () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Rename Andy");
-    const box = screen.getByRole("textbox", { name: "Name for Andy" });
+    const box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "boris" } });
     await press("Save");
     expect(screen.getByRole("alert").textContent).toBe(
       "Someone with that name is already in the list.",
     );
-    expect(screen.getByRole("textbox", { name: "Name for Andy" })).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", {
+        name: "Name for Andy (required unless only job title known)",
+      }),
+    ).toBeTruthy();
   });
 
   it("asks before removing someone with no projects", async () => {
@@ -253,7 +268,11 @@ describe("the People screen", () => {
     refreshPeople();
     await renderPeople();
     expect(screen.getByRole("alert").textContent).toMatch(/cannot be read/);
-    expect(screen.queryByRole("textbox", { name: "Add a person" })).toBeNull();
+    expect(
+      screen.queryByRole("textbox", {
+        name: "Add a person (required unless only job title known)",
+      }),
+    ).toBeNull();
     expect(localStorage.getItem(peopleKey)).toBe("{damaged");
   });
 
