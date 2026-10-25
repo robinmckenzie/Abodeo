@@ -187,12 +187,17 @@ describe("the People screen", () => {
     expect(screen.getByRole("textbox", { name: "Name for Andy" })).toBeTruthy();
   });
 
-  it("removes someone with no projects at once", async () => {
+  it("asks before removing someone with no projects", async () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Remove Andy");
+    const dialog = screen.getByRole("alertdialog", { name: "Remove Andy" });
+    expect(dialog.textContent).toContain(
+      "Andy is not assigned to any project.",
+    );
+    expect(names()).toEqual(["Andy", "Boris"]);
+    await press("Remove");
     expect(names()).toEqual(["Boris"]);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
   it("asks before removing someone assigned to projects, saying how many", async () => {

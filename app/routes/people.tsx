@@ -110,10 +110,6 @@ export default function People() {
       fail(counted.reason);
       return;
     }
-    if (counted.count === 0) {
-      await finishRemoval({ storeKey, person, ...counted });
-      return;
-    }
     setBusyId(null);
     setRemoval({ storeKey, person, ...counted });
   };
