@@ -264,8 +264,18 @@ export function createPeopleStore(
           case "rename": {
             const change =
               operation.op === "add"
-                ? addPerson(locked.people, operation.id, operation.name)
-                : renamePerson(locked.people, operation.id, operation.name);
+                ? addPerson(
+                    locked.people,
+                    operation.id,
+                    operation.name,
+                    operation.jobTitle,
+                  )
+                : renamePerson(
+                    locked.people,
+                    operation.id,
+                    operation.name,
+                    operation.jobTitle,
+                  );
             if (!change.ok) return describeProblem(change);
             const isChanged =
               serialisePeople(change.people) !== serialisePeople(locked.people);

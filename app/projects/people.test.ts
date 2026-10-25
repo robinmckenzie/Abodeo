@@ -218,3 +218,36 @@ describe("matching people by name", () => {
     expect([...mapped]).toEqual([["x1", "b1"]]);
   });
 });
+
+describe("job titles", () => {
+  it("adds a person with a tidied job title, or none", () => {
+    expect(addPerson(people, "c1", "Clement", "  Site   manager ")).toEqual({
+      ok: true,
+      people: [
+        andy,
+        boris,
+        { id: "c1", name: "Clement", jobTitle: "Site manager" },
+      ],
+    });
+    expect(addPerson(people, "c1", "Clement", "  ")).toEqual({
+      ok: true,
+      people: [andy, boris, { id: "c1", name: "Clement" }],
+    });
+  });
+
+  it("sets and clears a job title when renaming", () => {
+    const titled = renamePerson(people, "andy", "Andy", "Plumber");
+    expect(titled).toEqual({
+      ok: true,
+      people: [{ ...andy, jobTitle: "Plumber" }, boris],
+    });
+    expect(
+      renamePerson((titled as { people: Person[] }).people, "andy", "Andy"),
+    ).toEqual({ ok: true, people });
+  });
+
+  it("keeps a job title through saving and reading", () => {
+    const titled = [{ ...andy, jobTitle: "Plumber" }, boris];
+    expect(parsePeople(serialisePeople(titled))).toEqual(titled);
+  });
+});

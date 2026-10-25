@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/people";
@@ -9,7 +9,11 @@ import {
   FloatingMessages,
   useFloatingMessages,
 } from "../projects/floating-messages";
-import { personNameMaxLength, type Person } from "../projects/people";
+import {
+  personJobTitleMaxLength,
+  personNameMaxLength,
+  type Person,
+} from "../projects/people";
 import {
   describePersonFailure,
   type PersonFailure,
@@ -229,8 +233,10 @@ function PersonRow({
   onRemove: () => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const [jobTitleDraft, setJobTitleDraft] = useState("");
   const [problem, setProblem] = useState<PersonFailure | null>(null);
   const inputId = useId();
+  const jobTitleInputId = useId();
   const editButtonRef = useRef<HTMLButtonElement>(null);
 
   const stopEditing = () => {
@@ -243,21 +249,39 @@ function PersonRow({
   const save = async () => {
     if (draft === null) return;
     onMessage(null);
-    const result = await source.renamePerson(person.id, draft);
+    const result = await source.renamePerson(person.id, draft, jobTitleDraft);
     if (result.ok) stopEditing();
     else setProblem(result.reason);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void save();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      stopEditing();
+    }
   };
 
   if (draft === null) {
     return (
       <li className="people-row">
-        <span className="people-name">{person.name}</span>
+        <span className="people-name">
+          {person.name}
+          {person.jobTitle && (
+            <span className="people-job-title">{person.jobTitle}</span>
+          )}
+        </span>
         <button
           ref={editButtonRef}
           type="button"
           aria-label={`Rename ${person.name}`}
           disabled={isBusy}
-          onClick={() => setDraft(person.name)}
+          onClick={() => {
+            setDraft(person.name);
+            setJobTitleDraft(person.jobTitle ?? "");
+          }}
         >
           Rename
         </button>
@@ -289,15 +313,18 @@ function PersonRow({
           setDraft(event.target.value);
           setProblem(null);
         }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            void save();
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            stopEditing();
-          }
-        }}
+        onKeyDown={onKeyDown}
+      />
+      <label htmlFor={jobTitleInputId} className="people-edit-label">
+        Job title for {person.name} (optional)
+      </label>
+      <input
+        id={jobTitleInputId}
+        value={jobTitleDraft}
+        maxLength={personJobTitleMaxLength + 10}
+        autoComplete="off"
+        onChange={(event) => setJobTitleDraft(event.target.value)}
+        onKeyDown={onKeyDown}
       />
       <button type="button" onClick={() => void save()}>
         Save
@@ -324,7 +351,9 @@ function AddPersonForm({
   showMessage: (message: string) => void;
 }) {
   const id = useId();
+  const jobTitleId = useId();
   const [name, setName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
   const [problem, setProblem] = useState<PersonFailure | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -337,10 +366,11 @@ function AddPersonForm({
         if (isAdding) return;
         setIsAdding(true);
         onMessage(null);
-        const result = await source.addPerson(name);
+        const result = await source.addPerson(name, jobTitle);
         setIsAdding(false);
         if (result.ok) {
           setName("");
+          setJobTitle("");
           setProblem(null);
           showMessage(`${result.person.name} was added.`);
         } else {
@@ -359,6 +389,14 @@ function AddPersonForm({
           setName(event.target.value);
           setProblem(null);
         }}
+      />
+      <label htmlFor={jobTitleId}>Job title (optional)</label>
+      <input
+        id={jobTitleId}
+        value={jobTitle}
+        maxLength={personJobTitleMaxLength + 10}
+        autoComplete="off"
+        onChange={(event) => setJobTitle(event.target.value)}
       />
       <button type="submit" disabled={isAdding}>
         Add

@@ -4,10 +4,12 @@
 // offered first, and cannot be added, renamed or removed.
 import { isPersonId, unassignedId, type Project } from "./projects";
 
-export type Person = { id: string; name: string };
+// The job title is optional, and is left out when there is none.
+export type Person = { id: string; name: string; jobTitle?: string };
 
 export const unassignedName = "Unassigned";
 export const personNameMaxLength = 40;
+export const personJobTitleMaxLength = 40;
 
 // The people a store that already has projects assigned to them starts with.
 export const startingPeople: readonly Person[] = [
@@ -30,6 +32,16 @@ export const personNameMessages: Record<PersonNameProblem, string> = {
 // Surrounding spaces are dropped and runs of spaces become one.
 export function normalisePersonName(name: string) {
   return name.trim().replace(/\s+/g, " ");
+}
+
+// A job title is tidied like a name and cut to its length. Empty is none.
+export function normalisePersonJobTitle(jobTitle: string | undefined) {
+  return normalisePersonName(jobTitle ?? "").slice(0, personJobTitleMaxLength);
+}
+
+function withJobTitle(person: Person, jobTitle: string | undefined): Person {
+  const title = normalisePersonJobTitle(jobTitle);
+  return title === "" ? person : { ...person, jobTitle: title };
 }
 
 function isSameName(a: string, b: string) {
@@ -70,6 +82,7 @@ export function addPerson(
   people: readonly Person[],
   id: string,
   name: string,
+  jobTitle?: string,
 ): ListChange {
   if (!isPersonId(id)) return { ok: false, problem: "not-found" };
   const existing = people.find((person) => person.id === id);
@@ -81,13 +94,17 @@ export function addPerson(
   }
   const checked = checkPersonName(name, people);
   if (!checked.ok) return checked;
-  return { ok: true, people: [...people, { id, name: checked.name }] };
+  return {
+    ok: true,
+    people: [...people, withJobTitle({ id, name: checked.name }, jobTitle)],
+  };
 }
 
 export function renamePerson(
   people: readonly Person[],
   id: string,
   name: string,
+  jobTitle?: string,
 ): ListChange {
   if (!people.some((person) => person.id === id)) {
     return { ok: false, problem: "not-found" };
@@ -100,7 +117,9 @@ export function renamePerson(
   return {
     ok: true,
     people: people.map((person) =>
-      person.id === id ? { id, name: checked.name } : person,
+      person.id === id
+        ? withJobTitle({ id, name: checked.name }, jobTitle)
+        : person,
     ),
   };
 }
@@ -141,7 +160,9 @@ export function derivePeopleFromProjects(
 export function serialisePeople(people: readonly Person[]) {
   return JSON.stringify({
     version: peopleVersion,
-    people: people.map(({ id, name }) => ({ id, name })),
+    people: people.map(({ id, name, jobTitle }) =>
+      jobTitle ? { id, name, jobTitle } : { id, name },
+    ),
   });
 }
 
@@ -164,12 +185,27 @@ export function readPeople(saved: unknown): Person[] | null {
   }
   const people: Person[] = [];
   for (const entry of value.people) {
-    const { id, name } = (entry ?? {}) as { id?: unknown; name?: unknown };
+    const { id, name, jobTitle } = (entry ?? {}) as {
+      id?: unknown;
+      name?: unknown;
+      jobTitle?: unknown;
+    };
     if (!isPersonId(id) || typeof name !== "string") return null;
     const checked = checkPersonName(name, people);
     if (!checked.ok || checked.name !== name) return null;
     if (people.some((person) => person.id === id)) return null;
-    people.push({ id, name });
+    if (jobTitle === undefined) {
+      people.push({ id, name });
+      continue;
+    }
+    if (
+      typeof jobTitle !== "string" ||
+      jobTitle === "" ||
+      normalisePersonJobTitle(jobTitle) !== jobTitle
+    ) {
+      return null;
+    }
+    people.push({ id, name, jobTitle });
   }
   return people;
 }
