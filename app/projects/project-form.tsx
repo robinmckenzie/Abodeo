@@ -4,15 +4,36 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { DueDatePicker } from "./due-date-picker";
-import { assignees, hasTitle, type ProjectFields } from "./projects";
+import {
+  isKnownAssignee,
+  personNameMaxLength,
+  unassignedName,
+  type Person,
+} from "./people";
+import { describePersonFailure, type PersonFailure } from "./people-messages";
+import { hasTitle, unassignedId, type ProjectFields } from "./projects";
 import { createTasks, readTaskEntries, type Task } from "./tasks";
 
 export type FormMessage = { text: string; isError: boolean } | null;
+
+// How many places the parts of the form arrive in turn. A long list of people
+// does not delay the rest.
+const maxArrivalPlace = 4;
+
+// Adds a new person and chooses them for the project.
+export type AddPerson = (
+  name: string,
+) => Promise<
+  { ok: true; person: Person } | { ok: false; reason: PersonFailure }
+>;
 
 export function ProjectForm({
   values,
   isNew,
   isReadOnly = false,
+  people,
+  onAddPerson,
+  projectKey,
   message,
   messageActions,
   getFocusField,
@@ -33,6 +54,13 @@ export function ProjectForm({
   // While an account's project loads its latest copy, it can be read and
   // closed but not changed.
   isReadOnly?: boolean;
+  // Who the project can be assigned to, besides Unassigned (AD #61 Manage
+  // People). Without onAddPerson, there is no box to add someone.
+  people: readonly Person[];
+  onAddPerson?: AddPerson;
+  // Tells which project is open, so that a person added while another project
+  // is opened is not assigned to it.
+  projectKey?: string;
   message: FormMessage;
   // Buttons beside the message, such as for choosing which version to keep.
   messageActions?: React.ReactNode;
@@ -60,7 +88,25 @@ export function ProjectForm({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
+  const onChangeRef = useRef(onChange);
+  const projectKeyRef = useRef(projectKey);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    projectKeyRef.current = projectKey;
+  });
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
+  const options = [{ id: unassignedId, name: unassignedName }, ...people];
+  // Someone no longer in the list shows as Unassigned.
+  const assigned = isKnownAssignee(people, values.assignee)
+    ? values.assignee
+    : unassignedId;
 
   // Focuses the field on appearing only, not when it changes. A new project
   // focuses it without scrolling, as in place its bar scrolls the page to
@@ -161,23 +207,54 @@ export function ProjectForm({
         <div className="project-form-side">
           <fieldset className="assignee-list">
             <legend>Assigned to</legend>
-            {assignees.map((assignee, index) => (
-              <label
-                key={assignee.id}
-                className="assignee-option arrives-in-turn"
-                style={arriveAt(index)}
-              >
-                <input
-                  type="radio"
-                  name="assignee"
-                  value={assignee.id}
-                  checked={values.assignee === assignee.id}
-                  onChange={() => onChange({ assignee: assignee.id })}
-                />
-                <AssigneeIcon isSelected={values.assignee === assignee.id} />
-                <span>{assignee.name}</span>
-              </label>
-            ))}
+            <div className="assignee-options">
+              {options.map((assignee, index) => (
+                <label
+                  key={assignee.id}
+                  className="assignee-option arrives-in-turn"
+                  style={arriveAt(index)}
+                >
+                  <input
+                    type="radio"
+                    name="assignee"
+                    value={assignee.id}
+                    checked={assigned === assignee.id}
+                    onChange={() => onChange({ assignee: assignee.id })}
+                    // Unassigned shows as chosen for someone no longer in the
+                    // list, so choosing it again changes nothing by itself.
+                    onClick={() => {
+                      if (
+                        assigned === assignee.id &&
+                        values.assignee !== assignee.id
+                      ) {
+                        onChange({ assignee: assignee.id });
+                      }
+                    }}
+                  />
+                  <AssigneeIcon isSelected={assigned === assignee.id} />
+                  <span>{assignee.name}</span>
+                </label>
+              ))}
+            </div>
+            {onAddPerson && (
+              <AddPersonBox
+                place={options.length}
+                onAdd={async (name) => {
+                  const startedFor = projectKeyRef.current;
+                  const result = await onAddPerson(name);
+                  // The latest onChange, as the form may have changed while
+                  // the person was being added.
+                  if (
+                    result.ok &&
+                    isMountedRef.current &&
+                    projectKeyRef.current === startedFor
+                  ) {
+                    onChangeRef.current({ assignee: result.person.id });
+                  }
+                  return result;
+                }}
+              />
+            )}
           </fieldset>
           <DueDatePicker
             value={values.dueDate}
@@ -185,7 +262,7 @@ export function ProjectForm({
             startDate={calendarDate}
             onActiveDateChange={onCalendarDateChange}
             className="arrives-in-turn"
-            style={arriveAt(assignees.length)}
+            style={arriveAt(options.length + (onAddPerson ? 1 : 0))}
           />
         </div>
         {/* Focusable only from code, as the starting point for an opened
@@ -318,7 +395,75 @@ function NewProjectTasks({
 // notes box, after the title's label, which shows at once with the first
 // assignee.
 function arriveAt(place: number) {
-  return { "--arrival": place } as React.CSSProperties;
+  return {
+    "--arrival": Math.min(place, maxArrivalPlace),
+  } as React.CSSProperties;
+}
+
+// A text box below the people, to add someone and choose them at once. Enter
+// adds them, and does not create or save the project.
+function AddPersonBox({
+  place,
+  onAdd,
+}: {
+  place: number;
+  onAdd: (
+    name: string,
+  ) => Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
+}) {
+  const id = useId();
+  const [name, setName] = useState("");
+  const [problem, setProblem] = useState<PersonFailure | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+
+  const add = async () => {
+    if (isAdding) return;
+    setIsAdding(true);
+    const result = await onAdd(name);
+    setIsAdding(false);
+    if (result.ok) {
+      setName("");
+      setProblem(null);
+    } else {
+      setProblem(result.reason);
+    }
+  };
+
+  return (
+    <div className="assignee-add arrives-in-turn" style={arriveAt(place)}>
+      <label htmlFor={id} className="assignee-add-label">
+        Add a person
+      </label>
+      <div className="assignee-add-row">
+        <input
+          id={id}
+          name="new-person"
+          value={name}
+          maxLength={personNameMaxLength + 10}
+          autoComplete="off"
+          aria-invalid={problem !== null}
+          aria-describedby={problem ? `${id}-problem` : undefined}
+          onChange={(event) => {
+            setName(event.target.value);
+            setProblem(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            void add();
+          }}
+        />
+        <button type="button" disabled={isAdding} onClick={() => void add()}>
+          Add
+        </button>
+      </div>
+      {problem && (
+        <p id={`${id}-problem`} className="assignee-add-error" role="alert">
+          {describePersonFailure(problem)}
+        </p>
+      )}
+    </div>
+  );
 }
 
 // A thin circle, with a three-line arrow pointing right when selected. The

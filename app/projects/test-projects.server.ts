@@ -13,6 +13,7 @@ export function createMemoryProjectStore() {
     return accounts.get(userId)!;
   };
   const store: ProjectStore = {
+    async receiveDefaults() {},
     async list(userId) {
       calls.push(userId);
       return {

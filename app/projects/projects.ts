@@ -4,21 +4,14 @@
 import { isCalendarDate } from "./due-date";
 import { isTask, type Task } from "./tasks";
 
-// Hard-coded for now. The ids are what is saved, so that the names shown can
-// change without affecting saved projects.
-export const assignees = [
-  { id: "unassigned", name: "Unassigned" },
-  { id: "andy", name: "Andy" },
-  { id: "boris", name: "Boris" },
-  { id: "clement", name: "Clement" },
-] as const;
-
-export type AssigneeId = (typeof assignees)[number]["id"];
+// What is saved is a person's id, so that the names shown can change without
+// affecting saved projects. Unassigned is not a person (see people.ts).
+export const unassignedId = "unassigned";
 
 export type ProjectFields = {
   title: string;
   notes: string;
-  assignee: AssigneeId;
+  assignee: string;
   // "YYYY-MM-DD", or null for none.
   dueDate: string | null;
   tasks: Task[];
@@ -33,7 +26,7 @@ export type Project = ProjectFields & {
 export const newProjectFields: ProjectFields = {
   title: "",
   notes: "",
-  assignee: "unassigned",
+  assignee: unassignedId,
   dueDate: null,
   tasks: [],
 };
@@ -58,12 +51,19 @@ export function hasTitle(title: string) {
   return title.trim() !== "";
 }
 
-export function isAssigneeId(value: unknown): value is AssigneeId {
-  return assignees.some((assignee) => assignee.id === value);
+// Whether a value could be a person's id: its shape only. Who exists is for
+// the list of people to say, so that reading a project never needs it, and a
+// project never becomes unreadable because a person was removed.
+export function isPersonId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value !== unassignedId &&
+    /^[\w-]{1,100}$/.test(value)
+  );
 }
 
-export function findAssigneeName(id: AssigneeId) {
-  return assignees.find((assignee) => assignee.id === id)?.name ?? id;
+export function isAssigneeId(value: unknown): value is string {
+  return value === unassignedId || isPersonId(value);
 }
 
 // A project's saved form, as kept under its own storage entry. The id is in

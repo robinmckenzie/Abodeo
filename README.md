@@ -110,7 +110,8 @@ their columns exist because Better Auth expects them, and are always empty. Test
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
 projects and their tasks are in `project`, and which default
 projects it has received in `project_defaults_received`. The images added to its projects are in
-`project_image` (details, caption and sizes) and `project_image_bytes` (the files).
+`project_image` (details, caption and sizes) and `project_image_bytes` (the files). The people its
+projects can be assigned to are in `account_people`.
 
 ### Projects while signed in
 
@@ -144,6 +145,46 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
   has failed to save. A save started as the page closes is sent so that it can finish afterwards,
   but can still be lost if the network fails then.
 - Provisional limits: a request body of 256 KB, or 1 MB when moving projects in.
+
+### People
+
+AD #61 Manage People. The code is in `app/projects/people*.ts`, `account-people.ts`,
+`use-people.ts` and `app/routes/people.tsx`.
+
+- The application menu (the Projects and People links below the account area, shown on every
+  screen with the sign-in button) has a People entry, which opens
+  the People screen at `/people`. There people are added, renamed and removed. A project saves
+  only a person's id, so a rename changes no project. Unassigned is always the first option in
+  Assigned To, and is not a person: it cannot be added, renamed or removed.
+- A name is trimmed, has runs of spaces joined, and is 1 to 40 characters, different from every
+  other name whatever the case, and not "Unassigned". The same rules apply in the browser and on
+  the server.
+- The list is kept where the projects are: signed out, in the browser (`abodeo-people`); signed
+  in, in the account (`account_people`, one row holding the whole list, reached through
+  `/api/people`, which is read with GET and changed with POST: add, rename, remove and
+  establish). A new list starts empty. A store whose projects are already assigned to Andy, Boris
+  or Clement starts with those people, saved the first time it is read. The default projects are
+  all Unassigned, so receiving them once resets any edits to received default projects.
+- Reading an account's list never writes. With no list saved yet, the people its projects are
+  assigned to are shown, and the list is saved by the first change to it, by moving the browser's
+  projects in, or once the offer to move them has been settled.
+- A text box below the people in Assigned To adds a person and assigns them to the open project.
+- Removing someone assigned to projects asks first, saying how many, and then sets those projects
+  to Unassigned. The server counts them (a dry run), and a removal sent with that count changes
+  nothing, and answers with the new count, if the count has changed since. Projects that cannot
+  be read are left as they are, and are reported. In the browser, removal sets the projects one
+  by one, so it is not atomic, and takes turns with assigning in other tabs using Web Locks where
+  the browser has them.
+- The server checks that a person chosen for a project is in the account's list, as the write is
+  made (the list row is held until then), and refuses with `unknown_assignee` otherwise, as
+  happens when someone is removed on another device. The browser does the same for its own list.
+  A project already assigned to someone no longer in the list shows as Unassigned until edited.
+- Moving the browser's projects in takes its list too. If the account has no list, the browser's
+  becomes the account's and people carry by id. If it has one, each project's person is matched
+  to the account's by name, whatever the case, and anyone without a match becomes Unassigned.
+  Sending the same move again after someone was renamed finds the projects already moved.
+- Rolling the app back to a version before this makes projects assigned to people added since
+  unreadable to it.
 
 ### Images on projects
 
@@ -339,7 +380,7 @@ output. The production address is https://abodeo-kappa.vercel.app.
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
    `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile`,
    `calendar_link`, `account_sign_in`, `account_visit`, `project`,
-   `project_defaults_received`, `project_image` and `project_image_bytes`.
+   `project_defaults_received`, `project_image`, `project_image_bytes` and `account_people`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |

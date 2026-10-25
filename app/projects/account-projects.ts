@@ -11,6 +11,7 @@ import {
   type Project,
   type ProjectFields,
 } from "./projects";
+import type { Person } from "./people";
 import {
   accountHeader,
   buildProjectPath,
@@ -20,7 +21,7 @@ import {
 } from "./projects-api";
 import { canMergeTaskChanges, type Task } from "./tasks";
 
-type Fetch = typeof fetch;
+export type Fetch = typeof fetch;
 
 export type AccountFailure =
   // The server or the account store did not answer.
@@ -31,6 +32,9 @@ export type AccountFailure =
   | "not-found"
   | "unreadable"
   | "too-large"
+  // The person chosen is not in the account's list, such as removed on
+  // another device.
+  | "unknown-assignee"
   | "refused";
 
 // A save of a field changed elsewhere since it was loaded.
@@ -45,9 +49,9 @@ export function setPageLeaving(value: boolean) {
   isPageLeaving = value;
 }
 
-type Answer = { status: number; body: unknown } | "unreachable";
+export type Answer = { status: number; body: unknown } | "unreachable";
 
-async function send(
+export async function send(
   fetchFn: Fetch,
   accountId: string,
   path: string,
@@ -78,7 +82,7 @@ async function send(
   }
 }
 
-function readFailure(answer: Answer): AccountFailure {
+export function readFailure(answer: Answer): AccountFailure {
   if (answer === "unreachable") return "unreachable";
   const error = (answer.body as { error?: unknown } | null)?.error;
   switch (answer.status) {
@@ -93,7 +97,7 @@ function readFailure(answer: Answer): AccountFailure {
     case 422:
       return "unreadable";
     case 400:
-      return "refused";
+      return error === "unknown_assignee" ? "unknown-assignee" : "refused";
   }
   return "unreachable";
 }
@@ -197,6 +201,8 @@ export async function createAccountProject(
 export async function importProjects(
   accountId: string,
   projects: Project[],
+  // The browser's list of people, which goes with its projects.
+  people: Person[] | undefined = undefined,
   fetchFn: Fetch = fetch,
 ): Promise<
   | { ok: true; outcomes: Record<string, ImportOutcome> }
@@ -209,6 +215,7 @@ export async function importProjects(
         const { id, ...rest } = project;
         return { id, version: projectVersion, ...rest };
       }),
+      ...(people && { people }),
     },
   });
   const outcomes =

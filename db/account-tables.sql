@@ -1,4 +1,4 @@
--- Version: v1.51.1
+-- Version: v1.61.0
 --
 -- "Create script" for Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
 --
@@ -11,7 +11,7 @@
 -- user_profile, calendar_link, account_sign_in, account_visit, project and
 -- project_defaults_received are Abodeo's own. Deleting a row from auth_user
 -- deletes that account's sessions, Google link, profile, calendar link,
--- history and projects.
+-- history, projects and people.
 --
 -- What is kept: Google's permanent account ID (auth_account.account_id), and
 -- the name and email from the first sign-in. The token, scope, image,
@@ -51,6 +51,13 @@
 -- details. An image id is made by the browser, so a retry is recognisable,
 -- and content_hash tells a retry from a different image with the same id.
 -- Removing a project, or the account, removes its images.
+--
+-- account_people (AD #61 Manage People) keeps the people an account's projects
+-- can be assigned to. One row per account holds the whole ordered list as
+-- data: {"version": 1, "people": [{"id": "...", "name": "..."}]}. A project
+-- saves only a person's id, so a rename changes no project. revision changes
+-- on every change. An account with no row has not saved a list yet, and the
+-- app shows the people its projects are already assigned to until it does.
 
 create table if not exists auth_user (
     id text primary key,
@@ -189,4 +196,10 @@ create table if not exists project_image_bytes (
     primary key (user_id, project_id, image_id, kind),
     foreign key (user_id, project_id, image_id)
         references project_image (user_id, project_id, id) on delete cascade
+);
+
+create table if not exists account_people (
+    user_id text primary key references auth_user (id) on delete cascade,
+    data jsonb not null,
+    revision bigint not null default 1
 );

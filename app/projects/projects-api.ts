@@ -53,7 +53,9 @@ export type ProjectConflictResponse = {
 };
 
 // Each project's saved form with its id, as the browser keeps it.
-export type ImportProjectsRequest = { projects: unknown[] };
+// With the browser's list of people, which goes with them (AD #61 Manage
+// People).
+export type ImportProjectsRequest = { projects: unknown[]; people?: unknown[] };
 
 // For each id sent: moved, already in the account from an earlier move, or
 // moved as a copy because the account's copy differs.
@@ -71,5 +73,7 @@ export type ProjectErrorCode =
   | "not_found"
   | "unreadable"
   | "conflict"
+  // The person chosen is not in the account's list.
+  | "unknown_assignee"
   | "account_changed"
   | "too_large";

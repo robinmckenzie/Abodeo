@@ -1,6 +1,6 @@
 // Answers every request under /api: sign-in through Better Auth, whether
 // sign-in is configured, the profile, activity for the visit history, the
-// signed-in account's projects and their images, and the Calendar test. The
+// signed-in account's projects, people and images, and the Calendar test. The
 // resource route in app/routes/api.ts sends requests here, in development and
 // on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
@@ -27,6 +27,14 @@ import {
   createImageStore,
   type ImageStore,
 } from "../projects/image-store.server";
+import {
+  handlePeopleRequest,
+  isPeoplePath,
+} from "../projects/people-handler.server";
+import {
+  createPeopleStore,
+  type PeopleStore,
+} from "../projects/people-store.server";
 import {
   handleProjectsRequest,
   isProjectsPath,
@@ -62,14 +70,15 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 
-// What one request needs: Better Auth, the profile, history and project
-// and image stores, the Calendar test, and a way to let go of them.
+// What one request needs: Better Auth, the profile, history and project,
+// people and image stores, the Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
   projects: ProjectStore;
+  people: PeopleStore;
   images: ImageStore;
   calendar: CalendarDependencies;
   // Closes the database connections, once the response is ready.
@@ -106,6 +115,9 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     profiles: createProfileStore(pool),
     history,
     projects,
+    people: createPeopleStore(pool, {
+      prepare: (userId) => projects.receiveDefaults(userId),
+    }),
     images: createImageStore(pool),
     calendar: {
       secret: config.secret,
@@ -166,6 +178,7 @@ export function createAccountRequestHandler(
     const isCalendar = isCalendarPath(pathname);
     const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
+    const isPeople = isPeoplePath(pathname);
     const isProjects = !isImages && isProjectsPath(pathname);
     if (
       !isProfile &&
@@ -173,6 +186,7 @@ export function createAccountRequestHandler(
       !isCalendar &&
       !isAppointments &&
       !isProjects &&
+      !isPeople &&
       !isImages &&
       !isEnabledAuthPath(pathname)
     ) {
@@ -229,6 +243,12 @@ export function createAccountRequestHandler(
         return await handleImagesRequest(request, {
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.images,
+        });
+      }
+      if (isPeople) {
+        return await handlePeopleRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.people,
         });
       }
       if (isProjects) {

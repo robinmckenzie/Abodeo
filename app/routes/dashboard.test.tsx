@@ -19,7 +19,10 @@ import {
 
 import Dashboard from "./dashboard";
 import { forgetPresentation } from "../projects/presentation";
+import { serialisePeople } from "../projects/people";
+import { peopleKey } from "../projects/people-storage";
 import { projectKeyPrefix } from "../projects/project-storage";
+import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
@@ -36,6 +39,7 @@ beforeAll(() => {
 beforeEach(() => {
   localStorage.clear();
   refreshProjects();
+  refreshPeople();
   forgetPresentation();
   vi.stubGlobal(
     "fetch",
@@ -57,6 +61,15 @@ async function renderDashboard(state?: unknown) {
   );
   await act(async () => {});
   return rendered;
+}
+
+// Saves the browser's list of people, with ids made from their names.
+function savePeople(...names: string[]) {
+  localStorage.setItem(
+    peopleKey,
+    serialisePeople(names.map((name) => ({ id: name.toLowerCase(), name }))),
+  );
+  refreshPeople();
 }
 
 const titleField = () => screen.getByRole("textbox", { name: "Title" });
@@ -211,6 +224,7 @@ describe("Dashboard", () => {
   });
 
   it("adds projects as bars, with their notes and assignee saved", async () => {
+    savePeople("Andy", "Boris", "Clement");
     await renderDashboard();
     await addProject("Kitchen", "Tiles\nGrout", "Andy");
     await addProject("Kitchen");
@@ -323,6 +337,7 @@ describe("Dashboard", () => {
   });
 
   it("saves an opened project's changes without a button", async () => {
+    savePeople("Andy", "Boris", "Clement");
     await renderDashboard();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
@@ -1226,5 +1241,157 @@ describe("tasks", () => {
       "Seal",
       "Tiles",
     ]);
+  });
+});
+
+describe("Dashboard people (AD #61)", () => {
+  const assigneeLabels = () =>
+    [
+      ...screen
+        .getByRole("group", { name: "Assigned to" })
+        .querySelectorAll("label"),
+    ].map((label) => label.textContent);
+
+  it("offers only Unassigned, and a box to add someone, in a new browser", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(assigneeLabels()).toEqual(["Unassigned", "Add a person"]);
+  });
+
+  it("offers the people in the list", async () => {
+    savePeople("Dora", "Eli");
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(assigneeLabels()).toEqual([
+      "Unassigned",
+      "Dora",
+      "Eli",
+      "Add a person",
+    ]);
+  });
+
+  it("starts a browser's list with those its projects are assigned to", async () => {
+    localStorage.setItem(
+      `${projectKeyPrefix}old`,
+      JSON.stringify({
+        version: 3,
+        title: "Old shed",
+        notes: "",
+        assignee: "boris",
+        dueDate: null,
+        tasks: [],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+    refreshProjects();
+    await renderDashboard();
+    expect(bars().map((bar) => bar.textContent)).toEqual(["BorisOld shed"]);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(assigneeLabels()).toEqual(["Unassigned", "Boris", "Add a person"]);
+  });
+
+  it("adds a person from a new project's form and creates the project assigned to them", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(titleField(), { target: { value: "Shed" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
+      target: { value: "Dora" },
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Add a person" }), {
+        key: "Enter",
+      });
+    });
+    // Enter adds the person, and does not create the project.
+    expect(savedProjects()).toHaveLength(0);
+    expect(
+      (screen.getByRole("radio", { name: "Dora" }) as HTMLInputElement).checked,
+    ).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+    expect(bars().map((bar) => bar.textContent)).toEqual(["DoraShed"]);
+    expect(savedProjects()[0].assignee).toBe(
+      JSON.parse(localStorage.getItem(peopleKey)!).people[0].id,
+    );
+  });
+
+  it("adds a person from an open project's form, saving the assignment", async () => {
+    await renderDashboard();
+    await addProject("Shed");
+    fireEvent.click(bars()[0]);
+    fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
+      target: { value: "Dora" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    });
+    await closeForm();
+    expect(bars().map((bar) => bar.textContent)).toEqual(["DoraShed"]);
+  });
+
+  it("shows why a name is refused, and adds no one", async () => {
+    savePeople("Dora");
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
+      target: { value: "dora" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    });
+    expect(
+      screen.getByText("Someone with that name is already in the list."),
+    ).toBeTruthy();
+    expect(assigneeLabels()).toEqual(["Unassigned", "Dora", "Add a person"]);
+  });
+
+  it("shows a renamed person's new name on the project", async () => {
+    savePeople("Dora");
+    await renderDashboard();
+    await addProject("Shed", "", "Dora");
+    expect(bars().map((bar) => bar.textContent)).toEqual(["DoraShed"]);
+    savePeople("Dorothy");
+    // The same person, as the id is kept: only the name changes.
+    localStorage.setItem(
+      peopleKey,
+      serialisePeople([{ id: "dora", name: "Dorothy" }]),
+    );
+    refreshPeople();
+    await act(async () => {});
+    expect(bars().map((bar) => bar.textContent)).toEqual(["DorothyShed"]);
+  });
+
+  it("goes to the People screen from the application menu, saving the open project first", async () => {
+    const Stub = createRoutesStub([
+      { path: "/dashboard", Component: Dashboard },
+      { path: "/people", Component: () => <p>People screen</p> },
+    ]);
+    render(<Stub initialEntries={["/dashboard"]} />);
+    await act(async () => {});
+    await addProject("Shed");
+    fireEvent.click(bars()[0]);
+    fireEvent.change(titleField(), { target: { value: "Shed, painted" } });
+    // Earlier tests can leave typed tasks behind, which the check before
+    // leaving asks about.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("link", { name: "People" }));
+    });
+    await act(async () => {});
+    expect(screen.getByText("People screen")).toBeTruthy();
+    expect(savedProjects()[0].title).toBe("Shed, painted");
+  });
+
+  it("always shows the application menu links, with Projects as the current screen", async () => {
+    await renderDashboard();
+    expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Projects" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("link", { name: "People" })).toBeTruthy();
   });
 });

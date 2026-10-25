@@ -78,7 +78,10 @@ describe("projects", () => {
     ["a later version", JSON.stringify({ ...saved(), version: 4 })],
     ["an empty title", JSON.stringify({ ...saved(), title: " " })],
     ["missing notes", JSON.stringify({ ...saved(), notes: undefined })],
-    ["an unknown assignee", JSON.stringify({ ...saved(), assignee: "zed" })],
+    [
+      "an assignee that is not an id",
+      JSON.stringify({ ...saved(), assignee: "not an id!" }),
+    ],
     ["a missing date", JSON.stringify({ ...saved(), createdAt: 1 })],
     ["a missing due date", JSON.stringify({ ...saved(), dueDate: undefined })],
     [
@@ -103,6 +106,13 @@ describe("projects", () => {
     ],
   ])("treats %s as unreadable", (_, json) => {
     expect(parseProject("a", json)).toBeNull();
+  });
+
+  it("reads a project assigned to someone it knows nothing about", () => {
+    // Who exists is for the list of people to say, so that removing someone
+    // never makes a project unreadable.
+    const json = JSON.stringify({ ...saved(), assignee: "zed" });
+    expect(parseProject("a", json)?.assignee).toBe("zed");
   });
 
   it("lists projects oldest first", () => {

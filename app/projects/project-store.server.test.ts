@@ -2,147 +2,9 @@
 import { describe, expect, it } from "vitest";
 
 import { readDefaultProjects, type DefaultProjects } from "./default-projects";
-import {
-  buildCopyId,
-  createProjectStore,
-  type TransactionalDatabase,
-} from "./project-store.server";
+import { buildCopyId, createProjectStore } from "./project-store.server";
+import { createFakeDatabase } from "./test-database.server";
 import { serialiseProject, type Project } from "./projects";
-
-type Row = { user_id: string; id: string; data: unknown; revision: number };
-
-// Stands in for Postgres, understanding only the store's own statements, and
-// recording each one with its values.
-function createFakeDatabase() {
-  const projects: Row[] = [];
-  const records = new Map<string, { hash: string; ids: string[] }>();
-  // The newest image of each project, as the database would answer.
-  const latestImages: { user_id: string; project_id: string; id: string }[] =
-    [];
-  const statements: { text: string; values: unknown[] }[] = [];
-  // Runs just before a save's update, as another save landing in between.
-  let beforeUpdate: (() => void) | null = null;
-  let isFailing = false;
-  let isImageTableMissing = false;
-
-  const find = (userId: string, id: string) =>
-    projects.find((row) => row.user_id === userId && row.id === id);
-
-  const query = async (text: string, values: unknown[]) => {
-    const sql = text.replace(/\s+/g, " ").trim();
-    statements.push({ text: sql, values });
-    if (isFailing) throw Object.assign(new Error("down"), { code: "57P01" });
-    const [userId] = values as string[];
-    if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
-    if (sql.startsWith("select hash, ids from project_defaults_received")) {
-      const record = records.get(userId);
-      return { rows: record ? [{ ...record }] : [] };
-    }
-    if (sql.startsWith("insert into project_defaults_received")) {
-      if (!records.has(userId)) records.set(userId, { hash: "", ids: [] });
-      return { rows: [] };
-    }
-    if (sql.startsWith("update project_defaults_received")) {
-      records.set(userId, {
-        hash: values[1] as string,
-        ids: JSON.parse(values[2] as string),
-      });
-      return { rows: [] };
-    }
-    if (sql.startsWith("insert into project ")) {
-      const entries = JSON.parse(values[1] as string) as {
-        id: string;
-        data: unknown;
-      }[];
-      const overwrite = sql.includes("do update");
-      const rows = [];
-      for (const { id, data } of entries) {
-        const existing = find(userId, id);
-        if (!existing) {
-          projects.push({ user_id: userId, id, data, revision: 1 });
-          rows.push({ id });
-        } else if (overwrite) {
-          existing.data = data;
-          existing.revision++;
-          rows.push({ id });
-        }
-      }
-      return { rows };
-    }
-    if (
-      sql.startsWith(
-        "select id, data from project where user_id = $1 and id in",
-      )
-    ) {
-      const ids = JSON.parse(values[1] as string) as string[];
-      return {
-        rows: projects
-          .filter((row) => row.user_id === userId && ids.includes(row.id))
-          .map(({ id, data }) => ({ id, data })),
-      };
-    }
-    if (sql.startsWith("delete from project")) {
-      const ids = JSON.parse(values[1] as string) as string[];
-      for (const id of ids) {
-        const index = projects.indexOf(find(userId, id)!);
-        if (index >= 0) projects.splice(index, 1);
-      }
-      return { rows: [] };
-    }
-    if (sql === "select id, data from project where user_id = $1") {
-      return {
-        rows: projects
-          .filter((row) => row.user_id === userId)
-          .map(({ id, data }) => ({ id, data })),
-      };
-    }
-    if (sql.startsWith("select distinct on (project_id) project_id, id")) {
-      if (isImageTableMissing) {
-        throw Object.assign(new Error("no table"), { code: "42P01" });
-      }
-      return {
-        rows: latestImages.filter((row) => row.user_id === userId),
-      };
-    }
-    if (sql.startsWith("select data from project")) {
-      const row = find(userId, values[1] as string);
-      return { rows: row ? [{ data: row.data }] : [] };
-    }
-    if (sql.startsWith("select data, revision from project")) {
-      const row = find(userId, values[1] as string);
-      return {
-        rows: row ? [{ data: row.data, revision: String(row.revision) }] : [],
-      };
-    }
-    if (sql.startsWith("update project set data")) {
-      beforeUpdate?.();
-      beforeUpdate = null;
-      const row = find(userId, values[1] as string);
-      if (!row || String(row.revision) !== values[3]) return { rows: [] };
-      row.data = JSON.parse(values[2] as string);
-      row.revision++;
-      return { rows: [{ id: row.id }] };
-    }
-    throw new Error(`Unexpected statement: ${sql}`);
-  };
-
-  let released = 0;
-  const database: TransactionalDatabase = {
-    query,
-    connect: async () => ({ query, release: () => void released++ }),
-  };
-  return {
-    database,
-    projects,
-    records,
-    latestImages,
-    statements,
-    released: () => released,
-    setBeforeUpdate: (work: () => void) => (beforeUpdate = work),
-    fail: () => (isFailing = true),
-    removeImageTable: () => (isImageTableMissing = true),
-  };
-}
 
 const project = (id: string, title: string, overrides: Partial<Project> = {}) =>
   ({
@@ -441,6 +303,294 @@ describe("the project store", () => {
       await expect(store.list("ada")).rejects.toThrow("lock timeout");
       expect(sent.at(-1)).toBe("rollback");
       expect(released).toBe(true);
+    });
+  });
+
+  describe("who a project is assigned to (AD #61 Manage People)", () => {
+    const saveList = (
+      fake: ReturnType<typeof createFakeDatabase>,
+      list: { id: string; name: string }[],
+    ) =>
+      fake.people.set("ada", {
+        data: { version: 1, people: list },
+        revision: 1,
+      });
+    const andy = { id: "andy", name: "Andy" };
+
+    it("creates a project for someone in the account's list, holding the list", async () => {
+      const fake = createFakeDatabase();
+      saveList(fake, [andy]);
+      const store = createProjectStore(fake.database, { defaults: null, now });
+      expect(
+        await store.create(
+          "ada",
+          "p1",
+          project("p1", "Shed", { assignee: "andy" }),
+        ),
+      ).toMatchObject({ kind: "found", project: { assignee: "andy" } });
+      expect(
+        fake.statements.some(({ text }) =>
+          text.includes("from account_people where user_id = $1 for share"),
+        ),
+      ).toBe(true);
+      // Taken first, as the row may not exist yet.
+      expect(
+        fake.statements.some(({ text }) =>
+          text.includes("pg_advisory_xact_lock"),
+        ),
+      ).toBe(true);
+      expect(fake.released()).toBe(1);
+    });
+
+    it("refuses a create naming someone not in the list", async () => {
+      const fake = createFakeDatabase();
+      saveList(fake, [andy]);
+      const store = createProjectStore(fake.database, { defaults: null, now });
+      expect(
+        await store.create(
+          "ada",
+          "p1",
+          project("p1", "Shed", { assignee: "boris" }),
+        ),
+      ).toEqual({ kind: "unknown-assignee" });
+      expect(fake.projects).toHaveLength(0);
+    });
+
+    it("counts the people an account's projects are assigned to while it has no list", async () => {
+      const fake = createFakeDatabase();
+      const store = createProjectStore(fake.database, { defaults: null, now });
+      fake.projects.push({
+        user_id: "ada",
+        id: "old",
+        data: savedForm(project("old", "Old", { assignee: "andy" })),
+        revision: 1,
+      });
+      expect(
+        await store.create(
+          "ada",
+          "p1",
+          project("p1", "Shed", { assignee: "andy" }),
+        ),
+      ).toMatchObject({ kind: "found" });
+      expect(
+        await store.create(
+          "ada",
+          "p2",
+          project("p2", "Fence", { assignee: "boris" }),
+        ),
+      ).toEqual({ kind: "unknown-assignee" });
+    });
+
+    it("refuses a save choosing someone removed, but not other saves", async () => {
+      const fake = createFakeDatabase();
+      saveList(fake, [andy]);
+      const store = createProjectStore(fake.database, { defaults: null, now });
+      await store.create("ada", "p1", project("p1", "Shed"));
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { assignee: "unassigned" },
+          { assignee: "boris" },
+        ),
+      ).toEqual({ kind: "unknown-assignee" });
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { assignee: "unassigned" },
+          { assignee: "andy" },
+        ),
+      ).toMatchObject({ kind: "saved", project: { assignee: "andy" } });
+      // Someone removed since: the project is kept as it is until edited.
+      fake.people.get("ada")!.data = { version: 1, people: [] };
+      expect(
+        await store.saveChanges("ada", "p1", { notes: "" }, { notes: "x" }),
+      ).toMatchObject({ kind: "saved", project: { assignee: "andy" } });
+    });
+
+    it("drops a default project's person who is not in the list to Unassigned", async () => {
+      const fake = createFakeDatabase();
+      const defaults = makeDefaults([
+        project("d1", "Default", { assignee: "andy" }),
+      ]);
+      const store = createProjectStore(fake.database, { defaults, now });
+      const { projects } = await store.list("ada");
+      expect(projects.map((p) => p.assignee)).toEqual(["unassigned"]);
+    });
+
+    describe("moving a browser's people in", () => {
+      const sent = [
+        project("p1", "Shed", { assignee: "x1" }),
+        project("p2", "Fence", { assignee: "x2" }),
+      ];
+      const browser = [
+        { id: "x1", name: "Anders" },
+        { id: "x2", name: "Boris" },
+      ];
+
+      it("stops the move when the account's list is damaged", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", [], browser);
+        fake.people.get("ada")!.data = { version: 99 };
+        await expect(
+          store.importProjects("ada", sent, browser),
+        ).rejects.toThrow("account-people-unreadable");
+        expect(fake.projects).toEqual([]);
+      });
+
+      it("makes the browser's list the account's, carrying people by id", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", sent, browser);
+        expect(fake.people.get("ada")?.data).toEqual({
+          version: 1,
+          people: browser,
+        });
+        expect(
+          fake.projects.map((row) => (row.data as Project).assignee),
+        ).toEqual(["x1", "x2"]);
+      });
+
+      it("keeps the people the account's projects already use", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        fake.projects.push({
+          user_id: "ada",
+          id: "old",
+          data: savedForm(project("old", "Old", { assignee: "andy" })),
+          revision: 1,
+        });
+        await store.importProjects("ada", sent, browser);
+        expect(
+          (fake.people.get("ada")?.data as { people: unknown[] }).people,
+        ).toEqual([...browser, andy]);
+      });
+
+      it("keeps an account project's person who has the browser person's name", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        fake.projects.push({
+          user_id: "ada",
+          id: "old",
+          data: savedForm(project("old", "Old", { assignee: "andy" })),
+          revision: 1,
+        });
+        await store.importProjects("ada", sent, [
+          { id: "u1", name: "Andy" },
+          { id: "x2", name: "Boris" },
+        ]);
+        expect(
+          (fake.people.get("ada")?.data as { people: unknown[] }).people,
+        ).toEqual([
+          { id: "u1", name: "Andy" },
+          { id: "x2", name: "Boris" },
+        ]);
+        expect(
+          (fake.projects.find((row) => row.id === "old")?.data as Project)
+            .assignee,
+        ).toBe("u1");
+      });
+
+      it("follows swapped names once and leaves unreadable projects alone", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        for (const [id, assignee] of [
+          ["a", "andy"],
+          ["c", "clement"],
+        ]) {
+          fake.projects.push({
+            user_id: "ada",
+            id,
+            data: savedForm(project(id, id, { assignee })),
+            revision: 1,
+          });
+        }
+        fake.projects.push({
+          user_id: "ada",
+          id: "future",
+          data: { version: 999, assignee: "andy" },
+          revision: 1,
+        });
+        await store.importProjects("ada", sent, [
+          { id: "clement", name: "Andy" },
+          { id: "boris", name: "Clement" },
+        ]);
+        const assignee = (id: string) =>
+          (fake.projects.find((row) => row.id === id)?.data as Project)
+            .assignee;
+        expect(assignee("a")).toBe("clement");
+        expect(assignee("c")).toBe("boris");
+        expect(assignee("future")).toBe("andy");
+      });
+
+      it("matches people by name where the account has a list", async () => {
+        const fake = createFakeDatabase();
+        saveList(fake, [
+          { id: "b9", name: "boris" },
+          { id: "c9", name: "Cora" },
+        ]);
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", sent, browser);
+        expect(
+          fake.projects.map((row) => [row.id, (row.data as Project).assignee]),
+        ).toEqual([
+          ["p1", "unassigned"],
+          ["p2", "b9"],
+        ]);
+        // People without a match are not added.
+        expect(
+          (fake.people.get("ada")?.data as { people: unknown[] }).people,
+        ).toHaveLength(2);
+      });
+
+      it("finds what it made before when sent again after someone was renamed", async () => {
+        const fake = createFakeDatabase();
+        saveList(fake, [{ id: "b9", name: "Boris" }]);
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", sent, browser);
+        saveList(fake, [{ id: "b9", name: "Boris the Second" }]);
+        expect(await store.importProjects("ada", sent, browser)).toEqual({
+          p1: "already-moved",
+          p2: "already-moved",
+        });
+        expect(fake.projects).toHaveLength(2);
+      });
+
+      it("assigns no one where no list was sent and the account has none", async () => {
+        const fake = createFakeDatabase();
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects("ada", sent);
+        expect(fake.people.size).toBe(0);
+        expect(
+          fake.projects.map((row) => (row.data as Project).assignee),
+        ).toEqual(["unassigned", "unassigned"]);
+      });
     });
   });
 });

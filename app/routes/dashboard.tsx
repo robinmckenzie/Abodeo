@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
-import { AccountControl } from "../account/account-control";
 import { useAccount } from "../account/use-account";
+import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
 import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
@@ -34,6 +34,11 @@ import {
   unsupportedFilesMessage,
 } from "../projects/image-messages";
 import {
+  readStoredPeople,
+  removeStoredPeople,
+} from "../projects/people-storage";
+import { usePeople } from "../projects/use-people";
+import {
   ExpandedProjectBar,
   ProjectBar,
   type ExpandedProjectBarHandle,
@@ -62,6 +67,7 @@ import {
   saveProjectChanges,
   saveProjectTasks,
 } from "../projects/project-storage";
+import type { Person } from "../projects/people";
 import {
   hasTitle,
   newProjectFields,
@@ -133,6 +139,7 @@ export const tasksConflictMessage =
 // its projects stays shown.
 // One object, so that a hook given it does not see a change on each render.
 const noLatestImageIds: Record<string, string> = {};
+const noPeople: Person[] = [];
 
 function readSourceKey(view: ProjectsView, previous: string | null) {
   if (view.kind === "browser") return "browser";
@@ -182,6 +189,7 @@ export default function Dashboard() {
   // Saves of tasks and new projects on their way, and whether the opened
   // project has changes not yet saved, for the warning on leaving the page.
   const sendingRef = useRef(0);
+  const browserCreatingKeyRef = useRef<string | null>(null);
   // The openings, current or closed, whose changes are not yet saved.
   const pendingKeysRef = useRef(new Set<string>());
   const unsavedIdsRef = useRef(unsavedIds);
@@ -337,10 +345,13 @@ export default function Dashboard() {
   );
 
   // Signed in, a failure that means the sign-in has changed checks it again.
+  // One that names someone no longer in the list loads the list again.
+  const reloadPeopleRef = useRef(() => {});
   const noteAccountFailure = (reason: string) => {
     if (reason === "signed-out" || reason === "account-changed") {
       account.recheck();
     }
+    if (reason === "unknown-assignee") reloadPeopleRef.current();
   };
 
   // Pictures dropped on the page go to the open account project's images.
@@ -487,6 +498,9 @@ export default function Dashboard() {
         if (status.state === "pending") pendingKeysRef.current.add(key);
         else pendingKeysRef.current.delete(key);
         setUnsavedIds((ids) => toggleId(ids, id, isFailed));
+        if (isFailed && status.reason === "unknown-assignee") {
+          reloadPeopleRef.current();
+        }
         setOpen((current) =>
           current?.key === key
             ? {
@@ -622,7 +636,15 @@ export default function Dashboard() {
       | { ok: true; project: Project }
       | { ok: false; reason: ProjectSaveFailure | "changed-since-added" };
     if (view.kind === "browser") {
-      result = await createProject(open.values);
+      // Choosing someone can wait for another tab, so a second Create for
+      // the same form must not queue a second project.
+      if (browserCreatingKeyRef.current === key) return;
+      browserCreatingKeyRef.current = key;
+      try {
+        result = await createProject(open.values);
+      } finally {
+        browserCreatingKeyRef.current = null;
+      }
       refreshProjects();
     } else if (view.kind === "account" && view.state === "ready") {
       const { generation, accountId } = view;
@@ -791,11 +813,42 @@ export default function Dashboard() {
   const offeredCount =
     offerKey && moveOffer?.key === offerKey ? moveOffer.projects.length : 0;
 
+  // The people the projects can be assigned to. An account's list is saved
+  // once the offer to move the browser's projects and people in is settled.
+  const people = usePeople(account.view, {
+    isEstablishDue:
+      offerKey !== null &&
+      moveOffer?.key === offerKey &&
+      moveOffer.projects.length === 0 &&
+      moveOffer.status !== "moving",
+    onAccountFailure: noteAccountFailure,
+  });
+  useEffect(() => {
+    reloadPeopleRef.current = people.reload;
+  });
+  const readyPeople = people.view.status === "ready" ? people.view : null;
+
   const moveProjects = async () => {
     if (view.kind !== "account" || !moveOffer) return;
     const { key, projects } = moveOffer;
     setMoveOffer({ ...moveOffer, status: "moving" });
-    const result = await whileSending(importProjects(view.accountId, projects));
+    // The browser's people go with its projects.
+    const stored = readStoredPeople();
+    // A damaged list stops the move, so that no one loses who they were
+    // assigned to and the browser's copies are kept.
+    if (stored.state === "unreadable" || stored.state === "unavailable") {
+      setMoveOffer((current) =>
+        current?.key === key ? { ...current, status: "failed" } : current,
+      );
+      return;
+    }
+    const result = await whileSending(
+      importProjects(
+        view.accountId,
+        projects,
+        stored.state === "found" ? stored.people : undefined,
+      ),
+    );
     if (!result.ok) {
       noteAccountFailure(result.reason);
       setMoveOffer((current) =>
@@ -807,11 +860,14 @@ export default function Dashboard() {
     removeProjectsIfUnchanged(
       projects.filter(({ id }) => result.outcomes[id] !== undefined),
     );
+    // With none of its own projects left, the browser's list has gone too.
+    if (listOwnProjects().length === 0) removeStoredPeople();
     refreshProjects();
     setMoveOffer((current) =>
       current?.key === key ? { ...current, projects: [] } : current,
     );
     source.reload();
+    people.reload();
   };
 
   const declineMoveOffer = () => {
@@ -851,6 +907,9 @@ export default function Dashboard() {
       values={open.values}
       isNew={open.id === null}
       isReadOnly={open.isLoading}
+      people={readyPeople?.people ?? noPeople}
+      onAddPerson={readyPeople ? people.addPerson : undefined}
+      projectKey={open.key}
       message={open.message}
       messageActions={
         open.hasConflict && (
@@ -938,6 +997,7 @@ export default function Dashboard() {
       <ProjectForm
         values={bar.values}
         isNew={bar.id === null}
+        people={readyPeople?.people ?? noPeople}
         message={bar.message}
         getFocusField={() => "start"}
         onChange={() => {}}
@@ -971,10 +1031,15 @@ export default function Dashboard() {
             height={868}
           />
         </h1>
-        <AccountControl account={account} onBeforeLeave={prepareToLeave} />
+        <AppMenu
+          current="/dashboard"
+          account={account}
+          onBeforeLeave={prepareToLeave}
+        />
       </header>
       <main ref={mainRef} tabIndex={-1}>
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
+          <h2>Projects</h2>
           {/* Replaced by false when the app is built for deployment, which
               leaves the panel out. */}
           {import.meta.env.DEV && (
@@ -1057,6 +1122,7 @@ export default function Dashboard() {
               <ProjectBar
                 key={project.id}
                 project={project}
+                people={readyPeople?.people ?? null}
                 hasUnsavedChanges={unsavedIds.has(project.id)}
                 isInert={isAddingInPlace}
                 thumbnailUrl={barThumbnails[project.id]}
@@ -1179,6 +1245,8 @@ function describeFailure(reason: ProjectSaveFailure) {
       "Not saved: this page is no longer signed in to this account.",
     "not-found": "Not saved: this project is no longer in your account.",
     "too-large": "Not saved: this project is too large to save.",
+    "unknown-assignee":
+      "Not saved: that person is no longer in the list, so please choose someone else.",
     refused: "Not saved: Abodeo could not accept this change.",
     conflict: "This project was changed on another device.",
   }[reason];

@@ -67,6 +67,16 @@ export const recheckInterval = 10_000;
 // Other tabs hear of a sign-out on this channel.
 const channelName = "abodeo-account";
 
+// What the last screen settled on. Each screen looks the account up for
+// itself, so a screen reached from within the app starts from this and
+// shows no gap while its own lookup runs. The server and the first screen
+// load start from "checking", so that what is rendered agrees.
+let lastKnownView: AccountView = { kind: "checking" };
+
+export function forgetLastKnownAccount() {
+  lastKnownView = { kind: "checking" };
+}
+
 export function useAccount({
   onBeforeLeave,
   onLeaving,
@@ -78,7 +88,7 @@ export function useAccount({
 }): Account {
   const location = useLocation();
   const navigate = useNavigate();
-  const [view, setView] = useState<AccountView>({ kind: "checking" });
+  const [view, setView] = useState<AccountView>(lastKnownView);
   const [message, setMessage] = useState<string | null>(() =>
     hasSignInError(location.search) ? signInFailedMessage : null,
   );
@@ -89,6 +99,7 @@ export function useAccount({
   const recheckRef = useRef(() => {});
   useEffect(() => {
     viewRef.current = view;
+    if (view.kind !== "checking") lastKnownView = view;
     onBeforeLeaveRef.current = onBeforeLeave;
     onLeavingRef.current = onLeaving;
   });
@@ -130,9 +141,11 @@ export function useAccount({
       );
       const { id, name, email } = session;
       const shown = viewRef.current;
-      // The same account: its profile is already shown.
+      // The same account: its profile is already shown. One still loading
+      // may have been started by a screen that has gone, so it is looked up
+      // again.
       if (shown.kind === "signed-in" && shown.id === id) {
-        if (shown.profile !== "unavailable") return;
+        if (shown.profile === "ready") return;
       } else {
         setView({
           kind: "signed-in",

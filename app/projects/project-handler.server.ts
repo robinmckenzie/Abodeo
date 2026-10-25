@@ -13,6 +13,7 @@ import {
 import { bundledDefaultProjects } from "./default-projects";
 import { readProjectFields, readProjectSave } from "./project-changes";
 import type { ProjectStore } from "./project-store.server";
+import { peopleVersion, readPeople, type Person } from "./people";
 import {
   hasTitle,
   newProjectFields,
@@ -118,6 +119,14 @@ function readImport(body: unknown): Project[] | undefined {
   return projects;
 }
 
+// The browser's list of people to move in with its projects: undefined if
+// none was sent, null if it is not valid.
+function readImportPeople(body: unknown): Person[] | undefined | null {
+  const entries = (body as { people?: unknown } | null)?.people;
+  if (entries === undefined) return undefined;
+  return readPeople({ version: peopleVersion, people: entries });
+}
+
 export async function handleProjectsRequest(
   request: Request,
   {
@@ -188,6 +197,9 @@ export async function handleProjectsRequest(
         const outcome = await run(
           store.create(userId, id, { ...newProjectFields, ...read }),
         );
+        if (outcome.kind === "unknown-assignee") {
+          return respondWithProjectError(400, "unknown_assignee");
+        }
         if (outcome.kind !== "found") {
           return respondWithProjectError(422, "unreadable");
         }
@@ -213,6 +225,8 @@ export async function handleProjectsRequest(
               project: outcome.project,
               fields: outcome.fields,
             });
+          case "unknown-assignee":
+            return respondWithProjectError(400, "unknown_assignee");
           case "busy":
             return respondWithProjectError(503, "unavailable");
         }
@@ -224,7 +238,13 @@ export async function handleProjectsRequest(
         if (!projects || projects.some(({ id }) => defaultIds.includes(id))) {
           return respondWithProjectError(400, "invalid_request");
         }
-        const outcomes = await run(store.importProjects(userId, projects));
+        const people = readImportPeople(body);
+        if (people === null) {
+          return respondWithProjectError(400, "invalid_request");
+        }
+        const outcomes = await run(
+          store.importProjects(userId, projects, people),
+        );
         return respondWithJson(200, { outcomes });
       }
     }

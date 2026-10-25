@@ -21,11 +21,16 @@ let current: LoadResult | null = null;
 const listeners = new Set<() => void>();
 let hasReceivedDefaults = false;
 
+// Also needed before the people are first read, as it is the default
+// projects' assignees that they are made from.
+export function receiveDefaultProjectsOnce() {
+  if (hasReceivedDefaults) return;
+  hasReceivedDefaults = true;
+  receiveDefaultProjects();
+}
+
 function loadProjects() {
-  if (!hasReceivedDefaults) {
-    hasReceivedDefaults = true;
-    receiveDefaultProjects();
-  }
+  receiveDefaultProjectsOnce();
   return loadSavedProjects();
 }
 
