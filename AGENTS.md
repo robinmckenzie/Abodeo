@@ -26,6 +26,12 @@
 - After Robin merges a pull request, tidy up without asking: fetch with `--prune`, switch to `main`, pull and delete the local branch. Tell Robin if the branch is still on GitHub. If the local branch is not fully merged, leave it and tell Robin.
 - Update README when setup, commands, or documented user behaviour change.
 
+## Prototype scope
+
+- Abodeo is a rapid prototype and demo, used by Robin and a friend acting as a customer, so that Robin can learn the process. It is not for real use.
+- Do not plan, build, test or review for rare cases, odd or recovered states, returning users, or production polish. Cover what a normal path meets. Note a rare case in the pull request, without asking for a decision or opening a ticket. Reviews report only problems that a normal path meets.
+- This does not relax secret handling, the security rules, or the Saved data rules.
+
 ## Ticket writing
 
 - From DRAFT onwards, the ticket's body has the sections User story, Requirements and Acceptance criteria, in that order.
