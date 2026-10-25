@@ -400,6 +400,35 @@ describe("createAccountRequestHandler", () => {
     expect(names.size).toBe(0);
   });
 
+  it("drops Google's Calendar token cookie on signing out, and reaches the appointment endpoints only when signed in", async () => {
+    const { auth, handle } = createTestHandler();
+    const ada = await signInTestAccount(auth);
+    const connection = (headers: Record<string, string>) =>
+      handle(request("/api/calendar/connection", { headers }));
+
+    expect((await connection({ "X-Abodeo-Account": ada.user.id })).status).toBe(
+      401,
+    );
+    const signedIn = await connection({
+      cookie: ada.cookie,
+      "X-Abodeo-Account": ada.user.id,
+    });
+    expect(signedIn.status).toBe(200);
+    expect(await signedIn.json()).toEqual({ ready: false });
+
+    const signOut = await handle(
+      request("/api/auth/sign-out", {
+        method: "POST",
+        headers: { cookie: ada.cookie },
+      }),
+    );
+    const cleared = signOut.headers
+      .getSetCookie()
+      .find((value) => value.startsWith("abodeo_calendar_token="));
+    expect(cleared).toContain("Max-Age=0");
+    expect(cleared).toContain("Path=/api/calendar");
+  });
+
   it("refuses a profile request that uses a session after signing out", async () => {
     const { auth, handle } = createTestHandler();
     const ada = await signInTestAccount(auth);

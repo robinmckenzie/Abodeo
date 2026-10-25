@@ -48,6 +48,32 @@ function renderForm(
 describe("ProjectForm", () => {
   afterEach(cleanup);
 
+  it("shows an opened project's appointments below its images", () => {
+    render(
+      <ProjectForm
+        values={{ ...newProjectFields, assignee: "boris" }}
+        people={people}
+        isNew={false}
+        message={null}
+        getFocusField={() => "title"}
+        onChange={vi.fn()}
+        onFieldFocus={vi.fn()}
+        onFieldBlur={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+        images={<p>Images here</p>}
+        appointments={<p>Appointments here</p>}
+      />,
+    );
+
+    const images = screen.getByText("Images here");
+    const appointments = screen.getByText("Appointments here");
+    expect(
+      images.compareDocumentPosition(appointments) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("offers Unassigned and then the people, before the title and notes", () => {
     renderForm();
     const group = screen.getByRole("group", { name: "Assigned to" });
@@ -268,6 +294,48 @@ describe("ProjectForm's due date", () => {
     fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
     expect(screen.getByRole("group", { name: "January 0" })).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("offers a box for tasks in a new project only", () => {
+    renderForm();
+    expect(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+    ).toBeTruthy();
+    cleanup();
+    renderForm(false);
+    expect(
+      screen.queryByRole("textbox", { name: "Add tasks, one per line" }),
+    ).toBeNull();
+  });
+
+  it("turns the lines typed into tasks, ignoring blank lines", () => {
+    const onChange = vi.fn();
+    render(
+      <ProjectForm
+        values={newProjectFields}
+        people={people}
+        isNew
+        message={null}
+        getFocusField={() => "title"}
+        onChange={onChange}
+        onFieldFocus={vi.fn()}
+        onFieldBlur={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "Buy paint\n\n  Fetch ladder  \n- [x] Hang door" } },
+    );
+    const { tasks } = onChange.mock.calls.at(-1)![0];
+    expect(
+      tasks.map((t: { title: string; isDone: boolean }) => [t.title, t.isDone]),
+    ).toEqual([
+      ["Buy paint", false],
+      ["Fetch ladder", false],
+      ["Hang door", false],
+    ]);
   });
 });
 

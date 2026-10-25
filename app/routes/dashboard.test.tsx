@@ -960,10 +960,40 @@ describe("tasks", () => {
     });
   }
 
-  it("are not part of the Add project form", async () => {
+  const newTasksBox = () =>
+    screen.getByRole("textbox", { name: "Add tasks, one per line" });
+
+  it("typed in the Add project form become the new project's tasks", async () => {
     await renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(screen.queryByRole("heading", { name: "Tasks" })).toBeNull();
+    fireEvent.change(titleField(), { target: { value: "Shed" } });
+    fireEvent.change(newTasksBox(), {
+      target: { value: "Paint\n\nOil hinges\nFit lock" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+    expect(
+      savedProjects()[0].tasks.map((t: { title: string }) => t.title),
+    ).toEqual(["Paint", "Oil hinges", "Fit lock"]);
+  });
+
+  it("create a project with no tasks when the Add project form's box is empty", async () => {
+    await renderDashboard();
+    await addProject("Shed");
+    expect(savedProjects()[0].tasks).toEqual([]);
+  });
+
+  it("typed in the Add project form are discarded by Cancel", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(newTasksBox(), { target: { value: "Paint" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    });
+    expect(savedProjects()).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    expect(newTasksBox()).toHaveProperty("value", "");
   });
 
   it("adds a task per line with Enter, after the notes, and keeps them", async () => {

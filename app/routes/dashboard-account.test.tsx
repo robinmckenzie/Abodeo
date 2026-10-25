@@ -76,6 +76,9 @@ type Server = {
   signInStatus: number;
   calendarStatus: number;
   calendarBodies: unknown[];
+  // What the appointments endpoints answer (AD #70).
+  appointmentsAnswer: unknown;
+  connectionReady: boolean;
   calls: string[];
   hang: boolean;
   // The account's projects, behind the real projects endpoints.
@@ -100,6 +103,8 @@ function fakeServer(overrides: Partial<Server> = {}) {
     signInStatus: 500,
     calendarStatus: 503,
     calendarBodies: [],
+    appointmentsAnswer: { status: "ok", appointments: [] },
+    connectionReady: true,
     calls: [],
     hang: false,
     projects: createMemoryProjectStore(),
@@ -196,9 +201,14 @@ function fakeServer(overrides: Partial<Server> = {}) {
           return new Response("{}", { status: server.signInStatus });
         case "/api/account/activity":
           return new Response(null, { status: server.session ? 204 : 401 });
+        case "/api/calendar/connection":
+          return Response.json({ ready: server.connectionReady });
         case "/api/calendar/test-appointment":
           server.calendarBodies.push(JSON.parse(String(init.body)));
           return new Response("{}", { status: server.calendarStatus });
+      }
+      if (path.startsWith("/api/calendar/appointments")) {
+        return Response.json(server.appointmentsAnswer);
       }
       return new Response(null, { status: 404 });
     }),
@@ -475,6 +485,23 @@ describe("leaving to sign in or out", () => {
 
     expect(confirm).not.toHaveBeenCalled();
     expect(signInStarted(server)).toBe(true);
+  });
+
+  it("asks before losing tasks typed in a new project not yet added", async () => {
+    const server = fakeServer();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "Paint" } },
+    );
+
+    await click(signInButton());
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(confirm.mock.calls[0][0]).toMatch(/the new project/);
+    expect(signInStarted(server)).toBe(false);
   });
 
   it("asks before losing a new project not yet added, and stays if asked to", async () => {
@@ -1461,5 +1488,96 @@ describe("a signed-in account's people (AD #61)", () => {
     await click(screen.getByRole("button", { name: /^Shed/ }));
     await settle();
     expect(screen.queryByRole("textbox", { name: "Add a person" })).toBeNull();
+  });
+});
+
+describe("returning from Google to a project (AD #70)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const fields = {
+    notes: "",
+    assignee: "andy" as const,
+    dueDate: null,
+    tasks: [],
+  };
+
+  async function settle() {
+    for (let i = 0; i < 5; i++) await act(async () => {});
+  }
+
+  async function serverWithProject(overrides: Partial<Server> = {}) {
+    const server = fakeServer({ session: ada, ...overrides });
+    // A copy's id is not a UUID.
+    await server.projects.store.create("ada", "3f2a-copy-9c1d", {
+      title: "Shed",
+      ...fields,
+    });
+    return server;
+  }
+
+  it("opens the project and its new appointment form, and cleans the address", async () => {
+    await serverWithProject();
+    await renderDashboard(
+      "?project=3f2a-copy-9c1d&appointment=new&calendar=connected",
+    );
+    await settle();
+
+    expect(screen.getByRole("group", { name: "New appointment" })).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", { name: "Appointment title" }),
+    ).toBeTruthy();
+    // The Calendar test says nothing about a project's grant.
+    expect(screen.queryByText("Google Calendar is connected.")).toBeNull();
+  });
+
+  it("opens the project without the form when the form was not asked for", async () => {
+    await serverWithProject();
+    await renderDashboard("?project=3f2a-copy-9c1d&calendar=connected");
+    await settle();
+
+    expect(
+      screen.getByRole("button", { name: "Add appointment" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "New appointment" })).toBeNull();
+  });
+
+  it("opens the form once only: closing and reopening the project does not bring it back", async () => {
+    await serverWithProject();
+    await renderDashboard(
+      "?project=3f2a-copy-9c1d&appointment=new&calendar=connected",
+    );
+    await settle();
+    await click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("group", { name: "New appointment" })).toBeNull();
+  });
+
+  it("says Calendar access was not given after a refusal, and does not go through Google by itself", async () => {
+    const server = await serverWithProject({
+      appointmentsAnswer: { status: "needs-grant", connectedBefore: true },
+    });
+    await renderDashboard("?project=3f2a-copy-9c1d&calendar=denied");
+    await settle();
+
+    expect(
+      screen.getByText(
+        "Calendar access was not given, so appointments cannot be shown.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Connect Google Calendar" }),
+    ).toBeTruthy();
+    expect(server.calls).not.toContain("POST /api/calendar/test-appointment");
+    // The test button's message is not shown for a project's grant.
+    expect(
+      screen.queryByText(/Calendar access was not given, so no/),
+    ).toBeNull();
+  });
+
+  it("ignores a project the account does not have", async () => {
+    await serverWithProject();
+    await renderDashboard("?project=nope&appointment=new&calendar=connected");
+    await settle();
+
+    expect(screen.queryByRole("group", { name: "New appointment" })).toBeNull();
+    expect(screen.getByText("Shed")).toBeTruthy();
   });
 });

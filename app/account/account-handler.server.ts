@@ -5,6 +5,11 @@
 // on Vercel alike.
 import { Pool } from "@neondatabase/serverless";
 
+import {
+  handleAppointmentRequest,
+  isAppointmentPath,
+} from "../calendar/appointment-handler.server";
+import { clearCalendarTokenCookie } from "../calendar/calendar-token.server";
 import { createCalendarGoogle } from "../calendar/calendar-grant.server";
 import {
   handleCalendarRequest,
@@ -101,8 +106,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const pool = new Pool({ connectionString: config.databaseUrl });
   listenForPoolErrors(pool);
   const history = createHistoryStore(pool);
-  const auth = createAccountAuth(config, pool, history);
   const projects = createProjectStore(pool);
+  const auth = createAccountAuth(config, pool, history);
   return {
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
@@ -120,6 +125,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
       google: createCalendarGoogle(config),
       calendar: createGoogleCalendar(),
       store: createCalendarStore(pool),
+      hasProject: async (userId, projectId) =>
+        (await projects.read(userId, projectId)).kind !== "not-found",
     },
     close: () => pool.end(),
   };
@@ -169,6 +176,7 @@ export function createAccountRequestHandler(
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
     const isCalendar = isCalendarPath(pathname);
+    const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
     const isPeople = isPeoplePath(pathname);
     const isProjects = !isImages && isProjectsPath(pathname);
@@ -176,6 +184,7 @@ export function createAccountRequestHandler(
       !isProfile &&
       !isActivity &&
       !isCalendar &&
+      !isAppointments &&
       !isProjects &&
       !isPeople &&
       !isImages &&
@@ -212,6 +221,12 @@ export function createAccountRequestHandler(
       return isCalendar ? respondCalendarUnavailable(request) : fail();
     }
     try {
+      if (isAppointments) {
+        return await handleAppointmentRequest(request, {
+          ...runtime.calendar,
+          readSessionUserId: runtime.readSessionUserId,
+        });
+      }
       if (isCalendar) {
         return await handleCalendarRequest(request, {
           ...runtime.calendar,
@@ -263,6 +278,15 @@ export function createAccountRequestHandler(
       ) {
         reportFailure(`callback_${response.status}`);
         return fail();
+      }
+      // Signing out also drops Google's Calendar token.
+      if (pathname === `${authBasePath}/sign-out`) {
+        const cleared = new Response(response.body, response);
+        cleared.headers.append(
+          "Set-Cookie",
+          clearCalendarTokenCookie(runtime.calendar.isSecure),
+        );
+        return cleared;
       }
       return response;
     } catch (error) {
