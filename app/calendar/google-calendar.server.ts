@@ -221,7 +221,12 @@ export function createGoogleCalendar(
         if (!response.ok) throw await fail(response);
         const body: unknown = await response.json().catch(() => undefined);
         const items = (body as { items?: unknown } | undefined)?.items;
-        for (const item of Array.isArray(items) ? items : []) {
+        // Google always sends the list, empty or not. Without it the answer
+        // is not one to trust as "no appointments".
+        if (!Array.isArray(items)) {
+          throw new GoogleCalendarError("google_unreadable");
+        }
+        for (const item of items) {
           const event = readEvent(item);
           if (event) events.push(event);
         }

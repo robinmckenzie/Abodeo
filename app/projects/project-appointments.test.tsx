@@ -221,6 +221,33 @@ describe("calling fetch", () => {
   });
 });
 
+describe("leaving for Google", () => {
+  it("does not go through Google after the project has been closed", async () => {
+    const fakes = fakeEndpoints();
+    fakes.endpoints.list = { status: "needs-grant", connectedBefore: false };
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const answer = fakes.fetchFn.getMockImplementation()!;
+    fakes.fetchFn.mockImplementation(async (path, init) => {
+      if (path === "/api/calendar/test-appointment") await held;
+      return answer(path, init);
+    });
+    const { navigate } = await show(fakes);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Connect Google Calendar" }),
+    );
+    await settle();
+    cleanup();
+    release();
+    await settle();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
 describe("opening a project without a good Google token", () => {
   it("goes through Google by itself, once, for an account that connected before", async () => {
     const fakes = fakeEndpoints();

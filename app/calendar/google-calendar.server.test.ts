@@ -125,6 +125,18 @@ describe("createGoogleCalendar", () => {
     ).toBe("t");
   });
 
+  it("rejects rather than give an empty list when the answer is unreadable", async () => {
+    const calendar = createGoogleCalendar(
+      fakeFetch(new Response('{"items": [', { status: 200 })) as typeof fetch,
+    );
+
+    const error = await calendar
+      .listEvents("token", "id", { name: "n", value: "v" })
+      .catch((caught: unknown) => caught);
+
+    expect((error as GoogleCalendarError).code).toBe("google_unreadable");
+  });
+
   it("rejects rather than give a short list when there are too many pages", async () => {
     const fetchFn = vi.fn(async () =>
       Response.json({ items: [], nextPageToken: "more" }),

@@ -86,6 +86,8 @@ async function readJson(response: Response) {
   return (await response.json().catch(() => undefined)) as unknown;
 }
 
+const addAppointmentTimeout = 45_000;
+
 export function useProjectAppointments({
   accountId,
   projectId,
@@ -121,14 +123,14 @@ export function useProjectAppointments({
   });
 
   const send = useCallback(
-    (path: string, init: RequestInit = {}) => {
+    (path: string, init: RequestInit = {}, timeout = requestTimeout) => {
       // Called on its own: the browser's fetch fails if called as a method.
       const { fetchFn: sendRequest } = optionsRef.current;
       return sendRequest(path, {
         credentials: "same-origin",
         ...init,
         headers: { [accountHeader]: accountId, ...init.headers },
-        signal: AbortSignal.timeout(requestTimeout),
+        signal: AbortSignal.timeout(timeout),
       });
     },
     [accountId],
@@ -161,6 +163,8 @@ export function useProjectAppointments({
           noteSignInChange(response.status);
           return false;
         }
+        // Not if the person has moved to another project meanwhile.
+        if (!isCurrentRef.current) return false;
         optionsRef.current.navigate(url);
         return true;
       } catch {
@@ -244,15 +248,21 @@ export function useProjectAppointments({
   // Adds the appointment, then shows the list as Google now has it.
   const add = async (fields: AppointmentFields): Promise<AddResult> => {
     try {
-      const response = await send(calendarAppointmentsPath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...fields,
-          projectId,
-          timeZone: readBrowserTimeZone() ?? null,
-        }),
-      });
+      // Longer than a read: the server may make several Google calls, and
+      // giving up first would invite a second, duplicate, appointment.
+      const response = await send(
+        calendarAppointmentsPath,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...fields,
+            projectId,
+            timeZone: readBrowserTimeZone() ?? null,
+          }),
+        },
+        addAppointmentTimeout,
+      );
       if (!isCurrentRef.current) return { ok: false, reason: "unreachable" };
       if (response.ok) {
         setIsFormOpen(false);
