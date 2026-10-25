@@ -70,6 +70,17 @@ requirements, commitments, or scheduled work.
   time, caption and ordering independent of its image, so that a text-only
   entry can share them.
 
+## Testing
+
+- Tests for timing fixes: in AD #61 Manage People, Codex's review fixes for
+  race and ordering bugs mostly went in without regression tests (revision
+  ordering, the removal binding, the profile re-lookup, the form's delayed-add
+  guards), because timing code in hooks and components is awkward to test. If
+  it happens again, propose a line for `AGENTS.md`: a fix for a race or
+  ordering bug gets a test that settles the promises out of order, or its
+  decision logic goes into a plain, tested function; if neither is practical,
+  the pull request says so.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
