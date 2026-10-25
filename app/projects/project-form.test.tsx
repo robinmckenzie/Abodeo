@@ -29,6 +29,31 @@ function renderForm(isNew = true, message: FormMessage = null) {
 describe("ProjectForm", () => {
   afterEach(cleanup);
 
+  it("shows an opened project's appointments below its images", () => {
+    render(
+      <ProjectForm
+        values={{ ...newProjectFields, assignee: "boris" }}
+        isNew={false}
+        message={null}
+        getFocusField={() => "title"}
+        onChange={vi.fn()}
+        onFieldFocus={vi.fn()}
+        onFieldBlur={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+        images={<p>Images here</p>}
+        appointments={<p>Appointments here</p>}
+      />,
+    );
+
+    const images = screen.getByText("Images here");
+    const appointments = screen.getByText("Appointments here");
+    expect(
+      images.compareDocumentPosition(appointments) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("offers the four assignees, before the title and notes", () => {
     renderForm();
     const group = screen.getByRole("group", { name: "Assigned to" });

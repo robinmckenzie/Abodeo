@@ -2182,3 +2182,105 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .dashboard.is-drop-target:has(.project-window)::after {
   display: none;
 }
+
+/* A project's appointments, below its images. */
+.project-appointments {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.project-appointments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.project-appointments .task-heading {
+  margin: 0;
+}
+
+.project-appointments button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.project-appointments button:hover:not(:disabled) {
+  background: #f6f3ec;
+}
+
+.project-appointments button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.project-appointments-note {
+  margin: 0.375rem 0;
+  color: #5a5548;
+  font-size: 0.875rem;
+}
+
+.project-appointments .appointment-error {
+  color: #9a2a1a;
+}
+
+.appointment-list {
+  margin: 0.375rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appointment-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.375rem 0;
+  border-top: 1px solid #e4dfd2;
+}
+
+.appointment-title {
+  font-weight: 500;
+}
+
+.appointment-time,
+.appointment-notes {
+  color: #5a5548;
+  font-size: 0.875rem;
+}
+
+.appointment-notes {
+  white-space: pre-wrap;
+}
+
+.appointment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.appointment-form input[type="text"],
+.appointment-form input[type="date"],
+.appointment-form input[type="datetime-local"],
+.appointment-form textarea {
+  font: inherit;
+  padding: 0.25rem 0.375rem;
+}
+
+.appointment-all-day {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.appointment-form-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}

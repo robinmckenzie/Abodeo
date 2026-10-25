@@ -80,7 +80,9 @@ tuning panels, stay in the browser either way.
   (whether sign-in is configured), `/api/account/profile` (the preferred name), `/api/account/activity` (see
   [Sign-in history](#sign-in-history)), `/api/projects` (see
   [Projects while signed in](#projects-while-signed-in)) and the Calendar
-  test's `/api/calendar/test-appointment` and `/api/calendar/callback`. Any other Better Auth
+  endpoints `/api/calendar/test-appointment`, `/api/calendar/callback`,
+  `/api/calendar/connection` and `/api/calendar/appointments` (see
+  [Project appointments](#project-appointments)). Any other Better Auth
   endpoint gets a 404.
 - Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
   database in `DATABASE_URL`. `npm run dev` uses a separate database, `abodeo-local`, through
@@ -257,8 +259,9 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   only, encrypted with `BETTER_AUTH_SECRET`. Better Auth's tables and endpoints are not used.
 - Google returns to `/api/calendar/callback`, which checks the cookie, the session and that the
   permission was ticked, refuses a Google account other than the signed-in one, and exchanges the
-  code for a token. The token is used for this one test and then dropped: it is never saved or
-  logged, so each test may go through Google again.
+  code for a token. The token is never saved in the database or logged. It is used for the test
+  and kept for up to an hour in the cookie described under
+  [Project appointments](#project-appointments).
 - The appointment, "Abodeo test appointment", is at the next whole hour for 30 minutes, in a
   calendar named Abodeo. The first test makes the calendar and saves its ID in `calendar_link`.
   Later tests reuse it, or make a new one if Google answers that it cannot be found. If two tests
@@ -270,6 +273,34 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   hidden it: in testing, a calendar permanently deleted in Google Calendar was still returned by
   Google and still accepted appointments, which were then not shown. Abodeo reports them as
   created.
+
+### Project appointments
+
+A project shows and adds appointments (AD #70 Add Appointments To Projects). They are events in
+the account's Abodeo calendar in Google Calendar, and Abodeo keeps no copy. The code is in
+`app/calendar/` and `app/projects/project-appointments.tsx`.
+
+- Each event has the project's ID in a private extended property (`abodeoProject`), which only
+  the client that wrote it can see, so a project lists just the events Abodeo made for it. The
+  title is the event's summary and the notes its description. An all-day appointment is a single
+  day (`date` fields), a timed one uses a local date-time and the browser's time zone, and the end
+  defaults to an hour after the start.
+- A grant keeps Google's access token for up to 55 minutes (or Google's expiry if sooner) in a
+  second encrypted cookie, `abodeo_calendar_token`, `HttpOnly` and scoped to `/api/calendar`. It
+  is read only if it was made for the signed-in account, is cleared at sign-out, and is never in
+  the database or logs. The browser never sees it: every Google call is made by
+  `/api/calendar/connection` (is the token good for more than five minutes?) and
+  `/api/calendar/appointments` (list by `projectId`, and add), which name the account the page
+  works for, as the projects endpoints do.
+- Opening a project lists its appointments. With no good token it answers `needs-grant`: an
+  account that has an Abodeo calendar (has connected before) goes through Google by itself and
+  returns to the project, once per page load and not straight after a refusal or failure; any
+  other sees a Connect Google Calendar button. Opening the form checks the token first and goes
+  through Google if it is missing or near expiry. A save with an expired token creates nothing.
+- Google returns to `/dashboard?project=<id>&appointment=new&calendar=connected`, which opens the
+  project (and its form) once its projects have loaded, then cleans the address.
+- If Google cannot be reached, or the list cannot be read in full, the project says appointments
+  cannot be shown rather than showing none.
 
 ### Setting it up from scratch
 

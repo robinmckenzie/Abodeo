@@ -6,7 +6,10 @@ import {
 } from "./calendar-grant.server";
 import type { CalendarDependencies } from "./calendar-handler.server";
 import type { CalendarStore } from "./calendar-store.server";
-import type { CalendarEvent, GoogleCalendar } from "./google-calendar.server";
+import type {
+  CalendarEventRecord,
+  GoogleCalendar,
+} from "./google-calendar.server";
 import { GoogleCalendarError } from "./google-calendar.server";
 
 export const testAccessToken = "access-token-never-kept";
@@ -17,13 +20,15 @@ export const testSecret = "test-secret-that-is-long-enough-for-better-auth";
 export function createMemoryGoogleCalendar() {
   const calendars = new Map<
     string,
-    { summary: string; events: CalendarEvent[] }
+    { summary: string; events: CalendarEventRecord[] }
   >();
   const tokensUsed: string[] = [];
   let made = 0;
+  let madeEvents = 0;
   const failures: {
     insertCalendar?: string;
     insertEvent?: string;
+    listEvents?: string;
     deleteCalendar?: string;
   } = {};
   const fail = (method: keyof typeof failures) => {
@@ -43,8 +48,20 @@ export function createMemoryGoogleCalendar() {
       fail("insertEvent");
       const found = calendars.get(calendarId);
       if (!found) return "not-found";
-      found.events.push(event);
-      return "created";
+      const record = { ...event, id: `event-${++madeEvents}` };
+      found.events.push(record);
+      return record;
+    },
+    async listEvents(accessToken, calendarId, { name, value }) {
+      tokensUsed.push(accessToken);
+      fail("listEvents");
+      const found = calendars.get(calendarId);
+      if (!found) return [];
+      const sortKey = (event: CalendarEventRecord) =>
+        "date" in event.start ? event.start.date : event.start.dateTime;
+      return found.events
+        .filter((event) => event.extendedProperties?.private[name] === value)
+        .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
     },
     async deleteCalendar(accessToken, calendarId) {
       tokensUsed.push(accessToken);
@@ -101,6 +118,7 @@ export function createFakeCalendarGoogle() {
       accessToken: testAccessToken,
       idToken: testIdToken,
       scopes: ["openid", calendarScope],
+      accessTokenExpiresAt: undefined,
     },
     subject: "google-sub-1",
   };
@@ -127,12 +145,16 @@ export function createFakeCalendarDependencies() {
   const google = createFakeCalendarGoogle();
   const calendar = createMemoryGoogleCalendar();
   const store = createMemoryCalendarStore();
+  // The accounts' projects, as "userId/projectId".
+  const projects = new Set<string>();
   const dependencies: CalendarDependencies = {
     secret: testSecret,
     isSecure: false,
     google: google.google,
     calendar: calendar.calendar,
     store: store.store,
+    hasProject: async (userId, projectId) =>
+      projects.has(`${userId}/${projectId}`),
   };
-  return { dependencies, google, calendar, store };
+  return { dependencies, google, calendar, store, projects };
 }

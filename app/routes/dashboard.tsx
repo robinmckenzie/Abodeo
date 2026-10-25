@@ -41,6 +41,15 @@ import {
 import { ProjectForm, type FormMessage } from "../projects/project-form";
 import { useFileDrag } from "../projects/use-file-drag";
 import { ProjectImages, type AddFiles } from "../projects/project-images";
+import {
+  describeReturnResult,
+  ProjectAppointments,
+} from "../projects/project-appointments";
+import {
+  readProjectReturn,
+  removeProjectReturn,
+} from "../calendar/appointments-api";
+import { isReconnectBlockedBy } from "../calendar/use-project-appointments";
 import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
@@ -688,6 +697,51 @@ export default function Dashboard() {
   };
 
   const isAccountReady = view.kind === "account" && view.state === "ready";
+
+  // Google returns the browser to a project (AD #70 Add Appointments To
+  // Projects) as ?project=<id>, with the result of the grant. Read once, as
+  // the address is then cleaned. The project opens once the account's
+  // projects have loaded.
+  const [returnTarget] = useState(() => readProjectReturn(location.search));
+  const isReturnHandledRef = useRef(false);
+  // The project to open the new appointment form for, on its opening only.
+  const formProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (open === null) formProjectIdRef.current = null;
+  }, [open]);
+  const openProjectRef = useRef(openProject);
+  useEffect(() => {
+    openProjectRef.current = openProject;
+  });
+  const returnedProject =
+    isAccountReady && returnTarget
+      ? view.projects.find(({ id }) => id === returnTarget.projectId)
+      : undefined;
+  const isReturnSettled =
+    isAccountReady || view.kind === "browser" || view.kind === "unavailable";
+  useEffect(() => {
+    if (!returnTarget || isReturnHandledRef.current || !isReturnSettled) return;
+    isReturnHandledRef.current = true;
+    if (returnedProject) {
+      const bar = document.querySelector<HTMLElement>(
+        `[data-project-id="${CSS.escape(returnedProject.id)}"]`,
+      );
+      openProjectRef.current(
+        returnedProject,
+        bar?.getBoundingClientRect().height ?? 0,
+      );
+      if (returnTarget.openForm && returnTarget.result === "connected") {
+        formProjectIdRef.current = returnedProject.id;
+      }
+    }
+    navigate(
+      {
+        pathname: location.pathname,
+        search: removeProjectReturn(location.search),
+      },
+      { replace: true, state: location.state },
+    );
+  }, [returnTarget, isReturnSettled, returnedProject, location, navigate]);
   const browserProjects =
     view.kind === "browser" && view.result?.ok ? view.result : null;
   const list = isAccountReady
@@ -832,6 +886,25 @@ export default function Dashboard() {
                 source.showLatestImage(view.generation, open.id, imageId);
               }
             }}
+          />
+        )
+      }
+      appointments={
+        open.id !== null && (
+          <ProjectAppointments
+            accountId={view.kind === "account" ? view.accountId : null}
+            projectId={open.id}
+            shouldOpenForm={() => formProjectIdRef.current === open.id}
+            canReconnectAutomatically={
+              !isReconnectBlockedBy(returnTarget?.result)
+            }
+            returnNote={
+              returnTarget?.projectId === open.id
+                ? describeReturnResult(returnTarget.result)
+                : null
+            }
+            onBeforeLeave={prepareToLeave}
+            onSignInChange={noteAccountFailure}
           />
         )
       }

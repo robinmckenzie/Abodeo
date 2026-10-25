@@ -537,3 +537,181 @@ describe("the test appointment", () => {
     });
   });
 });
+
+describe("a grant for a project's appointments", () => {
+  function postProjectStart(
+    body: Record<string, unknown>,
+    account: string | null = "user-1",
+  ) {
+    return new Request(`${origin}/api/calendar/test-appointment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(account ? { "X-Abodeo-Account": account } : {}),
+      },
+      body: JSON.stringify({ timeZone: "Europe/London", ...body }),
+    });
+  }
+
+  async function startForProject(
+    test: TestSetUp,
+    body: Record<string, unknown>,
+  ) {
+    const response = await test.handle(postProjectStart(body));
+    expect(response.status).toBe(200);
+    const { url } = (await response.json()) as { url: string };
+    return {
+      cookie: (response.headers.get("Set-Cookie") ?? "").split(";")[0],
+      state: new URL(url).searchParams.get("state") ?? "",
+    };
+  }
+
+  function readReturn(response: Response) {
+    expect(response.status).toBe(302);
+    const { pathname, searchParams } = new URL(
+      response.headers.get("Location") ?? "",
+    );
+    expect(pathname).toBe("/dashboard");
+    return Object.fromEntries(searchParams);
+  }
+
+  it("names the account the page works for, and a valid project", async () => {
+    const test = setUp();
+    const project = { projectId: "p-1", openForm: true };
+
+    expect((await test.handle(postProjectStart(project, null))).status).toBe(
+      400,
+    );
+    const other = await test.handle(postProjectStart(project, "user-2"));
+    expect(other.status).toBe(409);
+    expect(await other.json()).toEqual({ error: "account_changed" });
+    expect(other.headers.get("Set-Cookie")).toBeNull();
+    for (const projectId of ["", "a b", "x".repeat(101), 5, "../x"]) {
+      expect((await test.handle(postProjectStart({ projectId }))).status).toBe(
+        400,
+      );
+    }
+    test.session.userId = undefined;
+    expect((await test.handle(postProjectStart(project))).status).toBe(401);
+  });
+
+  it("returns to the project with its form, connecting and creating nothing", async () => {
+    const test = setUp();
+    // A copy's id is not a UUID.
+    const projectId = "3f2a-copy-9c1d";
+    const { cookie, state } = await startForProject(test, {
+      projectId,
+      openForm: true,
+    });
+
+    const response = await test.handle(
+      callback(`state=${state}&code=google-code`, cookie),
+    );
+
+    expect(readReturn(response)).toEqual({
+      project: projectId,
+      appointment: "new",
+      calendar: "connected",
+    });
+    expect(test.calendar.calendars.size).toBe(0);
+    const cookies = response.headers.getSetCookie();
+    const token = cookies.find((value) =>
+      value.startsWith("abodeo_calendar_token="),
+    );
+    expect(token).toContain("HttpOnly");
+    expect(token).toContain("Path=/api/calendar");
+    expect(token).not.toContain(testAccessToken);
+    expect(cookies.some((value) => value.includes("Max-Age=0"))).toBe(true);
+  });
+
+  it("returns to the project without the form when it was not asked for", async () => {
+    const test = setUp();
+    const { cookie, state } = await startForProject(test, {
+      projectId: "p-1",
+      openForm: false,
+    });
+
+    const response = await test.handle(
+      callback(`state=${state}&code=google-code`, cookie),
+    );
+
+    expect(readReturn(response)).toEqual({
+      project: "p-1",
+      calendar: "connected",
+    });
+  });
+
+  it("returns to the project after a refusal, a wrong account or a failure, with no token", async () => {
+    const refused = setUp();
+    const first = await startForProject(refused, {
+      projectId: "p-1",
+      openForm: true,
+    });
+    const denied = await refused.handle(
+      callback(`state=${first.state}&error=access_denied`, first.cookie),
+    );
+    expect(readReturn(denied)).toEqual({ project: "p-1", calendar: "denied" });
+    expect(
+      denied.headers
+        .getSetCookie()
+        .some((value) => value.startsWith("abodeo_calendar_token=")),
+    ).toBe(false);
+
+    const wrong = setUp();
+    wrong.google.answer.subject = "google-sub-other";
+    const second = await startForProject(wrong, { projectId: "p-1" });
+    expect(
+      readReturn(
+        await wrong.handle(
+          callback(`state=${second.state}&code=c`, second.cookie),
+        ),
+      ),
+    ).toEqual({ project: "p-1", calendar: "wrong-account" });
+
+    const failed = setUp();
+    const third = await startForProject(failed, { projectId: "p-1" });
+    expect(
+      readReturn(
+        await failed.handle(
+          callback(`state=${third.state}&code=`, third.cookie),
+        ),
+      ),
+    ).toEqual({ project: "p-1", calendar: "failed" });
+  });
+
+  it("keeps the token for the account's calendar test too, without logging it", async () => {
+    const test = setUp();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { cookie, state } = await start(test);
+
+    const response = await test.handle(
+      callback(`state=${state}&code=google-code`, cookie),
+    );
+
+    expect(readResult(response)).toBe("created");
+    expect(
+      response.headers
+        .getSetCookie()
+        .some((value) => value.startsWith("abodeo_calendar_token=")),
+    ).toBe(true);
+    expect(JSON.stringify(log.mock.calls)).not.toContain(testAccessToken);
+    log.mockRestore();
+  });
+
+  it("follows Google's expiry for the token's lifetime", async () => {
+    const test = setUp();
+    test.google.answer.tokens.accessTokenExpiresAt = startTime + 600_000;
+    const { cookie, state } = await startForProject(test, {
+      projectId: "p-1",
+    });
+
+    const response = await test.handle(
+      callback(`state=${state}&code=google-code`, cookie),
+    );
+
+    const token = response.headers
+      .getSetCookie()
+      .find((value) => value.startsWith("abodeo_calendar_token="));
+    expect(token).toContain("Max-Age=600");
+  });
+});

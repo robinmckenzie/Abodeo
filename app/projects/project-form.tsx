@@ -26,6 +26,7 @@ export function ProjectForm({
   hasCloseButton = true,
   tasks,
   images,
+  appointments,
 }: {
   values: ProjectFields;
   isNew: boolean;
@@ -54,6 +55,8 @@ export function ProjectForm({
   tasks?: React.ReactNode;
   // An opened project's images, shown below its tasks.
   images?: React.ReactNode;
+  // An opened project's appointments, shown below its images.
+  appointments?: React.ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const id = useId();
@@ -233,6 +236,7 @@ export function ProjectForm({
           )}
           {tasks}
           {images}
+          {appointments}
         </div>
       </div>
       <div className="project-form-footer">
