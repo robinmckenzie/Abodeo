@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import { returnProjectParameter } from "./appointments-api";
 import {
   calendarResultParameter,
   calendarTestAppointmentPath,
@@ -15,6 +16,7 @@ import {
 
 export const calendarMessages: Record<CalendarResult, string> = {
   created: "Test appointment created in your Abodeo calendar.",
+  connected: "Google Calendar is connected.",
   denied: "Calendar access was not given, so no appointment was created.",
   "wrong-account":
     "Choose the Google account you signed in with. No appointment was created.",
@@ -69,8 +71,13 @@ export function useCalendarTest({
 }): CalendarTest {
   const location = useLocation();
   const navigate = useNavigate();
-  const [result, setResult] = useState<CalendarResult | null>(
-    () => readCalendarResult(location.search) ?? null,
+  // A return to a project (AD #70 Add Appointments To Projects) is the
+  // project's own to report, not this test's.
+  const isForProject = new URLSearchParams(location.search).has(
+    returnProjectParameter,
+  );
+  const [result, setResult] = useState<CalendarResult | null>(() =>
+    isForProject ? null : (readCalendarResult(location.search) ?? null),
   );
   const [isLeaving, setIsLeaving] = useState(false);
   const onBeforeLeaveRef = useRef(onBeforeLeave);
@@ -78,9 +85,9 @@ export function useCalendarTest({
     onBeforeLeaveRef.current = onBeforeLeave;
   });
 
-  const isResultInAddress = new URLSearchParams(location.search).has(
-    calendarResultParameter,
-  );
+  const isResultInAddress =
+    !isForProject &&
+    new URLSearchParams(location.search).has(calendarResultParameter);
   useEffect(() => {
     if (!isResultInAddress) return;
     navigate(

@@ -31,6 +31,10 @@ export type CalendarGrant = {
   userId: string;
   // The browser's IANA time zone, or null if it gave none that is valid.
   timeZone: string | null;
+  // The project to return the browser to, or null for the dashboard.
+  returnProjectId: string | null;
+  // Whether to open the project's new appointment form on return.
+  openForm: boolean;
   expiresAt: number;
 };
 
@@ -39,6 +43,8 @@ export type CalendarTokens = {
   accessToken: string | undefined;
   idToken: string | undefined;
   scopes: string[];
+  // When the access token ends, in milliseconds, if Google said.
+  accessTokenExpiresAt: number | undefined;
 };
 
 // Google's side of the grant, which the tests stand in for.
@@ -90,6 +96,7 @@ export function createCalendarGoogle(config: AccountConfig): CalendarGoogle {
         accessToken: tokens.accessToken,
         idToken: tokens.idToken,
         scopes: tokens.scopes ?? [],
+        accessTokenExpiresAt: tokens.accessTokenExpiresAt?.getTime(),
       };
     },
     readIdTokenSubject: async (idToken) => {
@@ -131,6 +138,8 @@ export async function startCalendarGrant(
     userId,
     googleAccountId,
     timeZone,
+    returnProjectId = null,
+    openForm = false,
     now,
   }: {
     secret: string;
@@ -139,6 +148,8 @@ export async function startCalendarGrant(
     // Suggests the signed-in Google account at Google's account chooser.
     googleAccountId: string;
     timeZone: string | null;
+    returnProjectId?: string | null;
+    openForm?: boolean;
     now: number;
   },
 ) {
@@ -147,6 +158,8 @@ export async function startCalendarGrant(
     verifier: generateRandomString(128),
     userId,
     timeZone,
+    returnProjectId,
+    openForm,
     expiresAt: now + calendarGrantLifetime,
   };
   const url = await calendarGoogle.createAuthorizationURL({
@@ -168,7 +181,7 @@ export async function startCalendarGrant(
   };
 }
 
-function readCookie(cookieHeader: string | null, name: string) {
+export function readCookie(cookieHeader: string | null, name: string) {
   for (const part of cookieHeader?.split(";") ?? []) {
     const separator = part.indexOf("=");
     if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
@@ -185,6 +198,9 @@ function isCalendarGrant(value: unknown): value is CalendarGrant {
     typeof grant.verifier === "string" &&
     typeof grant.userId === "string" &&
     (grant.timeZone === null || typeof grant.timeZone === "string") &&
+    (grant.returnProjectId === null ||
+      typeof grant.returnProjectId === "string") &&
+    typeof grant.openForm === "boolean" &&
     typeof grant.expiresAt === "number"
   );
 }

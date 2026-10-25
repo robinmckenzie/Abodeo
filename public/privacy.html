@@ -46,8 +46,8 @@
         you sign out.
       </li>
       <li>
-        The ID of the Abodeo calendar in your Google Calendar, if you have used the Calendar test
-        described below.
+        The ID of the Abodeo calendar in your Google Calendar, if you have used Google Calendar
+        with Abodeo as described below.
       </li>
       <li>
         A record of sessions with their lengths: when you signed in, and when you used Abodeo and
@@ -81,8 +81,9 @@
 
     <h2>Google Calendar</h2>
     <p>
-      Once signed in, you can choose to create a test appointment in Google Calendar. Only then
-      does Abodeo ask Google for access to your calendar, and Google asks for your permission.
+      Once signed in, you can add appointments to your projects, which Abodeo puts in Google
+      Calendar, and you can create a test appointment there. Only then does Abodeo ask Google for
+      access to your calendar, and Google asks for your permission.
     </p>
     <ul>
       <li>
@@ -91,12 +92,22 @@
         calendars or their events.
       </li>
       <li>
-        Abodeo makes one calendar, named Abodeo, and adds a test appointment to it. It keeps the
-        calendar's ID, so that later tests use the same calendar.
+        Abodeo makes one calendar, named Abodeo, and adds your appointments and test appointments
+        to it. It keeps the calendar's ID, so that the same calendar is used each time.
       </li>
       <li>
-        Google gives Abodeo a token for the test. It is used for that one test and never kept, so
-        Google may ask again next time.
+        An appointment is an event in your Abodeo calendar. Abodeo keeps no copy of it: it
+        shows a project's appointments by reading them from Google Calendar. Each event carries
+        the ID of its project, in a private property that only Abodeo can read, so that Abodeo
+        knows which project it belongs to, and holds the title, times and notes you gave it.
+        Deleting your Abodeo account does not delete these events, as they are in your own
+        Google Calendar: delete them there.
+      </li>
+      <li>
+        Google gives Abodeo a token to use your calendar. Abodeo keeps it for up to an hour, or
+        until Google ends it if sooner, in an encrypted cookie in your browser that only Abodeo's
+        own pages and not other sites can send back to it. It is removed when you sign out, and
+        it is never saved in Abodeo's database, so Google may ask again when it has ended.
       </li>
       <li>
         You can withdraw the permission at any time at

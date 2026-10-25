@@ -10,6 +10,9 @@ export const calendarResultParameter = "calendar";
 
 export const calendarResults = [
   "created",
+  // Google's permission was given for a project's appointments (AD #70 Add
+  // Appointments To Projects), where nothing is created yet.
+  "connected",
   "denied",
   "wrong-account",
   "failed",

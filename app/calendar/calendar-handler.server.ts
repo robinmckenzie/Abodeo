@@ -15,6 +15,12 @@ import {
   withTimeout,
   type ReadSessionUserId,
 } from "../account/account-profile.server";
+import { readRequestAccount } from "../projects/request-account.server";
+import { isProjectId } from "../projects/projects-api";
+import {
+  buildProjectReturnSearch,
+  type AppointmentReturnTarget,
+} from "./appointments-api";
 import {
   calendarCallbackPath,
   calendarResultParameter,
@@ -29,11 +35,13 @@ import {
   startCalendarGrant,
   type CalendarGoogle,
 } from "./calendar-grant.server";
+import { createCalendarTokenCookie } from "./calendar-token.server";
 import type { CalendarStore } from "./calendar-store.server";
 import {
   GoogleCalendarError,
   googleCalendarTimeout,
   type CalendarEvent,
+  type CalendarEventRecord,
   type GoogleCalendar,
 } from "./google-calendar.server";
 
@@ -58,6 +66,7 @@ const testAppointmentDescription =
   "Made by Abodeo's Calendar test, to check that Abodeo can add appointments to your Abodeo calendar. You can delete it.";
 const testAppointmentLength = 30 * 60 * 1000;
 const hour = 60 * 60 * 1000;
+const unknownTokenLifetime = 30 * 60 * 1000;
 
 // What the endpoints need once sign-in is configured.
 export type CalendarDependencies = {
@@ -68,6 +77,9 @@ export type CalendarDependencies = {
   google: CalendarGoogle;
   calendar: GoogleCalendar;
   store: CalendarStore;
+  // Whether the account has the project, which may be one this version
+  // cannot read.
+  hasProject(userId: string, projectId: string): Promise<boolean>;
 };
 
 export type ReportCalendarFailure = (
@@ -143,34 +155,34 @@ export function buildTestAppointment(
   };
 }
 
-// Adds the test appointment to the account's Abodeo calendar, making the
-// calendar first if there is none or Google no longer finds it. Two tests at once (two
+// Adds the event to the account's Abodeo calendar, making the calendar first
+// if there is none or Google no longer finds it. Two additions at once (two
 // tabs) save the calendar by compare-and-swap: the one that loses deletes the
 // calendar it made and uses the winner's, so only one calendar is ever in
-// use. Rejects if the appointment was not created.
-export async function createTestAppointment({
+// use. Rejects if the event was not created.
+export async function insertAbodeoEvent({
   accessToken,
   userId,
   timeZone,
+  event,
   store,
   calendar,
-  now,
   timeout = accountStoreTimeout,
   reportFailure = reportCalendarFailure,
 }: {
   accessToken: string;
   userId: string;
+  // The calendar's time zone, if it has to be made.
   timeZone: string | null;
+  event: CalendarEvent;
   store: CalendarStore;
   calendar: GoogleCalendar;
-  now: number;
   timeout?: number;
   reportFailure?: ReportCalendarFailure;
-}) {
+}): Promise<CalendarEventRecord> {
   // Database calls are limited here. Google's calls limit themselves (see
   // googleCalendarTimeout), as they can take longer.
   const call = <Result>(work: Promise<Result>) => withTimeout(work, timeout);
-  const event = buildTestAppointment(now, timeZone);
   const makeCalendar = () =>
     calendar.insertCalendar(accessToken, {
       summary: abodeoCalendarName,
@@ -193,7 +205,7 @@ export async function createTestAppointment({
   let calendarId = await call(store.readCalendarId(userId));
   if (calendarId !== undefined) {
     const result = await calendar.insertEvent(accessToken, calendarId, event);
-    if (result === "created") return;
+    if (result !== "not-found") return result;
     const replacementId = await makeCalendar();
     calendarId = (await call(
       store.replaceCalendarId(userId, calendarId, replacementId),
@@ -207,16 +219,42 @@ export async function createTestAppointment({
       : await adoptWinningCalendar(firstId);
   }
   const result = await calendar.insertEvent(accessToken, calendarId, event);
-  if (result !== "created") throw new GoogleCalendarError("calendar_missing");
+  if (result === "not-found") throw new GoogleCalendarError("calendar_missing");
+  return result;
 }
 
-async function readStartTimeZone(request: Request) {
+// Adds the test appointment to the account's Abodeo calendar.
+export async function createTestAppointment({
+  now,
+  timeZone,
+  ...rest
+}: Omit<Parameters<typeof insertAbodeoEvent>[0], "event"> & { now: number }) {
+  await insertAbodeoEvent({
+    ...rest,
+    timeZone,
+    event: buildTestAppointment(now, timeZone),
+  });
+}
+
+// What the start request asks for: the browser's time zone, and a project to
+// return to if it names one. "invalid" if the project is named wrongly.
+async function readStartRequest(request: Request): Promise<{
+  timeZone: string | null;
+  target: AppointmentReturnTarget | "invalid" | undefined;
+}> {
+  let body: { timeZone?: unknown; projectId?: unknown; openForm?: unknown };
   try {
-    const body: unknown = await request.json();
-    return normaliseTimeZone((body as { timeZone?: unknown } | null)?.timeZone);
+    body = ((await request.json()) as typeof body | null) ?? {};
   } catch {
-    return null;
+    return { timeZone: null, target: undefined };
   }
+  const timeZone = normaliseTimeZone(body.timeZone);
+  if (body.projectId === undefined) return { timeZone, target: undefined };
+  if (!isProjectId(body.projectId)) return { timeZone, target: "invalid" };
+  return {
+    timeZone,
+    target: { projectId: body.projectId, openForm: body.openForm === true },
+  };
 }
 
 async function handleStart(
@@ -239,15 +277,29 @@ async function handleStart(
     return respondWithError(400, "invalid_request");
   }
   try {
-    const userId = await withTimeout(
-      readSessionUserId(request.headers),
+    const { timeZone, target } = await withTimeout(
+      readStartRequest(request),
       timeout,
-    );
-    if (userId === undefined) return respondWithError(401, "not_signed_in");
-    const timeZone = await withTimeout(
-      readStartTimeZone(request),
-      timeout,
-    ).catch(() => null);
+    ).catch(() => ({ timeZone: null, target: undefined }));
+    if (target === "invalid") return respondWithError(400, "invalid_request");
+    let userId: string | undefined;
+    if (target) {
+      // A grant for a project names the account the page is working for, as
+      // the projects requests do, so that a page left open for another
+      // account does not send this one through Google.
+      const account = await readRequestAccount(
+        request,
+        readSessionUserId,
+        timeout,
+      );
+      if (account.kind === "refused") {
+        return respondWithJson(account.status, { error: account.error });
+      }
+      userId = account.userId;
+    } else {
+      userId = await withTimeout(readSessionUserId(request.headers), timeout);
+      if (userId === undefined) return respondWithError(401, "not_signed_in");
+    }
     const googleAccountId = await withTimeout(
       store.readGoogleAccountId(userId),
       timeout,
@@ -262,6 +314,8 @@ async function handleStart(
       userId,
       googleAccountId,
       timeZone,
+      returnProjectId: target?.projectId,
+      openForm: target?.openForm,
       now: now(),
     });
     const response = respondWithJson(200, {
@@ -275,20 +329,30 @@ async function handleStart(
   }
 }
 
-// Returns the browser to the dashboard with the result. A cookie to set,
-// if given, removes the grant.
+// Returns the browser to the dashboard with the result, at the project if
+// the grant was for one (opening its new appointment form only after a
+// success). The cookies are set on the way.
 function returnToDashboard(
   request: Request,
   result: CalendarResult,
-  clearCookie?: string,
+  cookies: string[] = [],
+  target?: AppointmentReturnTarget,
 ) {
   const location = new URL(accountReturnPath, request.url);
+  if (target) {
+    for (const [name, value] of buildProjectReturnSearch({
+      projectId: target.projectId,
+      openForm: target.openForm && result === "connected",
+    })) {
+      location.searchParams.set(name, value);
+    }
+  }
   location.searchParams.set(calendarResultParameter, result);
   const headers = new Headers({
     Location: location.toString(),
     "Cache-Control": "no-store",
   });
-  if (clearCookie) headers.append("Set-Cookie", clearCookie);
+  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(null, { status: 302, headers });
 }
 
@@ -306,11 +370,14 @@ async function handleCallback(
     timeout = accountStoreTimeout,
     reportFailure = reportCalendarFailure,
   } = dependencies;
-  const finish = (result: CalendarResult) =>
+  // Set once the grant is read and Google's answer is known to be for it.
+  let target: AppointmentReturnTarget | undefined;
+  const finish = (result: CalendarResult, ...cookies: string[]) =>
     returnToDashboard(
       request,
       result,
-      clearCalendarGrantCookie(dependencies.isSecure),
+      [clearCalendarGrantCookie(dependencies.isSecure), ...cookies],
+      target,
     );
   const failAt = (stage: string, code: string | undefined) => {
     reportFailure(stage, code);
@@ -333,6 +400,9 @@ async function handleCallback(
     // callback made elsewhere cannot report a refusal.
     if (parameters.get("state") !== grant.state) {
       return failAt(stage, "state_mismatch");
+    }
+    if (grant.returnProjectId !== null) {
+      target = { projectId: grant.returnProjectId, openForm: grant.openForm };
     }
     const googleError = parameters.get("error");
     if (googleError !== null) {
@@ -377,6 +447,20 @@ async function handleCallback(
     }
     if (subject !== googleAccountId) return finish("wrong-account");
 
+    // The token is kept for the project page's own calls. Without Google's
+    // expiry it is assumed to last half an hour.
+    const tokenCookie = await createCalendarTokenCookie({
+      secret,
+      isSecure: dependencies.isSecure,
+      accessToken: tokens.accessToken,
+      userId,
+      expiresAt: tokens.accessTokenExpiresAt ?? now() + unknownTokenLifetime,
+      now: now(),
+    });
+    // A grant for a project only connects: the project page adds the
+    // appointments.
+    if (target) return finish("connected", tokenCookie);
+
     stage = "appointment";
     await createTestAppointment({
       accessToken: tokens.accessToken,
@@ -388,7 +472,7 @@ async function handleCallback(
       timeout,
       reportFailure,
     });
-    return finish("created");
+    return finish("created", tokenCookie);
   } catch (error) {
     return failAt(stage, readFailureCode(error));
   }
