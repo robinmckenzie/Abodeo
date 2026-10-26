@@ -817,7 +817,7 @@ body:has(.dashboard) {
 
 .project-bar.is-expanded {
   position: relative;
-  padding: 1.25rem 1.5rem 1.5rem;
+  padding: 1.25rem 1.5rem 0.5rem;
   border: 1px solid #cfc8b8;
   border-radius: 12px;
   background: #fff;
@@ -831,8 +831,9 @@ body:has(.dashboard) {
 }
 
 /* The expanded bar's upward arrow at the bottom centre, styled as the
-   form's close button. It takes no room of its own: it sits in the bottom
-   padding, level with the Delete button's row, which is at the right. */
+   form's close button. It takes no room of its own: it sits over the foot of
+   the form, in the middle, level with the Delete button's row, which is at
+   the right, and over the space under the shorter column. */
 .project-bar-collapse {
   position: absolute;
   bottom: 0.25rem;
