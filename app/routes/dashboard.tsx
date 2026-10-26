@@ -1295,11 +1295,15 @@ export default function Dashboard() {
       <FloatingMessages boxes={messageBoxes} />
       <KeyboardShortcuts
         shortcuts={[
-          {
-            keyboardKeyLabel: "T",
-            action: "Toggle tuning panel",
-            isShown: !isTextFieldFocused,
-          },
+          ...(import.meta.env.DEV
+            ? [
+                {
+                  keyboardKeyLabel: "T",
+                  action: "Toggle tuning panel",
+                  isShown: !isTextFieldFocused,
+                },
+              ]
+            : []),
           {
             keyboardKeyLabel: "E",
             action: (

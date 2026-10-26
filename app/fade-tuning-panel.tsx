@@ -317,9 +317,10 @@ export function FadeTuningPanel() {
     save(saved);
   }, [saved]);
 
-  // F shows and hides the panel. A held key, browser shortcuts and typing
+  // F shows and hides the panel, in development only. A held key, browser shortcuts and typing
   // into a text field are ignored.
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "f" && e.key !== "F") return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

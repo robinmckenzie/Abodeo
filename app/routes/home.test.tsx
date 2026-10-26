@@ -43,6 +43,7 @@ function saveProject() {
 describe("Home", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     localStorage.clear();
     refreshProjects();
@@ -70,6 +71,18 @@ describe("Home", () => {
     expect(
       [...panel.querySelectorAll("li")].map((row) => row.textContent),
     ).toEqual(["TToggle tuning panel", "FToggle fading panel"]);
+  });
+
+  it("has no shortcuts panel and no tuning panels in the deployed app", () => {
+    vi.stubEnv("DEV", false);
+    renderHome();
+    expect(
+      screen.queryByRole("complementary", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+    fireEvent.keyDown(window, { key: "t" });
+    fireEvent.keyDown(window, { key: "f" });
+    expect(document.querySelector(".tuning-panel")).toBeNull();
+    expect(document.querySelector(".fade-tuning-panel")).toBeNull();
   });
 
   it("shows a Get Started button that goes to the dashboard", () => {

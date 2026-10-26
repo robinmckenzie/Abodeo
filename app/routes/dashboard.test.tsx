@@ -190,6 +190,22 @@ describe("Dashboard", () => {
     expect(shortcuts()).not.toContain("EscClose open project");
   });
 
+  it("does not list the tuning shortcut in the deployed app", async () => {
+    vi.stubEnv("DEV", false);
+    try {
+      await renderDashboard();
+      const panel = screen.getByRole("complementary", {
+        name: "Keyboard shortcuts",
+      });
+      const rows = within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+      expect(rows).toEqual(["ESwitch window / in place"]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("switches presentation and closes a project from the keycaps", async () => {
     await renderDashboard();
     await addProject("Kitchen");

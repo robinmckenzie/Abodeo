@@ -99,12 +99,14 @@ export default function Home() {
         />
       </Link>
       <TuningPanel />
-      <KeyboardShortcuts
-        shortcuts={[
-          { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
-          { keyboardKeyLabel: "F", action: "Toggle fading panel" },
-        ]}
-      />
+      {import.meta.env.DEV && (
+        <KeyboardShortcuts
+          shortcuts={[
+            { keyboardKeyLabel: "T", action: "Toggle tuning panel" },
+            { keyboardKeyLabel: "F", action: "Toggle fading panel" },
+          ]}
+        />
+      )}
     </main>
   );
 }
