@@ -1347,6 +1347,16 @@ body:has(.dashboard) {
   flex-direction: column;
 }
 
+/* The Add project form's box for tasks takes up what height the taller left
+   column leaves, so that there is no gap above Create. */
+.new-project-tasks {
+  flex: 1;
+}
+
+.new-project-tasks .task-entry {
+  flex: 1;
+}
+
 .task-heading {
   margin: 0 0 0.375rem;
   color: #6b665c;

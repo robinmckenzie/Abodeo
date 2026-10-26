@@ -388,7 +388,10 @@ function NewProjectTasks({
     tasks.map((task) => task.title).join("\n"),
   );
   return (
-    <section className="task-section" aria-labelledby={`${id}-heading`}>
+    <section
+      className="task-section new-project-tasks"
+      aria-labelledby={`${id}-heading`}
+    >
       <h3 id={`${id}-heading`} className="task-heading">
         Tasks
       </h3>
