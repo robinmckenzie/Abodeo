@@ -17,6 +17,11 @@ const localAccountVariables = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "AUTH_DATABASE_URL",
+  // AD #94: the email about a visit. Optional.
+  "RESEND_API_KEY",
+  "VISIT_ALERT_TO",
+  "VISIT_ALERT_FROM",
+  "VISIT_ALERT_IGNORE_LABELS",
 ];
 
 export default defineConfig({

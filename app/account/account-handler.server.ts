@@ -46,6 +46,7 @@ import {
 
 import {
   accountActivityPath,
+  siteVisitPath,
   accountProfilePath,
   accountReturnPath,
   accountStatusPath,
@@ -69,6 +70,12 @@ import {
   type ProfileStore,
   type ReadSessionUserId,
 } from "./account-profile.server";
+import {
+  createVisitStore,
+  handleSiteVisitRequest,
+  type VisitDependencies,
+} from "./site-visit.server";
+import { readVisitAlertSettings } from "./visit-alert.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
@@ -77,6 +84,7 @@ export type AccountRuntime = {
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
+  visits: VisitDependencies;
   projects: ProjectStore;
   people: PeopleStore;
   images: ImageStore;
@@ -114,6 +122,10 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
     history,
+    visits: {
+      store: createVisitStore(pool),
+      alerts: readVisitAlertSettings(process.env),
+    },
     projects,
     people: createPeopleStore(pool, {
       prepare: (userId) => projects.receiveDefaults(userId),
@@ -175,6 +187,7 @@ export function createAccountRequestHandler(
     }
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
+    const isSiteVisit = pathname === siteVisitPath;
     const isCalendar = isCalendarPath(pathname);
     const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
@@ -183,6 +196,7 @@ export function createAccountRequestHandler(
     if (
       !isProfile &&
       !isActivity &&
+      !isSiteVisit &&
       !isCalendar &&
       !isAppointments &&
       !isProjects &&
@@ -256,6 +270,9 @@ export function createAccountRequestHandler(
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.projects,
         });
+      }
+      if (isSiteVisit) {
+        return await handleSiteVisitRequest(request, runtime.visits);
       }
       if (isActivity) {
         return await handleActivityRequest(request, {

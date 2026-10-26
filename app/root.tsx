@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { useSiteVisit } from "./account/use-site-visit";
 import { useUsageLabel } from "./account/use-usage-label";
 import { fadeTuningScript } from "./fade-tuning-panel";
 import { hasProjectsScript } from "./projects/project-storage";
@@ -43,6 +44,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   useUsageLabel();
+  // After useUsageLabel, so that a label in the address is saved first.
+  useSiteVisit();
   return <Outlet />;
 }
 

@@ -13,6 +13,7 @@ import {
   handleProfileRequest,
   type ProfileStore,
 } from "./account-profile.server";
+import type { Visit, VisitDependencies } from "./site-visit.server";
 import {
   createTestAuth,
   signInTestAccount,
@@ -55,8 +56,24 @@ function createMemoryHistory() {
   return { signIns, activity, history };
 }
 
+// The visits recorded before sign-in, in order.
+function createMemoryVisits() {
+  const recorded: Visit[] = [];
+  const dependencies: VisitDependencies = {
+    store: {
+      recordVisit: async (visit) => {
+        recorded.push(visit);
+        return false;
+      },
+    },
+    alerts: undefined,
+  };
+  return { recorded, dependencies };
+}
+
 function createTestHandler() {
   const { signIns, activity, history } = createMemoryHistory();
+  const visits = createMemoryVisits();
   const { auth, rows } = createTestAuth(history);
   const { names, store } = createMemoryProfileStore();
   const close = vi.fn(async () => {});
@@ -68,6 +85,7 @@ function createTestHandler() {
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: store,
     history,
+    visits: visits.dependencies,
     projects: projectStore.store,
     people: createMemoryPeopleStore(),
     images: createMemoryImageStore().store,
@@ -88,6 +106,7 @@ function createTestHandler() {
     calendar,
     signIns,
     activity,
+    visits: visits.recorded,
     projectStore,
   };
 }
@@ -147,6 +166,7 @@ describe("createAccountRequestHandler", () => {
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
+          visits: createMemoryVisits().dependencies,
           projects: createMemoryProjectStore().store,
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
@@ -178,6 +198,7 @@ describe("createAccountRequestHandler", () => {
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
+        visits: createMemoryVisits().dependencies,
         projects: createMemoryProjectStore().store,
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
@@ -595,6 +616,26 @@ describe("createAccountRequestHandler", () => {
     expect(signIns).toEqual([ada.user.id, grace.user.id]);
   });
 
+  it("records a visit with no sign-in, taking the label from the cookie", async () => {
+    const { handle, visits } = createTestHandler();
+
+    const response = await handle(
+      request("/api/visit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "abodeo_label=Andrew",
+        },
+        body: '{"welcome":true}',
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(visits).toEqual([
+      { label: "Andrew", welcome: true, isBot: false, country: "", city: "" },
+    ]);
+  });
+
   it("records activity for the signed-in account, and none after signing out", async () => {
     const { auth, handle, activity } = createTestHandler();
     const ada = await signInTestAccount(auth);
@@ -639,6 +680,7 @@ describe("createAccountRequestHandler", () => {
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
         history: createMemoryHistory().history,
+        visits: createMemoryVisits().dependencies,
         projects: createMemoryProjectStore().store,
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
@@ -665,6 +707,7 @@ describe("createAccountRequestHandler", () => {
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
           history: createMemoryHistory().history,
+          visits: createMemoryVisits().dependencies,
           projects: createMemoryProjectStore().store,
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
