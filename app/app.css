@@ -1276,7 +1276,10 @@ body:has(.dashboard) {
 
 .due-date-clear {
   position: absolute;
-  top: -0.125rem;
+  /* The heading is above the fieldset's content box, which this is placed
+     from: up by the heading's line and the space under it, and centred on
+     the line. */
+  top: -1.5rem;
   right: 0;
   padding: 0.125rem 0.625rem;
   border: 0;
