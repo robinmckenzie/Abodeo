@@ -77,9 +77,10 @@ export function AssigneeTuningPanel() {
     applyValues(values);
   }, [values]);
 
-  // T shows and hides the panel. A held key, browser shortcuts and typing
+  // T shows and hides the panel, in development only. A held key, browser shortcuts and typing
   // into a field are ignored.
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "t" && e.key !== "T") return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

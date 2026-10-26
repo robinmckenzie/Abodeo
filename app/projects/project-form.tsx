@@ -330,6 +330,18 @@ export function ProjectForm({
           {tasks}
           {images}
           {appointments}
+          {!isNew && onDelete && (
+            <div className="project-form-delete-row">
+              <button
+                type="button"
+                className="project-form-delete"
+                disabled={isReadOnly}
+                onClick={onDelete}
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className="project-form-footer">
@@ -354,16 +366,6 @@ export function ProjectForm({
             <button type="submit">Create</button>
           </>
         )}
-        {!isNew && onDelete && (
-          <button
-            type="button"
-            className="project-form-delete"
-            disabled={isReadOnly}
-            onClick={onDelete}
-          >
-            Delete
-          </button>
-        )}
       </div>
     </form>
   );
@@ -386,7 +388,10 @@ function NewProjectTasks({
     tasks.map((task) => task.title).join("\n"),
   );
   return (
-    <section className="task-section" aria-labelledby={`${id}-heading`}>
+    <section
+      className="task-section new-project-tasks"
+      aria-labelledby={`${id}-heading`}
+    >
       <h3 id={`${id}-heading`} className="task-heading">
         Tasks
       </h3>

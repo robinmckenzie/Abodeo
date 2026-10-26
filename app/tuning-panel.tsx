@@ -500,9 +500,11 @@ export function TuningPanel() {
   const [v, setV] = useState(readValues);
   const [visible, setVisible] = useState(savedVisible);
 
-  // T shows and hides the panel. The tuned values apply either way. A held
+  // T shows and hides the panel, in development only. The tuned values apply
+  // either way, and in the deployed app too. A held
   // key, browser shortcuts and typing into a text field are ignored.
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "t" && e.key !== "T") return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

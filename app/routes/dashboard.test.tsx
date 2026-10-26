@@ -153,6 +153,24 @@ describe("Dashboard", () => {
     );
   });
 
+  it("hides the Development panel unless VITE_SHOW_DEVELOPMENT_PANEL is true", async () => {
+    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "false");
+    await renderDashboard();
+    expect(
+      screen.queryByRole("region", { name: "Default projects" }),
+    ).toBeNull();
+    cleanup();
+    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "true");
+    try {
+      await renderDashboard();
+      expect(
+        screen.getByRole("region", { name: "Default projects" }),
+      ).toBeTruthy();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
     await renderDashboard();
     const panel = screen.getByRole("complementary", {
@@ -170,6 +188,22 @@ describe("Dashboard", () => {
     expect(shortcuts()).toContain("EscClose open project");
     await closeForm();
     expect(shortcuts()).not.toContain("EscClose open project");
+  });
+
+  it("does not list the tuning shortcut in the deployed app", async () => {
+    vi.stubEnv("DEV", false);
+    try {
+      await renderDashboard();
+      const panel = screen.getByRole("complementary", {
+        name: "Keyboard shortcuts",
+      });
+      const rows = within(panel)
+        .queryAllByRole("listitem")
+        .map((row) => row.textContent);
+      expect(rows).toEqual(["ESwitch window / in place"]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("switches presentation and closes a project from the keycaps", async () => {
@@ -214,8 +248,21 @@ describe("Dashboard", () => {
     expect(shortcuts()).toEqual([
       "TToggle tuning panel",
       "ESwitch window / in place",
+      "MShow or hide a failed-save message",
       "EscClose open project",
     ]);
+  });
+
+  it("shows and hides a failed-save message on the open project with M, in development", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    act(() => screen.getByRole("button", { name: "Close" }).focus());
+    const note = "Not saved: Abodeo cannot reach your projects right now.";
+    expect(screen.queryByText(note)).toBeNull();
+    fireEvent.keyDown(window, { key: "m" });
+    expect(screen.getByText(note)).toBeTruthy();
+    fireEvent.keyDown(window, { key: "m" });
+    expect(screen.queryByText(note)).toBeNull();
   });
 
   it("shows that there are no projects yet", async () => {

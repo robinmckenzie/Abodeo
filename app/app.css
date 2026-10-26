@@ -816,6 +816,7 @@ body:has(.dashboard) {
 }
 
 .project-bar.is-expanded {
+  position: relative;
   padding: 1.25rem 1.5rem 0.5rem;
   border: 1px solid #cfc8b8;
   border-radius: 12px;
@@ -823,19 +824,32 @@ body:has(.dashboard) {
   box-shadow: 0 4px 18px rgb(26 26 26 / 0.08);
 }
 
-/* A new project's bar has no arrow, so it keeps space below Create. */
+/* A new project's bar has no arrow, so it keeps a little less space below
+   Create. */
 .project-bar.is-expanded:not(:has(> .project-bar-collapse)) {
   padding-bottom: 1.25rem;
 }
 
+/* A message in the form's footer, such as a failed save, gets a line of its
+   own above the arrow. */
+.project-bar.is-expanded:has(.project-form-footer p:not(:empty)) {
+  padding-bottom: 2.5rem;
+}
+
 /* The expanded bar's upward arrow at the bottom centre, styled as the
-   form's close button. */
+   form's close button. It takes no room of its own: it sits over the foot of
+   the form, in the middle, level with the Delete button's row, which is at
+   the right, and over the space under the shorter column. */
 .project-bar-collapse {
+  position: absolute;
+  bottom: 0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
-  margin: 0.5rem auto 0;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -1175,6 +1189,7 @@ body:has(.dashboard) {
 /* Its text cannot be selected, so that clicking quickly through the months,
    which the browser reads as double clicks, does not select the month. */
 .due-date-picker {
+  position: relative;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1274,7 +1289,12 @@ body:has(.dashboard) {
 }
 
 .due-date-clear {
-  margin-top: 0.5rem;
+  position: absolute;
+  /* The heading is above the fieldset's content box, which this is placed
+     from: up by the heading's line and the space under it, and centred on
+     the line. */
+  top: -1.5rem;
+  right: 0;
   padding: 0.125rem 0.625rem;
   border: 0;
   border-radius: 999px;
@@ -1331,6 +1351,16 @@ body:has(.dashboard) {
 .task-section {
   display: flex;
   flex-direction: column;
+}
+
+/* The Add project form's box for tasks takes up what height the taller left
+   column leaves, so that there is no gap above Create. */
+.new-project-tasks {
+  flex: 1;
+}
+
+.new-project-tasks .task-entry {
+  flex: 1;
 }
 
 .task-heading {
@@ -2241,12 +2271,13 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* The people in Assigned To scroll when there are many, and the box to add
-   someone sits below them. */
+   someone sits below them. The height shows six and a half people (each row is
+   2.375rem with its gap), so that the half row shows there is more to scroll to. */
 .assignee-options {
   display: grid;
   align-content: start;
   gap: 0.125rem;
-  max-height: 22rem;
+  max-height: 15.4rem;
   overflow-y: auto;
 }
 
@@ -2655,16 +2686,30 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   outline-offset: 3px;
 }
 
-/* Delete, at the foot of an opened project's form: outlined, like Cancel, so
-   that it stands back from the save. */
-.project-form-footer .project-form-delete {
-  margin-left: auto;
+/* Delete, at the foot of the right column of an opened project's form, so
+   that only what is in that column moves it. The column is as tall as the
+   left one, so its row goes to the bottom of it, with at least a rem above.
+   The button is outlined, like Cancel, so that it stands back from the
+   save. */
+.project-form-delete-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.project-form-fields .project-form-delete {
+  padding: 0.55rem 1.15rem;
+  border: 0;
+  border-radius: 999px;
   background: none;
   box-shadow: inset 0 0 0 1px #cfc8b8;
   color: #a12a2a;
+  font-weight: 500;
+  cursor: pointer;
 }
 
-.project-form-footer .project-form-delete:hover {
+.project-form-fields .project-form-delete:hover:not(:disabled) {
   background: #f8e9e6;
 }
 

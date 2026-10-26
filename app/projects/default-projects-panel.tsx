@@ -1,8 +1,8 @@
 // Development only: saves the projects here as the default projects that
 // every visitor receives, or resets the projects here to those defaults.
 // It works on this browser's signed-out projects only, even while signed
-// in. The dashboard shows it only in development, so the deployed app leaves
-// it out.
+// in. The dashboard shows it only in development, and only when
+// VITE_SHOW_DEVELOPMENT_PANEL=true is set, so the deployed app leaves it out.
 import { useState } from "react";
 
 import {

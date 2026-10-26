@@ -5,7 +5,7 @@ import type { Route } from "./+types/dashboard";
 import { useAccount } from "../account/use-account";
 import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
-import { useIsTextFieldFocused } from "../keyboard";
+import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
@@ -982,6 +982,28 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpenInPlace]);
 
+  // Development only, for looking at how the form shows a failed save: M puts
+  // the "cannot reach your projects" message on the open project, and again
+  // takes it off. Kept apart from the project's own message, so that loading
+  // or saving does not clear it. Not in the deployed app.
+  const [testMessageKey, setTestMessageKey] = useState<string | null>(null);
+  const isOpenRef = useRef<string | null>(null);
+  useEffect(() => {
+    isOpenRef.current = open?.key ?? null;
+  });
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "m" || event.repeat) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = isOpenRef.current;
+      if (isTextField(event.target) || key === null) return;
+      setTestMessageKey((current) => (current === key ? null : key));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -990,7 +1012,11 @@ export default function Dashboard() {
       people={readyPeople?.people ?? noPeople}
       onAddPerson={readyPeople ? people.addPerson : undefined}
       projectKey={open.key}
-      message={open.message}
+      message={
+        import.meta.env.DEV && testMessageKey === open.key
+          ? describeFailure("unreachable")
+          : open.message
+      }
       messageActions={
         open.hasConflict && (
           <>
@@ -1128,15 +1154,17 @@ export default function Dashboard() {
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
           <h2>Projects</h2>
           {/* Replaced by false when the app is built for deployment, which
-              leaves the panel out. */}
-          {import.meta.env.DEV && (
-            <DefaultProjectsPanel
-              isSignedIn={view.kind === "account"}
-              onBeforeChange={() => {
-                if (view.kind === "browser") closeProject();
-              }}
-            />
-          )}
+              leaves the panel out. Hidden in development too, unless
+              VITE_SHOW_DEVELOPMENT_PANEL=true is set in .env.local. */}
+          {import.meta.env.DEV &&
+            import.meta.env.VITE_SHOW_DEVELOPMENT_PANEL === "true" && (
+              <DefaultProjectsPanel
+                isSignedIn={view.kind === "account"}
+                onBeforeChange={() => {
+                  if (view.kind === "browser") closeProject();
+                }}
+              />
+            )}
           <button
             type="button"
             className="add-project"
@@ -1267,11 +1295,15 @@ export default function Dashboard() {
       <FloatingMessages boxes={messageBoxes} />
       <KeyboardShortcuts
         shortcuts={[
-          {
-            keyboardKeyLabel: "T",
-            action: "Toggle tuning panel",
-            isShown: !isTextFieldFocused,
-          },
+          ...(import.meta.env.DEV
+            ? [
+                {
+                  keyboardKeyLabel: "T",
+                  action: "Toggle tuning panel",
+                  isShown: !isTextFieldFocused,
+                },
+              ]
+            : []),
           {
             keyboardKeyLabel: "E",
             action: (
@@ -1288,6 +1320,15 @@ export default function Dashboard() {
             ),
             isShown: !isTextFieldFocused,
           },
+          ...(import.meta.env.DEV
+            ? [
+                {
+                  keyboardKeyLabel: "M",
+                  action: "Show or hide a failed-save message",
+                  isShown: open !== null && !isTextFieldFocused,
+                },
+              ]
+            : []),
           {
             keyboardKeyLabel: "Esc",
             action: "Close open project",
