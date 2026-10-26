@@ -14,6 +14,8 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: [],
+  cooldownMinutes: 0,
+  hourlyLimit: 20,
 };
 
 const alert: VisitAlert = {
@@ -49,6 +51,47 @@ describe("readVisitAlertSettings", () => {
         VISIT_ALERT_IGNORE_LABELS: " Robin, Test ,, ",
       })?.ignoredLabels,
     ).toEqual(["robin", "test"]);
+  });
+});
+
+describe("readVisitAlertSettings cooldown", () => {
+  const env = { RESEND_API_KEY: "k", VISIT_ALERT_TO: "robin@example.com" };
+
+  it("is 0 (none) unless a whole number of minutes is set", () => {
+    expect(readVisitAlertSettings(env)?.cooldownMinutes).toBe(0);
+    for (const [text, hours] of [
+      ["1", 1],
+      ["0", 0],
+    ] as const) {
+      expect(
+        readVisitAlertSettings({ ...env, VISIT_ALERT_COOLDOWN_MINUTES: text })
+          ?.cooldownMinutes,
+      ).toBe(hours);
+    }
+    for (const bad of ["soon", "-2", "1.5", ""]) {
+      expect(
+        readVisitAlertSettings({ ...env, VISIT_ALERT_COOLDOWN_MINUTES: bad })
+          ?.cooldownMinutes,
+      ).toBe(0);
+    }
+  });
+});
+
+describe("readVisitAlertSettings hourly limit", () => {
+  const env = { RESEND_API_KEY: "k", VISIT_ALERT_TO: "robin@example.com" };
+
+  it("is 20 unless a whole number is set", () => {
+    expect(readVisitAlertSettings(env)?.hourlyLimit).toBe(20);
+    expect(
+      readVisitAlertSettings({ ...env, VISIT_ALERT_HOURLY_LIMIT: "3" })
+        ?.hourlyLimit,
+    ).toBe(3);
+    for (const bad of ["many", "-1", "2.5", ""]) {
+      expect(
+        readVisitAlertSettings({ ...env, VISIT_ALERT_HOURLY_LIMIT: bad })
+          ?.hourlyLimit,
+      ).toBe(20);
+    }
   });
 });
 

@@ -2,8 +2,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  alertCooldownHours,
-  alertHourlyLimit,
   createVisitStore,
   handleSiteVisitRequest,
   isAlertCandidate,
@@ -18,6 +16,8 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: ["robin"],
+  cooldownMinutes: 0,
+  hourlyLimit: 20,
 };
 
 const human: Visit = {
@@ -111,20 +111,22 @@ describe("readVisitPlace", () => {
 });
 
 describe("createVisitStore", () => {
+  const limits = { cooldownMinutes: 4, hourlyLimit: 7 };
+
   it("adds the visit and says to email when the cooldown and limit allow", async () => {
     const { database, query, release } = createFakeDatabase(true);
-    const emailed = await createVisitStore(database).recordVisit(human, true);
+    const emailed = await createVisitStore(database).recordVisit(
+      human,
+      true,
+      limits,
+    );
 
     expect(emailed).toBe(true);
     const texts = query.mock.calls.map(([text]) => text);
     expect(texts[0]).toBe("begin");
     expect(texts[1]).toContain("pg_advisory_xact_lock");
     expect(texts[2]).toContain("site_visit");
-    expect(query.mock.calls[2][1]).toEqual([
-      "",
-      alertCooldownHours,
-      alertHourlyLimit,
-    ]);
+    expect(query.mock.calls[2][1]).toEqual(["", 4, 7]);
     expect(texts[3]).toContain("insert into site_visit");
     expect(query.mock.calls[3][1]).toEqual(["", true, false, "", "", true]);
     expect(texts[4]).toBe("commit");
@@ -133,7 +135,11 @@ describe("createVisitStore", () => {
 
   it("adds the visit without email inside the cooldown or over the limit", async () => {
     const { database, query } = createFakeDatabase(false);
-    const emailed = await createVisitStore(database).recordVisit(human, true);
+    const emailed = await createVisitStore(database).recordVisit(
+      human,
+      true,
+      limits,
+    );
 
     expect(emailed).toBe(false);
     expect(query.mock.calls[3][1]).toEqual(["", true, false, "", "", false]);
@@ -141,7 +147,11 @@ describe("createVisitStore", () => {
 
   it("does not check the cooldown when email is not wanted", async () => {
     const { database, query } = createFakeDatabase(true);
-    const emailed = await createVisitStore(database).recordVisit(human, false);
+    const emailed = await createVisitStore(database).recordVisit(
+      human,
+      false,
+      limits,
+    );
 
     expect(emailed).toBe(false);
     expect(query.mock.calls.map(([text]) => text)).toEqual([
@@ -160,7 +170,7 @@ describe("createVisitStore", () => {
     });
 
     await expect(
-      createVisitStore(database).recordVisit(human, false),
+      createVisitStore(database).recordVisit(human, false, limits),
     ).rejects.toThrow("boom");
     expect(query).toHaveBeenLastCalledWith("rollback", []);
     expect(release).toHaveBeenCalledOnce();
@@ -194,6 +204,7 @@ describe("handleSiteVisitRequest", () => {
         city: "Leeds",
       },
       true,
+      { cooldownMinutes: 0, hourlyLimit: 20 },
     );
   });
 
@@ -209,6 +220,7 @@ describe("handleSiteVisitRequest", () => {
     expect(store.recordVisit).toHaveBeenCalledWith(
       expect.objectContaining({ isBot: true }),
       false,
+      { cooldownMinutes: 0, hourlyLimit: 20 },
     );
   });
 
@@ -233,7 +245,10 @@ describe("handleSiteVisitRequest", () => {
       alerts: undefined,
     });
 
-    expect(store.recordVisit).toHaveBeenCalledWith(expect.anything(), false);
+    expect(store.recordVisit).toHaveBeenCalledWith(expect.anything(), false, {
+      cooldownMinutes: 0,
+      hourlyLimit: 20,
+    });
   });
 
   it("sends the email when the store says to", async () => {

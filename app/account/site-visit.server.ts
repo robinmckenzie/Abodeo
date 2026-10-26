@@ -14,14 +14,12 @@ import {
   withTimeout,
 } from "./account-profile.server";
 import { readLabel } from "./usage-label.server";
-import { sendVisitAlert, type VisitAlertSettings } from "./visit-alert.server";
-
-// No second email for a label within this long. A provisional default.
-export const alertCooldownHours = 6;
-
-// No more than this many emails in any hour, however many labels are sent,
-// because anyone can send a visit.
-export const alertHourlyLimit = 5;
+import {
+  defaultCooldownMinutes,
+  defaultHourlyLimit,
+  sendVisitAlert,
+  type VisitAlertSettings,
+} from "./visit-alert.server";
 
 export type Visit = {
   label: string;
@@ -31,10 +29,17 @@ export type Visit = {
   city: string;
 };
 
+// The cooldown for a label, in minutes, and the emails allowed in any hour.
+export type AlertLimits = { cooldownMinutes: number; hourlyLimit: number };
+
 export type VisitStore = {
   // Adds the visit, and says whether it is the one to email about: only when
   // canEmail, and neither the label's cooldown nor the hourly limit applies.
-  recordVisit(visit: Visit, canEmail: boolean): Promise<boolean>;
+  recordVisit(
+    visit: Visit,
+    canEmail: boolean,
+    limits: AlertLimits,
+  ): Promise<boolean>;
 };
 
 export type VisitDependencies = {
@@ -75,7 +80,7 @@ export function readVisitPlace(headers: Headers) {
 
 export function createVisitStore(database: HistoryDatabase): VisitStore {
   return {
-    async recordVisit(visit, canEmail) {
+    async recordVisit(visit, canEmail, { cooldownMinutes, hourlyLimit }) {
       const client = await database.connect();
       try {
         await client.query("begin", []);
@@ -90,13 +95,13 @@ export function createVisitStore(database: HistoryDatabase): VisitStore {
                not exists (
                  select 1 from site_visit
                  where emailed and label = $1
-                   and visited_at > clock_timestamp() - make_interval(hours => $2)
+                   and visited_at > clock_timestamp() - make_interval(mins => $2)
                )
                and (
                  select count(*) from site_visit
                  where emailed and visited_at > clock_timestamp() - interval '1 hour'
                ) < $3 as ok`,
-            [visit.label, alertCooldownHours, alertHourlyLimit],
+            [visit.label, cooldownMinutes, hourlyLimit],
           );
           shouldEmail = rows[0]?.ok === true;
         }
@@ -182,7 +187,10 @@ export async function handleSiteVisitRequest(
     const canEmail =
       alerts !== undefined && isAlertCandidate(visit, alerts.ignoredLabels);
     const shouldEmail = await withTimeout(
-      store.recordVisit(visit, canEmail),
+      store.recordVisit(visit, canEmail, {
+        cooldownMinutes: alerts?.cooldownMinutes ?? defaultCooldownMinutes,
+        hourlyLimit: alerts?.hourlyLimit ?? defaultHourlyLimit,
+      }),
       timeout,
     );
     if (shouldEmail && alerts) {

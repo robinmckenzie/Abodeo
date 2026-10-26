@@ -300,7 +300,7 @@ has the IP address or the user agent.
   JavaScript off (as for most link-preview crawlers), or while the account store is down.
 - An email goes to Robin through Resend for a visit that is not from a bot and either has a label
   that is not ignored, or has `?welcome` and no label, which is the link given to someone new. A
-  label gets at most one email every 6 hours, and the app sends at most 5 emails an hour in all.
+  label gets an email for every visit unless `VISIT_ALERT_COOLDOWN_MINUTES` sets a cooldown for each label, and the app sends at most 20 emails an hour in all (`VISIT_ALERT_HOURLY_LIMIT` changes it).
   A failed email loses the email, not the visit.
 - Nothing is sent without the settings below. In production set them in Vercel. In `.env.local`
   they are optional, and leaving them out means development sends nothing.
@@ -311,6 +311,8 @@ has the IP address or the user agent.
     | `VISIT_ALERT_TO` | Where the email goes. With Resend's test sender, only the Resend account's own address |
     | `VISIT_ALERT_FROM` | Optional sender. Defaults to `onboarding@resend.dev` |
     | `VISIT_ALERT_IGNORE_LABELS` | Optional, comma-separated labels that never send an email, such as Robin's own |
+    | `VISIT_ALERT_COOLDOWN_MINUTES` | Optional, whole minutes before a label can send another email. Defaults to 0, no cooldown |
+    | `VISIT_ALERT_HOURLY_LIMIT` | Optional, most emails sent in any hour, whatever the labels. Defaults to 20 |
 
 ### Calendar test
 
