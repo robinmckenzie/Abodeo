@@ -1006,6 +1006,25 @@ describe("a signed-in account's projects (AD #41)", () => {
   });
 
   describe("deleting a project (AD #62)", () => {
+    it("shows a failed-save message on M for an open project, signed in", async () => {
+      const server = fakeServer({ session: ada });
+      await server.projects.store.create("ada", "a1", {
+        title: "Old",
+        ...fields,
+      });
+      await renderDashboard();
+      await settle();
+      await openProject("Old");
+      await settle();
+      fireEvent.keyDown(window, { key: "m" });
+      await settle();
+      expect(
+        screen.getByText(
+          "Not saved: Abodeo cannot reach your projects right now.",
+        ),
+      ).toBeTruthy();
+    });
+
     const binned = (server: Server) =>
       server.projects.bins.get("ada")?.get("a1");
 

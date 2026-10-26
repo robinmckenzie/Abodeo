@@ -984,27 +984,21 @@ export default function Dashboard() {
 
   // Development only, for looking at how the form shows a failed save: M puts
   // the "cannot reach your projects" message on the open project, and again
-  // takes it off. Not in the deployed app.
-  const isOpenRef = useRef(open !== null);
-  const toggleTestMessageRef = useRef(() => {});
+  // takes it off. Kept apart from the project's own message, so that loading
+  // or saving does not clear it. Not in the deployed app.
+  const [testMessageKey, setTestMessageKey] = useState<string | null>(null);
+  const isOpenRef = useRef<string | null>(null);
   useEffect(() => {
-    isOpenRef.current = open !== null;
-    toggleTestMessageRef.current = () =>
-      setOpen(
-        (current) =>
-          current && {
-            ...current,
-            message: current.message ? null : describeFailure("unreachable"),
-          },
-      );
+    isOpenRef.current = open?.key ?? null;
   });
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "m" || event.repeat) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (isTextField(event.target) || !isOpenRef.current) return;
-      toggleTestMessageRef.current();
+      const key = isOpenRef.current;
+      if (isTextField(event.target) || key === null) return;
+      setTestMessageKey((current) => (current === key ? null : key));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1018,7 +1012,11 @@ export default function Dashboard() {
       people={readyPeople?.people ?? noPeople}
       onAddPerson={readyPeople ? people.addPerson : undefined}
       projectKey={open.key}
-      message={open.message}
+      message={
+        import.meta.env.DEV && testMessageKey === open.key
+          ? describeFailure("unreachable")
+          : open.message
+      }
       messageActions={
         open.hasConflict && (
           <>
