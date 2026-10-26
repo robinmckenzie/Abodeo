@@ -17,7 +17,7 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: ["robin"],
-  cooldownHours: 6,
+  cooldownMinutes: 360,
 };
 
 const human: Visit = {
@@ -202,7 +202,7 @@ describe("handleSiteVisitRequest", () => {
         city: "Leeds",
       },
       true,
-      6,
+      360,
     );
   });
 
@@ -218,7 +218,7 @@ describe("handleSiteVisitRequest", () => {
     expect(store.recordVisit).toHaveBeenCalledWith(
       expect.objectContaining({ isBot: true }),
       false,
-      6,
+      360,
     );
   });
 
@@ -243,7 +243,11 @@ describe("handleSiteVisitRequest", () => {
       alerts: undefined,
     });
 
-    expect(store.recordVisit).toHaveBeenCalledWith(expect.anything(), false, 6);
+    expect(store.recordVisit).toHaveBeenCalledWith(
+      expect.anything(),
+      false,
+      360,
+    );
   });
 
   it("sends the email when the store says to", async () => {

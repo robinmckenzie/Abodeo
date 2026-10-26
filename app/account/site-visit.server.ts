@@ -15,7 +15,7 @@ import {
 } from "./account-profile.server";
 import { readLabel } from "./usage-label.server";
 import {
-  defaultCooldownHours,
+  defaultCooldownMinutes,
   sendVisitAlert,
   type VisitAlertSettings,
 } from "./visit-alert.server";
@@ -34,12 +34,12 @@ export type Visit = {
 
 export type VisitStore = {
   // Adds the visit, and says whether it is the one to email about: only when
-  // canEmail, and neither the label's cooldown (in hours) nor the hourly
+  // canEmail, and neither the label's cooldown (in minutes) nor the hourly
   // limit applies.
   recordVisit(
     visit: Visit,
     canEmail: boolean,
-    cooldownHours: number,
+    cooldownMinutes: number,
   ): Promise<boolean>;
 };
 
@@ -81,7 +81,7 @@ export function readVisitPlace(headers: Headers) {
 
 export function createVisitStore(database: HistoryDatabase): VisitStore {
   return {
-    async recordVisit(visit, canEmail, cooldownHours) {
+    async recordVisit(visit, canEmail, cooldownMinutes) {
       const client = await database.connect();
       try {
         await client.query("begin", []);
@@ -96,13 +96,13 @@ export function createVisitStore(database: HistoryDatabase): VisitStore {
                not exists (
                  select 1 from site_visit
                  where emailed and label = $1
-                   and visited_at > clock_timestamp() - make_interval(hours => $2)
+                   and visited_at > clock_timestamp() - make_interval(mins => $2)
                )
                and (
                  select count(*) from site_visit
                  where emailed and visited_at > clock_timestamp() - interval '1 hour'
                ) < $3 as ok`,
-            [visit.label, cooldownHours, alertHourlyLimit],
+            [visit.label, cooldownMinutes, alertHourlyLimit],
           );
           shouldEmail = rows[0]?.ok === true;
         }
@@ -191,7 +191,7 @@ export async function handleSiteVisitRequest(
       store.recordVisit(
         visit,
         canEmail,
-        alerts?.cooldownHours ?? defaultCooldownHours,
+        alerts?.cooldownMinutes ?? defaultCooldownMinutes,
       ),
       timeout,
     );
