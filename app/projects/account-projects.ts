@@ -14,7 +14,10 @@ import {
 import type { Person } from "./people";
 import {
   accountHeader,
+  buildPermanentDeletePath,
   buildProjectPath,
+  buildRestorePath,
+  projectsBinPath,
   projectsImportPath,
   projectsPath,
   type ImportOutcome,
@@ -124,8 +127,20 @@ export type AccountLoad =
       unreadableCount: number;
       defaultIds: string[];
       latestImageIds: Record<string, string>;
+      imageCounts: Record<string, number>;
     }
   | { ok: false; reason: AccountFailure };
+
+// A server without the counts, or with damaged ones, counts no images.
+function readImageCounts(value: unknown) {
+  if (typeof value !== "object" || value === null) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && entry[1] > 0,
+    ),
+  );
+}
 
 // A server without the map, or with a damaged one, shows no thumbnails.
 function readLatestImageIds(value: unknown) {
@@ -150,6 +165,7 @@ export async function loadAccountProjects(
     unreadableCount?: unknown;
     defaultIds?: unknown;
     latestImageIds?: unknown;
+    imageCounts?: unknown;
   } | null;
   if (
     !Array.isArray(body?.projects) ||
@@ -173,7 +189,123 @@ export async function loadAccountProjects(
       (id): id is string => typeof id === "string",
     ),
     latestImageIds: readLatestImageIds(body.latestImageIds),
+    imageCounts: readImageCounts(body.imageCounts),
   };
+}
+
+// A deleted project, with when it went into the Bin as an ISO time.
+export type BinnedProject = { project: Project; deletedAt: string };
+
+export type AccountBin =
+  | {
+      ok: true;
+      projects: BinnedProject[];
+      unreadableCount: number;
+      imageCounts: Record<string, number>;
+    }
+  | { ok: false; reason: AccountFailure };
+
+// Reading the Bin never clears anything from it (AD #62 Delete Projects).
+export async function loadAccountBin(
+  accountId: string,
+  fetchFn: Fetch = fetch,
+): Promise<AccountBin> {
+  const answer = await send(fetchFn, accountId, projectsBinPath);
+  if (answer === "unreachable" || answer.status !== 200) {
+    return { ok: false, reason: readFailure(answer) };
+  }
+  const body = answer.body as {
+    projects?: unknown;
+    unreadableCount?: unknown;
+    imageCounts?: unknown;
+  } | null;
+  if (!Array.isArray(body?.projects)) {
+    return { ok: false, reason: "unreachable" };
+  }
+  const projects: BinnedProject[] = [];
+  let unreadableCount =
+    typeof body.unreadableCount === "number" ? body.unreadableCount : 0;
+  for (const entry of body.projects) {
+    const project = readProject(
+      (entry as { project?: unknown } | null)?.project,
+    );
+    const deletedAt = (entry as { deletedAt?: unknown } | null)?.deletedAt;
+    if (project && typeof deletedAt === "string") {
+      projects.push({ project, deletedAt });
+    } else {
+      unreadableCount++;
+    }
+  }
+  return {
+    ok: true,
+    projects,
+    unreadableCount,
+    imageCounts: readImageCounts(body.imageCounts),
+  };
+}
+
+export type BinChange = { ok: true } | { ok: false; reason: AccountFailure };
+
+// A project that is already gone counts as done, as when an answer was lost
+// and the request is sent again.
+async function sendBinChange(
+  accountId: string,
+  path: string,
+  method: "DELETE" | "POST",
+  { isGoneDone }: { isGoneDone: boolean },
+  fetchFn: Fetch,
+): Promise<BinChange> {
+  const answer = await send(fetchFn, accountId, path, { method, body: {} });
+  if (answer !== "unreachable" && answer.status === 200) return { ok: true };
+  const reason = readFailure(answer);
+  return reason === "not-found" && isGoneDone
+    ? { ok: true }
+    : { ok: false, reason };
+}
+
+// Puts a project in the Bin.
+export function binAccountProject(
+  accountId: string,
+  id: string,
+  fetchFn: Fetch = fetch,
+) {
+  return sendBinChange(
+    accountId,
+    buildProjectPath(id),
+    "DELETE",
+    { isGoneDone: true },
+    fetchFn,
+  );
+}
+
+// Fails with not-found if the project is no longer in the Bin, such as when
+// it was cleared for good.
+export function restoreAccountProject(
+  accountId: string,
+  id: string,
+  fetchFn: Fetch = fetch,
+) {
+  return sendBinChange(
+    accountId,
+    buildRestorePath(id),
+    "POST",
+    { isGoneDone: false },
+    fetchFn,
+  );
+}
+
+export function deleteAccountProjectPermanently(
+  accountId: string,
+  id: string,
+  fetchFn: Fetch = fetch,
+) {
+  return sendBinChange(
+    accountId,
+    buildPermanentDeletePath(id),
+    "DELETE",
+    { isGoneDone: true },
+    fetchFn,
+  );
 }
 
 // Sending the same id again, as after a lost answer, gives the project

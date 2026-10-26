@@ -8,6 +8,7 @@ import {
 import {
   createProject,
   declineMove,
+  deleteStoredProject,
   forgetDeclinedMove,
   hasProjectsScript,
   isMoveDeclined,
@@ -187,6 +188,31 @@ describe("project storage", () => {
     expect(hasOwnProjects()).toBe(false);
     localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
     expect(hasOwnProjects()).toBe(true);
+  });
+});
+
+describe("deleting a stored project (AD #62 Delete Projects)", () => {
+  it("removes the project for good, and no other", async () => {
+    const first = await createProject(fields);
+    const second = await createProject({ ...fields, title: "Garden" });
+    if (!first.ok || !second.ok) throw new Error("not created");
+
+    expect(deleteStoredProject(first.project.id)).toEqual({ ok: true });
+    const loaded = loadProjects();
+    expect(loaded.ok && loaded.projects.map((p) => p.title)).toEqual([
+      "Garden",
+    ]);
+    expect(deleteStoredProject(first.project.id)).toEqual({ ok: true });
+  });
+
+  it("reports storage that will not let it", () => {
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(deleteStoredProject("p1")).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
   });
 });
 

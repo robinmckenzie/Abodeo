@@ -363,3 +363,118 @@ function project(id: string): Project {
     updatedAt: "2026-10-01T00:00:00.000Z",
   };
 }
+
+describe("deleting projects (AD #62 Delete Projects)", () => {
+  const json = (response: Response) => response.json();
+
+  it("puts a project in the bin, lists it there, restores it, and deletes it for good", async () => {
+    const { handle } = createHandler();
+    await create(handle, "ada", "p1");
+
+    const removed = await handle(
+      send("/api/projects/p1", { method: "DELETE", body: {} }),
+    );
+    expect(removed.status).toBe(200);
+    expect((await json(await handle(send("/api/projects")))).projects).toEqual(
+      [],
+    );
+    const bin = await json(await handle(send("/api/projects/bin")));
+    expect(
+      bin.projects.map((entry: { project: Project }) => entry.project.id),
+    ).toEqual(["p1"]);
+
+    const restored = await handle(
+      send("/api/projects/p1/restore", { method: "POST", body: {} }),
+    );
+    expect(restored.status).toBe(200);
+    expect(
+      (await json(await handle(send("/api/projects")))).projects,
+    ).toHaveLength(1);
+
+    await handle(send("/api/projects/p1", { method: "DELETE", body: {} }));
+    const gone = await handle(
+      send("/api/projects/p1/permanent", { method: "DELETE", body: {} }),
+    );
+    expect(gone.status).toBe(200);
+    expect(
+      (await json(await handle(send("/api/projects/bin")))).projects,
+    ).toEqual([]);
+  });
+
+  it("answers not found for a project that is not there to delete, restore or delete for good", async () => {
+    const { handle } = createHandler();
+    for (const [path, method] of [
+      ["/api/projects/none", "DELETE"],
+      ["/api/projects/none/restore", "POST"],
+      ["/api/projects/none/permanent", "DELETE"],
+    ]) {
+      const response = await handle(send(path, { method, body: {} }));
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("keeps each account's bin to itself", async () => {
+    const { handle } = createHandler();
+    await create(handle, "ada", "p1");
+    await handle(send("/api/projects/p1", { method: "DELETE", body: {} }));
+
+    expect(
+      (await json(await handle(send("/api/projects/bin", { account: "bob" }))))
+        .projects,
+    ).toEqual([]);
+    const response = await handle(
+      send("/api/projects/p1/restore", {
+        account: "bob",
+        method: "POST",
+        body: {},
+      }),
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it("refuses these without a sign-in, from another account's page, or the wrong method", async () => {
+    const { handle } = createHandler();
+    expect(
+      (
+        await handle(
+          send("/api/projects/p1", {
+            account: null,
+            pageAccount: "ada",
+            method: "DELETE",
+            body: {},
+          }),
+        )
+      ).status,
+    ).toBe(401);
+    expect(
+      (await handle(send("/api/projects/bin", { pageAccount: "bob" }))).status,
+    ).toBe(409);
+    expect(
+      (await handle(send("/api/projects/p1/restore", { method: "GET" })))
+        .status,
+    ).toBe(405);
+    expect(
+      (await handle(send("/api/projects/bin", { method: "POST", body: {} })))
+        .status,
+    ).toBe(405);
+    expect(
+      (await handle(send("/api/projects/p1/other", { method: "GET" }))).status,
+    ).toBe(404);
+    expect(
+      (
+        await handle(
+          send("/api/projects/p1", {
+            method: "DELETE",
+            contentType: "text/plain",
+            body: {},
+          }),
+        )
+      ).status,
+    ).toBe(400);
+  });
+
+  it("does not let a project be made with the id of the bin", async () => {
+    const { handle } = createHandler();
+    expect((await create(handle, "ada", "bin")).status).toBe(400);
+  });
+});

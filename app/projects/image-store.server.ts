@@ -83,6 +83,12 @@ const imageColumns = `id, content_type, original_size, caption,
   to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
   as created_at`;
 
+// Limits a query on project_image to a project that is not in the Bin
+// (AD #62 Delete Projects).
+const isShown = `exists (select 1 from project
+  where project.user_id = project_image.user_id
+  and project.id = project_image.project_id and project.deleted_at is null)`;
+
 const usedBytesQuery = `select coalesce(sum(original_size + thumbnail_size), 0)
   as used from project_image where user_id = $1`;
 
@@ -121,7 +127,7 @@ export function createImageStore(
     projectId: string,
   ) => {
     const { rows } = await query.query(
-      "select 1 as found from project where user_id = $1 and id = $2",
+      "select 1 as found from project where user_id = $1 and id = $2 and deleted_at is null",
       [userId, projectId],
     );
     return rows.length > 0;
@@ -241,7 +247,8 @@ export function createImageStore(
     async read(userId, projectId, imageId, kind) {
       const { rows } = await database.query(
         `select content_type from project_image
-         where user_id = $1 and project_id = $2 and id = $3`,
+         where user_id = $1 and project_id = $2 and id = $3
+         and ${isShown}`,
         [userId, projectId, imageId],
       );
       if (rows.length === 0) return null;
@@ -260,11 +267,15 @@ export function createImageStore(
       const updated = await database.query(
         `update project_image set caption = $4
          where user_id = $1 and project_id = $2 and id = $3 and caption = $5
+         and ${isShown}
          returning ${imageColumns}`,
         [userId, projectId, imageId, caption, base],
       );
       if (updated.rows.length > 0) {
         return { kind: "saved", image: readImage(updated.rows[0]) };
+      }
+      if (!(await hasProject(database, userId, projectId))) {
+        return { kind: "not-found" };
       }
       const current = await findImage(database, userId, projectId, imageId);
       if (!current) return { kind: "not-found" };
@@ -278,7 +289,8 @@ export function createImageStore(
     async remove(userId, projectId, imageId) {
       const { rows } = await database.query(
         `delete from project_image
-         where user_id = $1 and project_id = $2 and id = $3 returning id`,
+         where user_id = $1 and project_id = $2 and id = $3
+         and ${isShown} returning id`,
         [userId, projectId, imageId],
       );
       if (rows.length === 0) return null;

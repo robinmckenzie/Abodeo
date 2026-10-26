@@ -1,4 +1,4 @@
--- Version: v1.61.0
+-- Version: v1.62.0
 --
 -- "Create script" for Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
 --
@@ -42,6 +42,12 @@
 -- revision changes on every write, so that two saves at once cannot both
 -- apply. project_defaults_received records which default projects the
 -- account has received, as each browser does for itself.
+--
+-- deleted_at (AD #62 Delete Projects) is when a project was put in the Bin, or
+-- null for a project that is shown. A binned project keeps its tasks and
+-- images, and can be restored until it is cleared for good: the dashboard's
+-- next load or save of the account's projects clears those binned for more
+-- than the cooling-off period, and Delete permanently clears one at once.
 --
 -- project_image and project_image_bytes (AD #48 Add Images To Projects) keep
 -- the images added to an account's projects. project_image holds each
@@ -161,8 +167,11 @@ create table if not exists project (
     id text not null,
     data jsonb not null,
     revision bigint not null default 1,
+    deleted_at timestamptz,
     primary key (user_id, id)
 );
+
+alter table project add column if not exists deleted_at timestamptz;
 
 create table if not exists project_defaults_received (
     user_id text primary key references auth_user (id) on delete cascade,

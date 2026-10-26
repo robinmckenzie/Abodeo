@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import {
@@ -1001,6 +1002,86 @@ describe("a signed-in account's projects (AD #41)", () => {
         .value,
     ).toBe("Changed on another device");
     expect(titleField().closest("[inert]")).toBeNull();
+  });
+
+  describe("deleting a project (AD #62)", () => {
+    const binned = (server: Server) =>
+      server.projects.bins.get("ada")?.get("a1");
+
+    async function openDeleteWindow(server: Server, title = "Old") {
+      await server.projects.store.create("ada", "a1", {
+        title,
+        ...fields,
+        tasks: [
+          { id: "t1", title: "Tiles", isDone: false },
+          { id: "t2", title: "Grout", isDone: false },
+        ],
+      });
+      await renderDashboard();
+      await settle();
+      await openProject(title);
+      await click(screen.getByRole("button", { name: "Delete" }));
+      return screen.getByRole("dialog", { name: `Delete “${title}”?` });
+    }
+
+    it("lists what is lost and the Bin's two days, and puts nothing in the Bin until confirmed", async () => {
+      const server = fakeServer({ session: ada });
+      const dialog = await openDeleteWindow(server);
+
+      expect(within(dialog).getByText("2 tasks")).toBeTruthy();
+      expect(
+        within(dialog).getByText(/restore it from the Bin for 2 days/),
+      ).toBeTruthy();
+      await click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(binned(server)).toBeUndefined();
+      expect(accountProject(server, "a1")).toBeTruthy();
+    });
+
+    it("puts the project in the Bin on confirming, closing it and taking it from the list", async () => {
+      const server = fakeServer({ session: ada });
+      const dialog = await openDeleteWindow(server);
+      await click(within(dialog).getByRole("button", { name: "Delete" }));
+      await settle();
+
+      expect(binned(server)?.project.title).toBe("Old");
+      expect(accountProject(server, "a1")).toBeUndefined();
+      expect(screen.queryByRole("button", { name: /Old/ })).toBeNull();
+      expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Bin" })).toBeTruthy();
+    });
+
+    it("saves a change still waiting before deleting, and does not bring the project back", async () => {
+      const server = fakeServer({ session: ada });
+      await server.projects.store.create("ada", "a1", {
+        title: "Old",
+        ...fields,
+      });
+      await renderDashboard();
+      await settle();
+      await openProject("Old");
+      fireEvent.change(titleField(), { target: { value: "New" } });
+      await click(screen.getByRole("button", { name: "Delete" }));
+      const dialog = screen.getByRole("dialog", { name: "Delete “New”?" });
+      await click(within(dialog).getByRole("button", { name: "Delete" }));
+      await settle();
+
+      expect(binned(server)?.project.title).toBe("New");
+      expect(screen.queryByRole("button", { name: /New|Old/ })).toBeNull();
+      expect(screen.getByText("No projects added yet.")).toBeTruthy();
+    });
+
+    it("keeps the project and says so when it cannot be deleted", async () => {
+      const server = fakeServer({ session: ada });
+      const dialog = await openDeleteWindow(server);
+      server.projectsStatus = 503;
+      await click(within(dialog).getByRole("button", { name: "Delete" }));
+      await settle();
+
+      expect(within(dialog).getByRole("alert").textContent).toMatch(
+        /^Not deleted/,
+      );
+      expect(binned(server)).toBeUndefined();
+    });
   });
 
   it("cannot change a project whose latest copy cannot be loaded", async () => {

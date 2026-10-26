@@ -8,6 +8,12 @@ import { serialiseProject, sortProjects, type Project } from "./projects";
 export function createMemoryProjectStore() {
   const accounts = new Map<string, Map<string, Project>>();
   const calls: string[] = [];
+  // Each account's binned projects, by id, with when they were binned.
+  const bins = new Map<string, Map<string, { project: Project; at: string }>>();
+  const binOf = (userId: string) => {
+    if (!bins.has(userId)) bins.set(userId, new Map());
+    return bins.get(userId)!;
+  };
   const projectsOf = (userId: string) => {
     if (!accounts.has(userId)) accounts.set(userId, new Map());
     return accounts.get(userId)!;
@@ -21,6 +27,7 @@ export function createMemoryProjectStore() {
         unreadableCount: 0,
         defaultIds: [],
         latestImageIds: {},
+        imageCounts: {},
       };
     },
     async read(userId, id) {
@@ -79,6 +86,37 @@ export function createMemoryProjectStore() {
       }
       return outcomes;
     },
+    async remove(userId, id) {
+      calls.push(userId);
+      const project = projectsOf(userId).get(id);
+      if (!project) return { kind: "not-found" };
+      projectsOf(userId).delete(id);
+      binOf(userId).set(id, { project, at: new Date().toISOString() });
+      return { kind: "done" };
+    },
+    async listBin(userId) {
+      calls.push(userId);
+      return {
+        projects: [...binOf(userId).values()].map(({ project, at }) => ({
+          project,
+          deletedAt: at,
+        })),
+        unreadableCount: 0,
+        imageCounts: {},
+      };
+    },
+    async restore(userId, id) {
+      calls.push(userId);
+      const binned = binOf(userId).get(id);
+      if (!binned) return { kind: "not-found" };
+      binOf(userId).delete(id);
+      projectsOf(userId).set(id, binned.project);
+      return { kind: "done" };
+    },
+    async deletePermanently(userId, id) {
+      calls.push(userId);
+      return { kind: binOf(userId).delete(id) ? "done" : "not-found" };
+    },
   };
-  return { store, accounts, calls };
+  return { store, accounts, bins, calls };
 }
