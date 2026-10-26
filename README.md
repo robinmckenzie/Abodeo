@@ -49,7 +49,8 @@ into an account. The deployed site is public, so keep anything private out of th
 projects. An account's copy of a default that is kept under the same id keeps its images when the
 defaults are refreshed; a default that the file no longer has is removed with its images.
 
-When the app runs with `npm run dev`, the dashboard shows a Development panel:
+When the app runs with `npm run dev` and `.env.local` has `VITE_SHOW_DEVELOPMENT_PANEL=true`, the
+dashboard shows a Development panel (hidden by default):
 
 - **Save as defaults** writes every project in this browser to `app/projects/default-projects.json`.
   Commit that file to include them in the next deployment. In this browser, they then count as the

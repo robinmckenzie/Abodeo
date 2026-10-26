@@ -153,6 +153,23 @@ describe("Dashboard", () => {
     );
   });
 
+  it("hides the Development panel unless VITE_SHOW_DEVELOPMENT_PANEL is true", async () => {
+    await renderDashboard();
+    expect(
+      screen.queryByRole("region", { name: "Default projects" }),
+    ).toBeNull();
+    cleanup();
+    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "true");
+    try {
+      await renderDashboard();
+      expect(
+        screen.getByRole("region", { name: "Default projects" }),
+      ).toBeTruthy();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
     await renderDashboard();
     const panel = screen.getByRole("complementary", {

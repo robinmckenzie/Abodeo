@@ -1128,15 +1128,17 @@ export default function Dashboard() {
         <div className="dashboard-toolbar" inert={isAddingInPlace}>
           <h2>Projects</h2>
           {/* Replaced by false when the app is built for deployment, which
-              leaves the panel out. */}
-          {import.meta.env.DEV && (
-            <DefaultProjectsPanel
-              isSignedIn={view.kind === "account"}
-              onBeforeChange={() => {
-                if (view.kind === "browser") closeProject();
-              }}
-            />
-          )}
+              leaves the panel out. Hidden in development too, unless
+              VITE_SHOW_DEVELOPMENT_PANEL=true is set in .env.local. */}
+          {import.meta.env.DEV &&
+            import.meta.env.VITE_SHOW_DEVELOPMENT_PANEL === "true" && (
+              <DefaultProjectsPanel
+                isSignedIn={view.kind === "account"}
+                onBeforeChange={() => {
+                  if (view.kind === "browser") closeProject();
+                }}
+              />
+            )}
           <button
             type="button"
             className="add-project"

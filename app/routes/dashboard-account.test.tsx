@@ -67,6 +67,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 type Server = {
@@ -1259,6 +1260,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       ...fields,
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "true");
     await renderDashboard();
     await settle();
 
