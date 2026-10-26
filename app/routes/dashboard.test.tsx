@@ -154,6 +154,7 @@ describe("Dashboard", () => {
   });
 
   it("hides the Development panel unless VITE_SHOW_DEVELOPMENT_PANEL is true", async () => {
+    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "false");
     await renderDashboard();
     expect(
       screen.queryByRole("region", { name: "Default projects" }),

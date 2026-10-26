@@ -830,6 +830,12 @@ body:has(.dashboard) {
   padding-bottom: 1.25rem;
 }
 
+/* A message in the form's footer, such as a failed save, gets a line of its
+   own above the arrow. */
+.project-bar.is-expanded:has(.project-form-footer p:not(:empty)) {
+  padding-bottom: 2.5rem;
+}
+
 /* The expanded bar's upward arrow at the bottom centre, styled as the
    form's close button. It takes no room of its own: it sits over the foot of
    the form, in the middle, level with the Delete button's row, which is at
