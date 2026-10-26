@@ -2265,12 +2265,13 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* The people in Assigned To scroll when there are many, and the box to add
-   someone sits below them. */
+   someone sits below them. The height shows six and a half people (each row is
+   2.375rem with its gap), so that the half row shows there is more to scroll to. */
 .assignee-options {
   display: grid;
   align-content: start;
   gap: 0.125rem;
-  max-height: 22rem;
+  max-height: 15.4rem;
   overflow-y: auto;
 }
 
