@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  binAccountProject,
+  deleteAccountProjectPermanently,
   keepaliveLimit,
+  loadAccountBin,
+  loadAccountProjects,
   openAccountProject,
+  restoreAccountProject,
   setPageLeaving,
 } from "./account-projects";
 import { handleProjectsRequest } from "./project-handler.server";
@@ -203,6 +208,71 @@ describe("an opened account project", () => {
       throw new TypeError("offline");
     }) as unknown as typeof fetch);
     expect(await opened.saveChanges({ notes: "x" })).toEqual({
+      ok: false,
+      reason: "unreachable",
+    });
+  });
+});
+
+describe("deleting account projects (AD #62 Delete Projects)", () => {
+  it("bins a project, finds it in the Bin, restores it and deletes it for good", async () => {
+    const { fetchFn } = await createServer();
+    expect(await loadAccountProjects("ada", fetchFn)).toMatchObject({
+      ok: true,
+      projects: [{ id: "p1" }],
+    });
+
+    expect(await binAccountProject("ada", "p1", fetchFn)).toEqual({ ok: true });
+    expect(await loadAccountProjects("ada", fetchFn)).toMatchObject({
+      projects: [],
+    });
+    const bin = await loadAccountBin("ada", fetchFn);
+    expect(bin).toMatchObject({
+      ok: true,
+      projects: [{ project: { id: "p1" }, deletedAt: expect.any(String) }],
+    });
+
+    expect(await restoreAccountProject("ada", "p1", fetchFn)).toEqual({
+      ok: true,
+    });
+    expect(await loadAccountProjects("ada", fetchFn)).toMatchObject({
+      projects: [{ id: "p1" }],
+    });
+
+    await binAccountProject("ada", "p1", fetchFn);
+    expect(await deleteAccountProjectPermanently("ada", "p1", fetchFn)).toEqual(
+      {
+        ok: true,
+      },
+    );
+    expect(await loadAccountBin("ada", fetchFn)).toMatchObject({
+      projects: [],
+    });
+  });
+
+  it("counts a project already gone as deleted, but not as restored", async () => {
+    const { fetchFn } = await createServer();
+    expect(await binAccountProject("ada", "none", fetchFn)).toEqual({
+      ok: true,
+    });
+    expect(
+      await deleteAccountProjectPermanently("ada", "none", fetchFn),
+    ).toEqual({ ok: true });
+    expect(await restoreAccountProject("ada", "none", fetchFn)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+  });
+
+  it("reports a server that cannot be reached", async () => {
+    const fetchFn = vi.fn(async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+    expect(await binAccountProject("ada", "p1", fetchFn)).toEqual({
+      ok: false,
+      reason: "unreachable",
+    });
+    expect(await loadAccountBin("ada", fetchFn)).toEqual({
       ok: false,
       reason: "unreachable",
     });

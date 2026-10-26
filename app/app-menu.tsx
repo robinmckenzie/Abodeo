@@ -10,6 +10,9 @@ import type { Account } from "./account/use-account";
 const screens = [
   { path: "/dashboard", name: "Projects" },
   { path: "/people", name: "People" },
+  // Deleted projects (AD #62 Delete Projects), only for an account, as signed
+  // out there is no Bin.
+  { path: "/bin", name: "Bin" },
 ] as const;
 
 export type MenuScreen = (typeof screens)[number]["path"];
@@ -25,13 +28,16 @@ export function AppMenu({
   onBeforeLeave: () => Promise<boolean>;
 }) {
   const navigate = useNavigate();
+  const shownScreens = screens.filter(
+    ({ path }) => path !== "/bin" || account.view.kind === "signed-in",
+  );
 
   return (
     <>
       <AccountControl account={account} onBeforeLeave={onBeforeLeave} />
       <nav className="app-menu" aria-label="Main">
         <ul className="app-menu-list">
-          {screens.map(({ path, name }) => (
+          {shownScreens.map(({ path, name }) => (
             <li key={path}>
               <Link
                 to={path}

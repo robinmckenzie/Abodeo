@@ -268,6 +268,17 @@ export function listOwnProjects(): Project[] {
   return loaded.projects.filter(({ id }) => !defaultIds.has(id));
 }
 
+// Removes a project for good (AD #62 Delete Projects): signed out there is
+// no Bin. Removing one that is already gone succeeds.
+export function deleteStoredProject(id: string): SaveResult {
+  try {
+    localStorage.removeItem(keyPrefix + id);
+    return { ok: true };
+  } catch (error) {
+    return toFailure(error);
+  }
+}
+
 // Removes each project that is still exactly as given, such as once it has
 // been moved into an account. One changed since, such as in another tab, is
 // kept, to be offered again.

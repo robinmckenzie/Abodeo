@@ -88,6 +88,9 @@ export type ProjectsView =
       // The newest image of each project that has any (AD #48 Add Images To
       // Projects), for its bar's thumbnail.
       latestImageIds: Record<string, string>;
+      // How many images each project that has any holds (AD #62 Delete
+      // Projects), for the warning before it is deleted.
+      imageCounts: Record<string, number>;
     };
 
 export type ProjectsSource = {
@@ -101,6 +104,9 @@ export type ProjectsSource = {
   ): void;
   // Shows a project as just saved in the account, without loading them all.
   showSavedProject(generation: number, project: Project): void;
+  // Takes a project out of the list once it has been deleted, and keeps any
+  // save or load still on its way from putting it back.
+  removeProject(generation: number, projectId: string): void;
   reload(): void;
 };
 
@@ -117,6 +123,9 @@ export function useProjectsSource(
   const [state, setState] = useState<AccountState | null>(null);
   // Set by the current account's effect, for use from event handlers.
   const actionsRef = useRef({ reload: () => {}, noteSavedProject: () => {} });
+  // The projects deleted from this page, whose id must not come back from a
+  // save or a load that was on its way when they went.
+  const deletedIdsRef = useRef(new Set<string>());
   const onSignedOutRef = useRef(onSignedOut);
   useEffect(() => {
     onSignedOutRef.current = onSignedOut;
@@ -131,6 +140,7 @@ export function useProjectsSource(
 
   useEffect(() => {
     if (!accountId) return;
+    deletedIdsRef.current = new Set();
     const generation = ++generations;
     let isCurrent = true;
     let lastLoad = 0;
@@ -158,6 +168,7 @@ export function useProjectsSource(
           unreadableCount: 0,
           defaultIds: [],
           latestImageIds: {},
+          imageCounts: {},
         });
         return;
       }
@@ -167,7 +178,11 @@ export function useProjectsSource(
         void load();
         return;
       }
-      const { projects, unreadableCount, defaultIds, latestImageIds } = result;
+      const { unreadableCount, defaultIds, latestImageIds, imageCounts } =
+        result;
+      const projects = result.projects.filter(
+        ({ id }) => !deletedIdsRef.current.has(id),
+      );
       writeAccountHint(
         accountId,
         hasOwnAccountProjects(projects, unreadableCount, defaultIds),
@@ -181,6 +196,7 @@ export function useProjectsSource(
         unreadableCount,
         defaultIds,
         latestImageIds,
+        imageCounts,
       });
     };
     const loadIfDue = () => {
@@ -217,6 +233,7 @@ export function useProjectsSource(
       unreadableCount: 0,
       defaultIds: [],
       latestImageIds: {},
+      imageCounts: {},
     };
   }
 
@@ -245,6 +262,7 @@ export function useProjectsSource(
         if (current?.generation !== generation || current.state !== "ready") {
           return current;
         }
+        if (deletedIdsRef.current.has(project.id)) return current;
         // An answer can arrive after a newer one, such as for a project
         // closed and opened again, so an older copy is not shown over it.
         const shown = current.projects.find(({ id }) => id === project.id);
@@ -260,6 +278,35 @@ export function useProjectsSource(
           ),
         );
         return { ...current, projects };
+      });
+    },
+    removeProject(generation, projectId) {
+      deletedIdsRef.current.add(projectId);
+      // A load on its way may have been read before the delete.
+      actionsRef.current.noteSavedProject();
+      setState((current) => {
+        if (current?.generation !== generation || current.state !== "ready") {
+          return current;
+        }
+        const projects = current.projects.filter(({ id }) => id !== projectId);
+        const without = <Value>(values: Record<string, Value>) =>
+          Object.fromEntries(
+            Object.entries(values).filter(([id]) => id !== projectId),
+          );
+        writeAccountHint(
+          current.accountId,
+          hasOwnAccountProjects(
+            projects,
+            current.unreadableCount,
+            current.defaultIds,
+          ),
+        );
+        return {
+          ...current,
+          projects,
+          latestImageIds: without(current.latestImageIds),
+          imageCounts: without(current.imageCounts),
+        };
       });
     },
     reload: () => actionsRef.current.reload(),

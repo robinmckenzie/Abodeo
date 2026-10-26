@@ -281,3 +281,20 @@ describe("the people store", () => {
     }
   });
 });
+
+describe("the people store and the Bin (AD #62 Delete Projects)", () => {
+  it("does not count a binned project as assigned to anyone", async () => {
+    const { fake, store } = setUp({ p1: "andy", p2: "andy" });
+    fake.projects[1].deletedAt = "2026-10-22T00:00:00.000Z";
+    expect(
+      await store.apply("ada", { op: "remove", id: "andy", dryRun: true }),
+    ).toEqual({ kind: "preview", count: 1, unreadable: 0 });
+  });
+
+  it("leaves a binned project's person alone when they are removed", async () => {
+    const { fake, store, assigneesOf } = setUp({ p1: "andy", p2: "andy" });
+    fake.projects[1].deletedAt = "2026-10-22T00:00:00.000Z";
+    await store.apply("ada", { op: "remove", id: "andy", expectedCount: 1 });
+    expect(assigneesOf()).toEqual({ p1: "unassigned", p2: "andy" });
+  });
+});

@@ -9,6 +9,7 @@ import { useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
+  binAccountProject,
   createAccountProject,
   importProjects,
   openAccountProject,
@@ -22,6 +23,10 @@ import {
   type ProjectSaveResult,
 } from "../projects/autosave";
 import { DefaultProjectsPanel } from "../projects/default-projects-panel";
+import {
+  DeleteProjectDialog,
+  type DeleteMode,
+} from "../projects/delete-project-dialog";
 import {
   FloatingMessages,
   useFloatingMessages,
@@ -59,6 +64,7 @@ import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
   declineMove,
+  deleteStoredProject,
   forgetDeclinedMove,
   isMoveDeclined,
   listOwnProjects,
@@ -130,6 +136,19 @@ type OpenedProject = {
   account?: OpenedAccountProject;
 };
 
+// A project being deleted (AD #62 Delete Projects), waiting for the person to
+// confirm, as it was when Delete was chosen.
+type Deletion = {
+  id: string;
+  title: string;
+  tasks: Task[];
+  imageCount: number;
+  appointmentCount: number | null;
+  mode: DeleteMode;
+  isBusy: boolean;
+  message: string | null;
+};
+
 export const tasksConflictMessage =
   "These tasks were changed on another device. Your last change was not saved.";
 
@@ -177,6 +196,7 @@ export default function Dashboard() {
   const presentation = usePresentation();
   const isInPlace = presentation === "in-place";
   const [open, setOpen] = useState<OpenProject | null>(null);
+  const [deletion, setDeletion] = useState<Deletion | null>(null);
   // In place, projects left open when another was opened, kept as they were
   // while their bars squash closed alongside the new one expanding.
   const [closing, setClosing] = useState<OpenProject[]>([]);
@@ -203,6 +223,10 @@ export default function Dashboard() {
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
   // Saves a task title being edited when the project closes.
+  // How many appointments the open project shows, null if not shown.
+  // How many images the open project shows, null if not shown.
+  const imageCountRef = useRef<number | null>(null);
+  const appointmentCountRef = useRef<number | null>(null);
   const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
 
   useSwitchPresentationKey();
@@ -388,6 +412,62 @@ export default function Dashboard() {
       ? `[data-project-id="${open.id}"]`
       : ".add-project";
     setOpen(null);
+  };
+
+  // Asks for the opened project to be deleted. A signed-in account's goes to
+  // the Bin; signed out, there is none.
+  const startDelete = () => {
+    if (!open || open.id === null || open.isLoading) return;
+    if (view.kind !== "account" && view.kind !== "browser") return;
+    setDeletion({
+      id: open.id,
+      title: open.values.title,
+      tasks: open.values.tasks,
+      imageCount:
+        view.kind === "account"
+          ? (imageCountRef.current ?? view.imageCounts[open.id] ?? 0)
+          : 0,
+      appointmentCount: appointmentCountRef.current,
+      mode: view.kind === "account" ? "bin" : "browser",
+      isBusy: false,
+      message: null,
+    });
+  };
+
+  // Closes the project if it is open, once its pending save has finished, so
+  // that nothing is saved to it afterwards, and then deletes it.
+  const confirmDelete = async () => {
+    if (!deletion || deletion.isBusy) return;
+    const { id, mode } = deletion;
+    const fail = (message: string) =>
+      setDeletion((current) =>
+        current?.id === id ? { ...current, isBusy: false, message } : current,
+      );
+    setDeletion({ ...deletion, isBusy: true, message: null });
+    if (openRef.current?.id === id) {
+      await finishTaskEditRef.current?.();
+      await saverRef.current?.saveNow();
+      closeProject();
+    }
+    if (mode === "browser") {
+      const result = deleteStoredProject(id);
+      refreshProjects();
+      if (!result.ok) return fail(deleteFailureMessage);
+    } else {
+      if (view.kind !== "account") return fail(deleteFailureMessage);
+      const result = await whileSending(binAccountProject(view.accountId, id));
+      if (!result.ok) {
+        noteAccountFailure(result.reason);
+        return fail(
+          result.reason === "unreachable"
+            ? "Not deleted: Abodeo cannot reach your projects right now."
+            : deleteFailureMessage,
+        );
+      }
+      source.removeProject(view.generation, id);
+    }
+    setDeletion(null);
+    document.querySelector<HTMLElement>(".add-project")?.focus();
   };
 
   // In place, the project left open squashes closed as the next one opens.
@@ -931,6 +1011,7 @@ export default function Dashboard() {
       onFieldBlur={() => saverRef.current?.saveNow()}
       onCreate={createOpenProject}
       onClose={closeOpenProject}
+      onDelete={open.id !== null ? startDelete : undefined}
       hasCloseButton={!isInPlace}
       images={
         open.id !== null && (
@@ -940,6 +1021,9 @@ export default function Dashboard() {
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
+            onCountChange={(count) => {
+              imageCountRef.current = count;
+            }}
             onLatestImageChange={(imageId) => {
               if (view.kind === "account" && open.id !== null) {
                 source.showLatestImage(view.generation, open.id, imageId);
@@ -964,6 +1048,9 @@ export default function Dashboard() {
             }
             onBeforeLeave={prepareToLeave}
             onSignInChange={noteAccountFailure}
+            onCountChange={(count) => {
+              appointmentCountRef.current = count;
+            }}
           />
         )
       }
@@ -1165,6 +1252,18 @@ export default function Dashboard() {
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </main>
+      {deletion && (
+        <DeleteProjectDialog
+          project={deletion}
+          imageCount={deletion.imageCount}
+          appointmentCount={deletion.appointmentCount}
+          mode={deletion.mode}
+          isBusy={deletion.isBusy}
+          message={deletion.message}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeletion(null)}
+        />
+      )}
       <FloatingMessages boxes={messageBoxes} />
       <KeyboardShortcuts
         shortcuts={[
@@ -1200,6 +1299,9 @@ export default function Dashboard() {
     </div>
   );
 }
+
+const deleteFailureMessage =
+  "Not deleted: Abodeo could not delete this project.";
 
 function toggleId(ids: ReadonlySet<string>, id: string, isIncluded: boolean) {
   if (ids.has(id) === isIncluded) return ids;

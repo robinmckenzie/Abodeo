@@ -28,7 +28,7 @@ type BytesRow = {
 // recording each one, and undoing a transaction's changes on rollback.
 function createFakeDatabase() {
   const state = {
-    projects: [] as { user_id: string; id: string }[],
+    projects: [] as { user_id: string; id: string; isBinned?: boolean }[],
     images: [] as ImageRow[],
     bytes: [] as BytesRow[],
   };
@@ -38,6 +38,13 @@ function createFakeDatabase() {
 
   const clone = () => structuredClone(state);
 
+  // A statement that names deleted_at reaches only a project not in the Bin.
+  const isReached = (sql: string, userId: string, projectId: string) =>
+    !sql.includes("deleted_at is null") ||
+    state.projects.some(
+      (row) => row.user_id === userId && row.id === projectId && !row.isBinned,
+    );
+
   const run = async (text: string, values: unknown[]) => {
     const sql = text.replace(/\s+/g, " ").trim();
     statements.push({ text: sql, values });
@@ -46,9 +53,10 @@ function createFakeDatabase() {
     if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
     if (sql.startsWith("select id from auth_user")) return { rows: [] };
     if (sql.startsWith("select 1 as found from project ")) {
-      const found = state.projects.some(
-        (row) => row.user_id === userId && row.id === projectId,
-      );
+      const found =
+        state.projects.some(
+          (row) => row.user_id === userId && row.id === projectId,
+        ) && isReached(sql, userId, projectId);
       return { rows: found ? [{ found: 1 }] : [] };
     }
     if (sql.includes("as used from project_image")) {
@@ -93,6 +101,7 @@ function createFakeDatabase() {
       return {
         rows: state.images.filter(
           (row) =>
+            isReached(sql, userId, projectId) &&
             row.user_id === userId &&
             row.project_id === projectId &&
             row.id === imageId,
@@ -154,6 +163,7 @@ function createFakeDatabase() {
           entry.user_id === userId &&
           entry.project_id === projectId &&
           entry.id === imageId &&
+          isReached(sql, userId, projectId) &&
           entry.caption === values[4],
       );
       if (row) row.caption = String(values[3]);
@@ -162,6 +172,7 @@ function createFakeDatabase() {
     if (sql.startsWith("delete from project_image ")) {
       const index = state.images.findIndex(
         (row) =>
+          isReached(sql, userId, projectId) &&
           row.user_id === userId &&
           row.project_id === projectId &&
           row.id === imageId,
@@ -204,6 +215,11 @@ function createFakeDatabase() {
     statements,
     addProject(userId: string, id: string) {
       state.projects.push({ user_id: userId, id });
+    },
+    binProject(userId: string, id: string) {
+      state.projects.find(
+        (row) => row.user_id === userId && row.id === id,
+      )!.isBinned = true;
     },
     failOn(pattern: RegExp, error: unknown) {
       failOn = { pattern, error };
@@ -406,6 +422,65 @@ describe("uploading", () => {
       ),
     ).toEqual({ kind: "not-found" });
     expect(state.images).toHaveLength(0);
+  });
+});
+
+describe("a project in the Bin (AD #62 Delete Projects)", () => {
+  async function setupBinned() {
+    const fixture = setup();
+    await fixture.store.upload(
+      "ada",
+      "shed",
+      "one",
+      "image/png",
+      original,
+      thumbnail,
+    );
+    fixture.binProject("ada", "shed");
+    return fixture;
+  }
+
+  it("takes no more images, and shows none", async () => {
+    const { store, state } = await setupBinned();
+    expect(
+      await store.upload(
+        "ada",
+        "shed",
+        "two",
+        "image/png",
+        original,
+        thumbnail,
+      ),
+    ).toEqual({ kind: "not-found" });
+    expect(await store.list("ada", "shed")).toBeNull();
+    expect(state.images).toHaveLength(1);
+  });
+
+  it("neither reads, captions nor removes its images", async () => {
+    const { store, state } = await setupBinned();
+    expect(await store.read("ada", "shed", "one", "original")).toBeNull();
+    expect(await store.setCaption("ada", "shed", "one", "", "Green")).toEqual({
+      kind: "not-found",
+    });
+    expect(await store.remove("ada", "shed", "one")).toBeNull();
+    expect(state.images).toHaveLength(1);
+  });
+
+  it("still counts its images towards the allowance", async () => {
+    const { store, addProject } = await setupBinned();
+    addProject("ada", "yard");
+    const result = await store.upload(
+      "ada",
+      "yard",
+      "two",
+      "image/png",
+      original,
+      thumbnail,
+    );
+    expect(result).toMatchObject({
+      kind: "added",
+      usedBytes: 2 * (original.length + thumbnail.length),
+    });
   });
 });
 

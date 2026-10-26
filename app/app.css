@@ -2576,3 +2576,166 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   gap: 0.5rem;
   margin-top: 0.375rem;
 }
+
+/* The window that asks "Are you sure?" before a project is deleted
+   (AD #62 Delete Projects). */
+.delete-dialog {
+  width: min(30rem, calc(100vw - 3rem));
+  padding: 1.25rem 1.75rem 1.5rem;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
+}
+
+.delete-dialog::backdrop {
+  background: rgb(26 26 26 / 0.22);
+}
+
+.delete-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.delete-dialog p,
+.delete-dialog ul {
+  margin: 0 0 0.75rem;
+}
+
+.delete-dialog ul {
+  padding-left: 1.25rem;
+}
+
+.delete-dialog-error {
+  color: #a12a2a;
+}
+
+.delete-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.delete-dialog-buttons button {
+  padding: 0.55rem 1.15rem;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.delete-dialog-buttons button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.delete-dialog-cancel {
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #1a1a1a;
+}
+
+.delete-dialog-cancel:hover:not(:disabled) {
+  background: #f1eee6;
+}
+
+.delete-dialog-confirm {
+  background: #a12a2a;
+  color: #fdfcf8;
+}
+
+.delete-dialog-confirm:hover:not(:disabled) {
+  background: #7e1f1f;
+}
+
+.delete-dialog button:focus-visible {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 3px;
+}
+
+/* Delete, at the foot of an opened project's form: outlined, like Cancel, so
+   that it stands back from the save. */
+.project-form-footer .project-form-delete {
+  margin-left: auto;
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #a12a2a;
+}
+
+.project-form-footer .project-form-delete:hover {
+  background: #f8e9e6;
+}
+
+/* The link from the dashboard to the Bin. */
+.bin-link {
+  align-self: center;
+  color: #1a1a1a;
+}
+
+.bin-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.bin-details {
+  flex: 1 1 14rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.bin-title {
+  font-weight: 600;
+}
+
+.bin-time {
+  color: #6b675e;
+  font-size: 0.9rem;
+}
+
+.bin-time.is-past {
+  color: #a12a2a;
+}
+
+.bin-row button {
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1a1a1a;
+  color: #fdfcf8;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.bin-row button:hover:not(:disabled) {
+  background: #3a3833;
+}
+
+.bin-row button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.bin-row .bin-delete {
+  background: none;
+  box-shadow: inset 0 0 0 1px #cfc8b8;
+  color: #a12a2a;
+}
+
+.bin-row .bin-delete:hover:not(:disabled) {
+  background: #f8e9e6;
+}

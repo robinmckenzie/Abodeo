@@ -56,7 +56,8 @@ function readStoredProject(id: string, data: unknown) {
 export async function deriveAccountPeople(query: Queryable, userId: string) {
   const { rows } = await query.query(
     `select id, data from project
-     where user_id = $1 and data->>'assignee' = any($2::text[])`,
+     where user_id = $1 and deleted_at is null
+     and data->>'assignee' = any($2::text[])`,
     [userId, startingIds],
   );
   const projects = rows
@@ -154,7 +155,8 @@ export function createPeopleStore(
   const findAssigned = async (query: Queryable, userId: string, id: string) => {
     const { rows } = await query.query(
       `select id, data from project
-       where user_id = $1 and data->>'assignee' = $2 for update`,
+       where user_id = $1 and deleted_at is null
+       and data->>'assignee' = $2 for update`,
       [userId, id],
     );
     const readable: string[] = [];
@@ -176,7 +178,8 @@ export function createPeopleStore(
     }
     const { rows } = await database.query(
       `select id, data from project
-       where user_id = $1 and data->>'assignee' = $2`,
+       where user_id = $1 and deleted_at is null
+       and data->>'assignee' = $2`,
       [userId, id],
     );
     const count = rows.filter((row) =>

@@ -25,6 +25,7 @@ import {
   importBodyLimit,
   isProjectId,
   projectBodyLimit,
+  projectsBinPath,
   projectsImportPath,
   projectsPath,
   type ProjectErrorCode,
@@ -57,7 +58,11 @@ type Route =
   | { kind: "create" }
   | { kind: "import" }
   | { kind: "read"; id: string }
-  | { kind: "save"; id: string };
+  | { kind: "save"; id: string }
+  | { kind: "list-bin" }
+  | { kind: "remove"; id: string }
+  | { kind: "restore"; id: string }
+  | { kind: "delete-permanently"; id: string };
 
 function findRoute(request: Request): Route | Response {
   const { pathname } = new URL(request.url);
@@ -71,15 +76,33 @@ function findRoute(request: Request): Route | Response {
   if (pathname === projectsImportPath) {
     return method === "POST" ? { kind: "import" } : notAllowed();
   }
+  if (pathname === projectsBinPath) {
+    return method === "GET" ? { kind: "list-bin" } : notAllowed();
+  }
+  const [idPart, action, ...extra] = pathname
+    .slice(projectsPath.length + 1)
+    .split("/");
   let id: string;
   try {
-    id = decodeURIComponent(pathname.slice(projectsPath.length + 1));
+    id = decodeURIComponent(idPart);
   } catch {
     return respondWithProjectError(404, "not_found");
   }
-  if (!isProjectId(id)) return respondWithProjectError(404, "not_found");
+  if (!isProjectId(id) || extra.length > 0) {
+    return respondWithProjectError(404, "not_found");
+  }
+  if (action === "restore") {
+    return method === "POST" ? { kind: "restore", id } : notAllowed();
+  }
+  if (action === "permanent") {
+    return method === "DELETE"
+      ? { kind: "delete-permanently", id }
+      : notAllowed();
+  }
+  if (action !== undefined) return respondWithProjectError(404, "not_found");
   if (method === "GET") return { kind: "read", id };
   if (method === "PATCH") return { kind: "save", id };
+  if (method === "DELETE") return { kind: "remove", id };
   return notAllowed();
 }
 
@@ -171,6 +194,25 @@ export async function handleProjectsRequest(
       case "list":
         return respondWithJson(200, await run(store.list(userId)));
 
+      case "list-bin":
+        return respondWithJson(200, await run(store.listBin(userId)));
+
+      case "remove":
+      case "restore":
+      case "delete-permanently": {
+        const outcome = await run(
+          route.kind === "remove"
+            ? store.remove(userId, route.id)
+            : route.kind === "restore"
+              ? store.restore(userId, route.id)
+              : store.deletePermanently(userId, route.id),
+        );
+        if (outcome.kind === "not-found") {
+          return respondWithProjectError(404, "not_found");
+        }
+        return respondWithJson(200, {});
+      }
+
       case "read": {
         const outcome = await run(store.read(userId, route.id));
         if (outcome.kind === "not-found") {
@@ -191,7 +233,7 @@ export async function handleProjectsRequest(
         if (!isProjectId(id) || !read || !hasTitle(read.title ?? "")) {
           return respondWithProjectError(400, "invalid_request");
         }
-        if (defaultIds.includes(id)) {
+        if (defaultIds.includes(id) || id === "bin") {
           return respondWithProjectError(400, "invalid_request");
         }
         const outcome = await run(

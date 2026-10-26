@@ -44,6 +44,7 @@ export function ProjectForm({
   onFieldBlur,
   onCreate,
   onClose,
+  onDelete,
   getCalendarDate,
   onCalendarDateChange,
   hasCloseButton = true,
@@ -74,6 +75,9 @@ export function ProjectForm({
   onFieldBlur: () => void;
   onCreate: () => void;
   onClose: () => void;
+  // Asks to delete the opened project (AD #62 Delete Projects). Without it,
+  // there is no Delete button.
+  onDelete?: () => void;
   // The calendar's day, kept outside the form, as the field to focus is, so
   // that switching presentation shows the same month and day.
   getCalendarDate?: () => string | null;
@@ -349,6 +353,16 @@ export function ProjectForm({
             </button>
             <button type="submit">Create</button>
           </>
+        )}
+        {!isNew && onDelete && (
+          <button
+            type="button"
+            className="project-form-delete"
+            disabled={isReadOnly}
+            onClick={onDelete}
+          >
+            Delete
+          </button>
         )}
       </div>
     </form>

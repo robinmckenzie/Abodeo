@@ -37,7 +37,12 @@ import {
   type Project,
   type ProjectFields,
 } from "./projects";
-import type { ImportOutcome, ProjectListResponse } from "./projects-api";
+import {
+  binPeriodMs,
+  type BinListResponse,
+  type ImportOutcome,
+  type ProjectListResponse,
+} from "./projects-api";
 import {
   inTransaction,
   transactionTimeout,
@@ -63,6 +68,8 @@ export type SaveOutcome =
   | { kind: "conflict"; project: Project; fields: ProjectField[] }
   // Other saves kept landing in between.
   | { kind: "busy" };
+
+export type RemoveOutcome = { kind: "done" } | { kind: "not-found" };
 
 export type ProjectStore = {
   // Brings the account's default projects up to date, if they have changed.
@@ -90,6 +97,17 @@ export type ProjectStore = {
     projects: Project[],
     people?: Person[],
   ): Promise<Record<string, ImportOutcome>>;
+  // Puts a project in the Bin (AD #62 Delete Projects), where it can be
+  // restored until it is cleared for good.
+  remove(userId: string, id: string): Promise<RemoveOutcome>;
+  // The account's binned projects. It never clears any, so that looking at
+  // the Bin cannot remove what is on it.
+  listBin(userId: string): Promise<BinListResponse>;
+  // Returns a binned project to the list as it was, as Unassigned if its
+  // person has been removed since.
+  restore(userId: string, id: string): Promise<RemoveOutcome>;
+  // Removes a binned project and its images at once.
+  deletePermanently(userId: string, id: string): Promise<RemoveOutcome>;
 };
 
 // How many times a save reads and tries again when another save lands
@@ -155,7 +173,7 @@ export function createProjectStore(
        from jsonb_array_elements($2::jsonb) as entry
        on conflict (user_id, id) do ${
          overwrite
-           ? "update set data = excluded.data, revision = project.revision + 1"
+           ? "update set data = excluded.data, revision = project.revision + 1 where project.deleted_at is null"
            : "nothing"
        }
        returning id`,
@@ -185,7 +203,7 @@ export function createProjectStore(
   const readRows = async (query: Queryable, userId: string, ids: string[]) => {
     const { rows } = await query.query(
       `select id, data from project
-       where user_id = $1
+       where user_id = $1 and deleted_at is null
        and id in (select jsonb_array_elements_text($2::jsonb))`,
       [userId, JSON.stringify(ids)],
     );
@@ -273,7 +291,7 @@ export function createProjectStore(
     query: Queryable = database,
   ): Promise<ReadOutcome> => {
     const { rows } = await query.query(
-      "select data from project where user_id = $1 and id = $2",
+      "select data from project where user_id = $1 and id = $2 and deleted_at is null",
       [userId, id],
     );
     if (rows.length === 0) return { kind: "not-found" };
@@ -285,9 +303,10 @@ export function createProjectStore(
     receiveDefaults,
 
     async list(userId) {
+      await purgeExpired(userId);
       const record = await receiveDefaults(userId);
       const { rows } = await database.query(
-        "select id, data from project where user_id = $1",
+        "select id, data from project where user_id = $1 and deleted_at is null",
         [userId],
       );
       const projects: Project[] = [];
@@ -302,6 +321,8 @@ export function createProjectStore(
         .query(
           `select distinct on (project_id) project_id, id from project_image
            where user_id = $1
+           and project_id in (
+             select id from project where user_id = $1 and deleted_at is null)
            order by project_id, created_at desc, id desc`,
           [userId],
         )
@@ -319,12 +340,14 @@ export function createProjectStore(
         unreadableCount,
         defaultIds: record?.ids ?? [],
         latestImageIds,
+        imageCounts: await readImageCounts(userId, false),
       };
     },
 
     read,
 
     async create(userId, id, fields) {
+      await purgeExpired(userId);
       const time = now();
       const project: Project = {
         ...fields,
@@ -351,10 +374,11 @@ export function createProjectStore(
     },
 
     async saveChanges(userId, id, base, changes) {
+      await purgeExpired(userId);
       const trySave = async (query: Queryable): Promise<SaveOutcome> => {
         for (let attempt = 0; attempt < saveAttempts; attempt++) {
           const { rows } = await query.query(
-            "select data, revision from project where user_id = $1 and id = $2",
+            "select data, revision from project where user_id = $1 and id = $2 and deleted_at is null",
             [userId, id],
           );
           if (rows.length === 0) return { kind: "not-found" };
@@ -367,6 +391,7 @@ export function createProjectStore(
           const updated = await query.query(
             `update project set data = $3::jsonb, revision = revision + 1
              where user_id = $1 and id = $2 and revision = $4
+             and deleted_at is null
              returning id`,
             [
               userId,
@@ -450,7 +475,114 @@ export function createProjectStore(
         return outcomes;
       });
     },
+
+    async remove(userId, id) {
+      const { rows } = await database.query(
+        `update project set deleted_at = $3::timestamptz, revision = revision + 1
+         where user_id = $1 and id = $2 and deleted_at is null
+         returning id`,
+        [userId, id, now()],
+      );
+      return { kind: rows.length > 0 ? "done" : "not-found" };
+    },
+
+    async listBin(userId) {
+      const { rows } = await database.query(
+        `select id, data,
+           to_char(deleted_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+           as deleted_at
+         from project where user_id = $1 and deleted_at is not null`,
+        [userId],
+      );
+      const projects: BinListResponse["projects"] = [];
+      let unreadableCount = 0;
+      for (const row of rows) {
+        const project = readStoredProject(String(row.id), row.data);
+        if (project) {
+          projects.push({ project, deletedAt: String(row.deleted_at) });
+        } else {
+          unreadableCount++;
+        }
+      }
+      projects.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+      return {
+        projects,
+        unreadableCount,
+        imageCounts: await readImageCounts(userId, true),
+      };
+    },
+
+    async restore(userId, id) {
+      return inTransaction(database, async (client) => {
+        const people = await readAccountPeople(client, userId, { lock: true });
+        const { rows } = await client.query(
+          `select data from project
+           where user_id = $1 and id = $2 and deleted_at is not null
+           for update`,
+          [userId, id],
+        );
+        if (rows.length === 0) return { kind: "not-found" };
+        const project = readStoredProject(id, rows[0].data);
+        // Removing a person only changes the projects that are shown, so a
+        // binned project may still name someone who has gone.
+        const data =
+          project && !isKnownAssignee(people, project.assignee)
+            ? toStoredData({ ...project, assignee: unassignedId })
+            : rows[0].data;
+        await client.query(
+          `update project set deleted_at = null, data = $3::jsonb,
+           revision = revision + 1
+           where user_id = $1 and id = $2`,
+          [userId, id, JSON.stringify(data)],
+        );
+        return { kind: "done" };
+      });
+    },
+
+    async deletePermanently(userId, id) {
+      const { rows } = await database.query(
+        `delete from project
+         where user_id = $1 and id = $2 and deleted_at is not null
+         returning id`,
+        [userId, id],
+      );
+      return { kind: rows.length > 0 ? "done" : "not-found" };
+    },
   };
+
+  // Clears the projects binned for longer than the cooling-off period, and
+  // with them their images. Only the dashboard's load and saves do this
+  // (AD #62 Delete Projects).
+  async function purgeExpired(userId: string) {
+    const cutoff = new Date(Date.parse(now()) - binPeriodMs).toISOString();
+    await database.query(
+      `delete from project
+       where user_id = $1 and deleted_at <= $2::timestamptz`,
+      [userId, cutoff],
+    );
+  }
+
+  // How many images each of the account's shown (or binned) projects has.
+  // Without the image tables, there are none.
+  async function readImageCounts(userId: string, isBinned: boolean) {
+    const rows = await database
+      .query(
+        `select i.project_id, count(*) as count
+         from project_image i
+         join project p on p.user_id = i.user_id and p.id = i.project_id
+         where i.user_id = $1 and (p.deleted_at is not null) = $2
+         group by i.project_id`,
+        [userId, isBinned],
+      )
+      .then(({ rows }) => rows)
+      .catch((error: unknown) => {
+        if ((error as { code?: string })?.code === "42P01") return [];
+        throw error;
+      });
+    return Object.fromEntries(
+      rows.map((row) => [String(row.project_id), Number(row.count)]),
+    );
+  }
 
   // The account's projects named a person by another id than the browser's
   // person of the same name, so they follow the browser's person rather than

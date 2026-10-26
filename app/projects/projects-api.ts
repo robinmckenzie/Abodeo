@@ -6,6 +6,12 @@ import type { Project, ProjectFields } from "./projects";
 
 export const projectsPath = "/api/projects";
 export const projectsImportPath = `${projectsPath}/import`;
+export const projectsBinPath = `${projectsPath}/bin`;
+
+// How long a deleted project can be restored from the Bin before the
+// dashboard next clears it for good (AD #62 Delete Projects). Provisional,
+// expected to be tuned.
+export const binPeriodMs = 2 * 24 * 60 * 60 * 1000;
 
 // The account the page believes it is working for. It never chooses the
 // account, which comes only from the sign-in: a request whose account
@@ -21,6 +27,14 @@ export function buildProjectPath(id: string) {
   return `${projectsPath}/${encodeURIComponent(id)}`;
 }
 
+export function buildRestorePath(id: string) {
+  return `${buildProjectPath(id)}/restore`;
+}
+
+export function buildPermanentDeletePath(id: string) {
+  return `${buildProjectPath(id)}/permanent`;
+}
+
 // A project id made by the browser, or a default project's.
 export function isProjectId(value: unknown): value is string {
   return typeof value === "string" && /^[\w-]{1,100}$/.test(value);
@@ -34,6 +48,17 @@ export type ProjectListResponse = {
   // The newest image of each project that has any, by project id, for its
   // bar's thumbnail (AD #48 Add Images To Projects).
   latestImageIds: Record<string, string>;
+  // How many images each project that has any holds, by project id, for the
+  // warning before it is deleted (AD #62 Delete Projects).
+  imageCounts: Record<string, number>;
+};
+
+// The account's deleted projects, each with when it was put in the Bin as an
+// ISO time.
+export type BinListResponse = {
+  projects: { project: Project; deletedAt: string }[];
+  unreadableCount: number;
+  imageCounts: Record<string, number>;
 };
 
 export type ProjectResponse = { project: Project };

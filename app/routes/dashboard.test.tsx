@@ -1395,3 +1395,51 @@ describe("Dashboard people (AD #61)", () => {
     expect(screen.getByRole("link", { name: "People" })).toBeTruthy();
   });
 });
+
+describe("Dashboard deleting (AD #62)", () => {
+  async function openDeleteWindow(title: string) {
+    await addProject(title);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(title) }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    });
+    return screen.getByRole("dialog", { name: `Delete “${title}”?` });
+  }
+
+  it("asks first, saying there is no Bin when signed out, and leaves the project if cancelled", async () => {
+    await renderDashboard();
+    const dialog = await openDeleteWindow("Kitchen");
+    expect(within(dialog).getByText(/there is no Bin/)).toBeTruthy();
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    });
+    expect(
+      screen.queryByRole("dialog", { name: /Delete “Kitchen”/ }),
+    ).toBeNull();
+    expect(savedProjects()).toHaveLength(1);
+  });
+
+  it("removes the project for good on confirming, and closes it", async () => {
+    await renderDashboard();
+    const dialog = await openDeleteWindow("Kitchen");
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    });
+
+    expect(savedProjects()).toEqual([]);
+    expect(bars()).toEqual([]);
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(screen.getByText("No projects added yet.")).toBeTruthy();
+  });
+
+  it("has no link to the Bin while signed out", async () => {
+    await renderDashboard();
+    expect(screen.queryByRole("link", { name: "Bin" })).toBeNull();
+  });
+});

@@ -47,6 +47,7 @@ export function ProjectImages({
   onMessage,
   addFilesRef,
   onLatestImageChange,
+  onCountChange,
 }: {
   // Null while signed out, when images are unavailable.
   accountId: string | null;
@@ -58,6 +59,9 @@ export function ProjectImages({
   // Given the newest image's id (null when none) once the images have
   // loaded, and again whenever it changes, for the project's bar.
   onLatestImageChange?: (imageId: string | null) => void;
+  // Given how many images there are once they have loaded, and again
+  // whenever that changes, and null when they are no longer shown.
+  onCountChange?: (count: number | null) => void;
 }) {
   if (accountId === null) {
     return (
@@ -78,6 +82,7 @@ export function ProjectImages({
       onMessage={onMessage}
       addFilesRef={addFilesRef}
       onLatestImageChange={onLatestImageChange}
+      onCountChange={onCountChange}
     />
   );
 }
@@ -89,6 +94,7 @@ function SignedInImages({
   onMessage,
   addFilesRef,
   onLatestImageChange,
+  onCountChange,
 }: {
   accountId: string;
   projectId: string;
@@ -96,6 +102,7 @@ function SignedInImages({
   onMessage?: (text: string) => void;
   addFilesRef?: RefObject<AddFiles | null>;
   onLatestImageChange?: (imageId: string | null) => void;
+  onCountChange?: (count: number | null) => void;
 }) {
   const images = useProjectImages({
     accountId,
@@ -112,6 +119,15 @@ function SignedInImages({
   useEffect(() => {
     if (state.status === "ready") onLatestRef.current?.(latestImageId);
   }, [state.status, latestImageId]);
+  const onCountRef = useRef(onCountChange);
+  useEffect(() => {
+    onCountRef.current = onCountChange;
+  });
+  const imageCount = state.status === "ready" ? state.images.length : null;
+  useEffect(() => {
+    onCountRef.current?.(imageCount);
+    return () => onCountRef.current?.(null);
+  }, [imageCount]);
   const inputRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [viewing, setViewing] = useState<{

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { readDefaultProjects, type DefaultProjects } from "./default-projects";
 import { buildCopyId, createProjectStore } from "./project-store.server";
+import { binPeriodMs } from "./projects-api";
 import { createFakeDatabase } from "./test-database.server";
 import { serialiseProject, type Project } from "./projects";
 
@@ -230,9 +231,11 @@ describe("the project store", () => {
       const count = fake.statements.length;
       await store.list("ada");
       expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
+        "delete from project where user_id = $1 and deleted_at <= $2::timestamptz",
         "select hash, ids from project_defaults_received where user_id = $1",
-        "select id, data from project where user_id = $1",
-        "select distinct on (project_id) project_id, id from project_image where user_id = $1 order by project_id, created_at desc, id desc",
+        "select id, data from project where user_id = $1 and deleted_at is null",
+        "select distinct on (project_id) project_id, id from project_image where user_id = $1 and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
+        "select i.project_id, count(*) as count from project_image i join project p on p.user_id = i.user_id and p.id = i.project_id where i.user_id = $1 and (p.deleted_at is not null) = $2 group by i.project_id",
       ]);
       expect(fake.released()).toBe(1);
     });
@@ -591,6 +594,190 @@ describe("the project store", () => {
           fake.projects.map((row) => (row.data as Project).assignee),
         ).toEqual(["unassigned", "unassigned"]);
       });
+    });
+  });
+
+  describe("the Bin (AD #62 Delete Projects)", () => {
+    let clock = Date.parse("2026-10-22T00:00:00.000Z");
+    const binNow = () => new Date(clock).toISOString();
+
+    function setUp() {
+      clock = Date.parse("2026-10-22T00:00:00.000Z");
+      const fake = createFakeDatabase();
+      const store = createProjectStore(fake.database, {
+        defaults: null,
+        now: binNow,
+      });
+      return { fake, store };
+    }
+
+    it("takes a project out of the list, reading and saving, and keeps it", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      await store.create("ada", "p2", project("p2", "Fence"));
+      expect(await store.remove("ada", "p1")).toEqual({ kind: "done" });
+
+      expect((await store.list("ada")).projects.map((p) => p.id)).toEqual([
+        "p2",
+      ]);
+      expect(await store.read("ada", "p1")).toEqual({ kind: "not-found" });
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { title: "Paint" },
+          { title: "X" },
+        ),
+      ).toEqual({ kind: "not-found" });
+      expect(fake.projects).toHaveLength(2);
+      expect(await store.remove("ada", "p1")).toEqual({ kind: "not-found" });
+    });
+
+    it("lists the bin, newest first, with when each was deleted", async () => {
+      const { store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      await store.create("ada", "p2", project("p2", "Fence"));
+      await store.remove("ada", "p1");
+      clock += 60_000;
+      await store.remove("ada", "p2");
+
+      const bin = await store.listBin("ada");
+      expect(bin.projects.map((entry) => entry.project.id)).toEqual([
+        "p2",
+        "p1",
+      ]);
+      expect(bin.projects[1].deletedAt).toBe("2026-10-22T00:00:00.000Z");
+      expect(await store.listBin("bob")).toMatchObject({ projects: [] });
+    });
+
+    it("counts the images of shown and binned projects separately", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      await store.create("ada", "p2", project("p2", "Fence"));
+      for (const [projectId, id] of [
+        ["p1", "a"],
+        ["p1", "b"],
+        ["p2", "c"],
+      ]) {
+        fake.images.push({ user_id: "ada", project_id: projectId, id });
+      }
+      await store.remove("ada", "p1");
+
+      expect((await store.list("ada")).imageCounts).toEqual({ p2: 1 });
+      expect((await store.listBin("ada")).imageCounts).toEqual({ p1: 2 });
+    });
+
+    it("restores a project as it was, with its person", async () => {
+      const { fake, store } = setUp();
+      fake.people.set("ada", {
+        data: { version: 1, people: [{ id: "andy", name: "Andy" }] },
+        revision: 1,
+      });
+      await store.create(
+        "ada",
+        "p1",
+        project("p1", "Paint", { assignee: "andy" }),
+      );
+      await store.remove("ada", "p1");
+      expect(await store.restore("ada", "p1")).toEqual({ kind: "done" });
+
+      expect(await store.read("ada", "p1")).toMatchObject({
+        project: { title: "Paint", assignee: "andy" },
+      });
+      expect((await store.listBin("ada")).projects).toEqual([]);
+      expect(await store.restore("ada", "p1")).toEqual({ kind: "not-found" });
+    });
+
+    it("restores a project whose person was removed as Unassigned", async () => {
+      const { fake, store } = setUp();
+      const saveList = (people: { id: string; name: string }[]) =>
+        fake.people.set("ada", { data: { version: 1, people }, revision: 1 });
+      saveList([{ id: "andy", name: "Andy" }]);
+      await store.create(
+        "ada",
+        "p1",
+        project("p1", "Paint", { assignee: "andy" }),
+      );
+      await store.remove("ada", "p1");
+      saveList([]);
+      await store.restore("ada", "p1");
+
+      expect(await store.read("ada", "p1")).toMatchObject({
+        project: { assignee: "unassigned" },
+      });
+    });
+
+    it("clears projects binned for the whole period when the list loads, but not when the bin does", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      await store.create("bob", "p1", project("p1", "Bob"));
+      await store.remove("ada", "p1");
+      await store.remove("bob", "p1");
+      clock += binPeriodMs;
+
+      expect((await store.listBin("ada")).projects).toHaveLength(1);
+      expect(fake.projects).toHaveLength(2);
+      expect(await store.restore("ada", "p1")).toEqual({ kind: "done" });
+      await store.remove("ada", "p1");
+      clock += binPeriodMs;
+
+      await store.list("ada");
+      expect(fake.projects.map((row) => row.user_id)).toEqual(["bob"]);
+    });
+
+    it("keeps a project binned for less than the period", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      await store.remove("ada", "p1");
+      clock += binPeriodMs - 1;
+      await store.list("ada");
+      expect(fake.projects).toHaveLength(1);
+    });
+
+    it("clears expired projects when a project is created or saved", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "old", project("old", "Old"));
+      await store.create("ada", "p2", project("p2", "Fence"));
+      await store.remove("ada", "old");
+      clock += binPeriodMs;
+      await store.saveChanges("ada", "p2", { title: "Fence" }, { title: "F" });
+      expect(fake.projects.map((row) => row.id)).toEqual(["p2"]);
+
+      await store.create("ada", "p3", project("p3", "Gate"));
+      await store.remove("ada", "p3");
+      clock += binPeriodMs;
+      await store.create("ada", "p4", project("p4", "Door"));
+      expect(fake.projects.map((row) => row.id)).toEqual(["p2", "p4"]);
+    });
+
+    it("deletes a binned project at once, but not a shown one", async () => {
+      const { fake, store } = setUp();
+      await store.create("ada", "p1", project("p1", "Paint"));
+      expect(await store.deletePermanently("ada", "p1")).toEqual({
+        kind: "not-found",
+      });
+      await store.remove("ada", "p1");
+      expect(await store.deletePermanently("ada", "p1")).toEqual({
+        kind: "done",
+      });
+      expect(fake.projects).toHaveLength(0);
+    });
+
+    it("leaves a binned default project in the Bin when the defaults change", async () => {
+      const fake = createFakeDatabase();
+      const first = makeDefaults([project("d1", "Welcome")]);
+      const store = createProjectStore(fake.database, {
+        defaults: first,
+        now: binNow,
+      });
+      await store.list("ada");
+      await store.remove("ada", "d1");
+      const later = createProjectStore(fake.database, {
+        defaults: makeDefaults([project("d1", "Welcome again")]),
+        now: binNow,
+      });
+      expect((await later.list("ada")).projects).toEqual([]);
+      expect((await later.listBin("ada")).projects).toHaveLength(1);
     });
   });
 });
