@@ -331,16 +331,14 @@ export function ProjectForm({
           {images}
           {appointments}
           {!isNew && onDelete && (
-            <div className="project-form-delete-row">
-              <button
-                type="button"
-                className="project-form-delete"
-                disabled={isReadOnly}
-                onClick={onDelete}
-              >
-                Delete
-              </button>
-            </div>
+            <button
+              type="button"
+              className="project-form-delete"
+              disabled={isReadOnly}
+              onClick={onDelete}
+            >
+              Delete
+            </button>
           )}
         </div>
       </div>
