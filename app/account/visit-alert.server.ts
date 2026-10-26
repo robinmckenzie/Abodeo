@@ -12,6 +12,9 @@ export type VisitAlertSettings = {
   ignoredLabels: string[];
   // No second email for a label within this many minutes.
   cooldownMinutes: number;
+  // No more than this many emails in any hour, however many labels are sent,
+  // because anyone can send a visit.
+  hourlyLimit: number;
 };
 
 export type VisitAlert = {
@@ -31,16 +34,17 @@ export const visitAlertTimeout = 3000;
 // default.
 export const defaultCooldownMinutes = 360;
 
+// The hourly limit when VISIT_ALERT_HOURLY_LIMIT is not set.
+export const defaultHourlyLimit = 20;
+
 function read(env: Environment, name: string) {
   return env[name]?.trim() || undefined;
 }
 
-// Whole minutes, 0 or more. Anything else uses the default.
-function readCooldownMinutes(env: Environment) {
-  const text = read(env, "VISIT_ALERT_COOLDOWN_MINUTES");
-  return text !== undefined && /^\d{1,4}$/.test(text)
-    ? Number(text)
-    : defaultCooldownMinutes;
+// A whole number, 0 or more. Anything else uses the default.
+function readCount(env: Environment, name: string, fallback: number) {
+  const text = read(env, name);
+  return text !== undefined && /^\d{1,5}$/.test(text) ? Number(text) : fallback;
 }
 
 export function readVisitAlertSettings(
@@ -57,7 +61,12 @@ export function readVisitAlertSettings(
       .split(",")
       .map((label) => label.trim().toLowerCase())
       .filter((label) => label !== ""),
-    cooldownMinutes: readCooldownMinutes(env),
+    cooldownMinutes: readCount(
+      env,
+      "VISIT_ALERT_COOLDOWN_MINUTES",
+      defaultCooldownMinutes,
+    ),
+    hourlyLimit: readCount(env, "VISIT_ALERT_HOURLY_LIMIT", defaultHourlyLimit),
   };
 }
 

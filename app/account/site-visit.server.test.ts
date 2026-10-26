@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  alertHourlyLimit,
   createVisitStore,
   handleSiteVisitRequest,
   isAlertCandidate,
@@ -18,6 +17,7 @@ const settings: VisitAlertSettings = {
   from: "onboarding@resend.dev",
   ignoredLabels: ["robin"],
   cooldownMinutes: 360,
+  hourlyLimit: 20,
 };
 
 const human: Visit = {
@@ -111,12 +111,14 @@ describe("readVisitPlace", () => {
 });
 
 describe("createVisitStore", () => {
+  const limits = { cooldownMinutes: 4, hourlyLimit: 7 };
+
   it("adds the visit and says to email when the cooldown and limit allow", async () => {
     const { database, query, release } = createFakeDatabase(true);
     const emailed = await createVisitStore(database).recordVisit(
       human,
       true,
-      4,
+      limits,
     );
 
     expect(emailed).toBe(true);
@@ -124,7 +126,7 @@ describe("createVisitStore", () => {
     expect(texts[0]).toBe("begin");
     expect(texts[1]).toContain("pg_advisory_xact_lock");
     expect(texts[2]).toContain("site_visit");
-    expect(query.mock.calls[2][1]).toEqual(["", 4, alertHourlyLimit]);
+    expect(query.mock.calls[2][1]).toEqual(["", 4, 7]);
     expect(texts[3]).toContain("insert into site_visit");
     expect(query.mock.calls[3][1]).toEqual(["", true, false, "", "", true]);
     expect(texts[4]).toBe("commit");
@@ -136,7 +138,7 @@ describe("createVisitStore", () => {
     const emailed = await createVisitStore(database).recordVisit(
       human,
       true,
-      4,
+      limits,
     );
 
     expect(emailed).toBe(false);
@@ -148,7 +150,7 @@ describe("createVisitStore", () => {
     const emailed = await createVisitStore(database).recordVisit(
       human,
       false,
-      4,
+      limits,
     );
 
     expect(emailed).toBe(false);
@@ -168,7 +170,7 @@ describe("createVisitStore", () => {
     });
 
     await expect(
-      createVisitStore(database).recordVisit(human, false, 4),
+      createVisitStore(database).recordVisit(human, false, limits),
     ).rejects.toThrow("boom");
     expect(query).toHaveBeenLastCalledWith("rollback", []);
     expect(release).toHaveBeenCalledOnce();
@@ -202,7 +204,7 @@ describe("handleSiteVisitRequest", () => {
         city: "Leeds",
       },
       true,
-      360,
+      { cooldownMinutes: 360, hourlyLimit: 20 },
     );
   });
 
@@ -218,7 +220,7 @@ describe("handleSiteVisitRequest", () => {
     expect(store.recordVisit).toHaveBeenCalledWith(
       expect.objectContaining({ isBot: true }),
       false,
-      360,
+      { cooldownMinutes: 360, hourlyLimit: 20 },
     );
   });
 
@@ -243,11 +245,10 @@ describe("handleSiteVisitRequest", () => {
       alerts: undefined,
     });
 
-    expect(store.recordVisit).toHaveBeenCalledWith(
-      expect.anything(),
-      false,
-      360,
-    );
+    expect(store.recordVisit).toHaveBeenCalledWith(expect.anything(), false, {
+      cooldownMinutes: 360,
+      hourlyLimit: 20,
+    });
   });
 
   it("sends the email when the store says to", async () => {
