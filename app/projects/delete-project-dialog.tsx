@@ -4,7 +4,11 @@
 // delete anything.
 import { useId, useLayoutEffect, useRef } from "react";
 
-import { describeBinPeriod, listLosses } from "./delete-project";
+import {
+  describeAppointmentsKept,
+  describeBinPeriod,
+  listLosses,
+} from "./delete-project";
 import { raiseFloatingMessages } from "./floating-messages";
 import type { Project } from "./projects";
 
@@ -16,6 +20,7 @@ export type DeleteMode = "bin" | "permanent" | "browser";
 export function DeleteProjectDialog({
   project,
   imageCount,
+  appointmentCount,
   mode,
   isBusy,
   message,
@@ -24,6 +29,8 @@ export function DeleteProjectDialog({
 }: {
   project: Pick<Project, "title" | "tasks">;
   imageCount: number;
+  // How many appointments the project has, or null if not known.
+  appointmentCount: number | null;
   mode: DeleteMode;
   isBusy: boolean;
   // Why the last try failed, if it did.
@@ -36,6 +43,8 @@ export function DeleteProjectDialog({
   const headingId = useId();
   const isPermanent = mode === "permanent";
   const losses = listLosses(project, imageCount);
+  const appointmentsNote =
+    mode === "browser" ? null : describeAppointmentsKept(appointmentCount);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -75,12 +84,7 @@ export function DeleteProjectDialog({
           </ul>
         </>
       )}
-      {mode !== "browser" && (
-        <p>
-          Its appointments stay in Google Calendar and are no longer shown in
-          Abodeo.
-        </p>
-      )}
+      {appointmentsNote && <p>{appointmentsNote}</p>}
       {mode === "bin" && (
         <p>
           You can restore it from the Bin for {describeBinPeriod()}. After that

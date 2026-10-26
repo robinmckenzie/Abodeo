@@ -30,6 +30,7 @@ function renderDialog(
     <DeleteProjectDialog
       project={{ title: "Bathroom", tasks }}
       imageCount={2}
+      appointmentCount={2}
       mode="bin"
       isBusy={false}
       message={null}
@@ -50,7 +51,28 @@ describe("the delete window", () => {
     expect(screen.getByText("3 tasks")).toBeTruthy();
     expect(screen.getByText("2 images")).toBeTruthy();
     expect(
-      screen.getByText(/appointments stay in Google Calendar/),
+      screen.getByText(
+        "Its appointments stay in Google Calendar and are no longer shown in Abodeo.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says its appointment stays, in the singular, for one", () => {
+    renderDialog({ appointmentCount: 1 });
+    expect(
+      screen.getByText(
+        "Its appointment stays in Google Calendar and is no longer shown in Abodeo.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says nothing of appointments where there are none, and does not say how many where not known", () => {
+    renderDialog({ appointmentCount: 0 });
+    expect(screen.queryByText(/Google Calendar/)).toBeNull();
+    cleanup();
+    renderDialog({ appointmentCount: null });
+    expect(
+      screen.getByText(/^Any appointments stay in Google Calendar/),
     ).toBeTruthy();
   });
 
@@ -61,9 +83,6 @@ describe("the delete window", () => {
     });
     expect(screen.queryByText("You will lose:")).toBeNull();
     expect(screen.queryByRole("listitem")).toBeNull();
-    expect(
-      screen.getByText(/appointments stay in Google Calendar/),
-    ).toBeTruthy();
   });
 
   it("says the project can be restored from the Bin for 2 days, when signed in", () => {

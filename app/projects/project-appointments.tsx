@@ -1,7 +1,7 @@
 // An opened project's appointments (AD #70 Add Appointments To Projects):
 // events in the Abodeo calendar in Google Calendar, shown earliest first
 // below the images. Signed out, a project has none, and this says so.
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import {
   addOneHour,
@@ -93,6 +93,9 @@ export function ProjectAppointments({
   accountId: string | null;
   // What Google last said when it returned the browser here, if it did.
   returnNote?: string | null;
+  // Told how many appointments there are once they are shown, or null when
+  // they are not.
+  onCountChange?: (count: number | null) => void;
 }) {
   if (accountId === null) {
     return (
@@ -117,10 +120,19 @@ export function ProjectAppointments({
 
 function SignedInAppointments({
   returnNote,
+  onCountChange,
   ...options
-}: ProjectAppointmentsOptions & { returnNote?: string | null }) {
+}: ProjectAppointmentsOptions & {
+  returnNote?: string | null;
+  onCountChange?: (count: number | null) => void;
+}) {
   const appointments = useProjectAppointments(options);
   const { state } = appointments;
+  const count = state.status === "ready" ? state.appointments.length : null;
+  useEffect(() => {
+    onCountChange?.(count);
+    return () => onCountChange?.(null);
+  }, [count]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="project-appointments" aria-label="Appointments">
       <div className="project-appointments-header">

@@ -143,6 +143,7 @@ type Deletion = {
   title: string;
   tasks: Task[];
   imageCount: number;
+  appointmentCount: number | null;
   mode: DeleteMode;
   isBusy: boolean;
   message: string | null;
@@ -222,6 +223,8 @@ export default function Dashboard() {
   const focusAfterCloseRef = useRef<string | null>(null);
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
   // Saves a task title being edited when the project closes.
+  // How many appointments the open project shows, null if not shown.
+  const appointmentCountRef = useRef<number | null>(null);
   const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
 
   useSwitchPresentationKey();
@@ -420,6 +423,7 @@ export default function Dashboard() {
       tasks: open.values.tasks,
       imageCount:
         view.kind === "account" ? (view.imageCounts[open.id] ?? 0) : 0,
+      appointmentCount: appointmentCountRef.current,
       mode: view.kind === "account" ? "bin" : "browser",
       isBusy: false,
       message: null,
@@ -1037,6 +1041,9 @@ export default function Dashboard() {
             }
             onBeforeLeave={prepareToLeave}
             onSignInChange={noteAccountFailure}
+            onCountChange={(count) => {
+              appointmentCountRef.current = count;
+            }}
           />
         )
       }
@@ -1242,6 +1249,7 @@ export default function Dashboard() {
         <DeleteProjectDialog
           project={deletion}
           imageCount={deletion.imageCount}
+          appointmentCount={deletion.appointmentCount}
           mode={deletion.mode}
           isBusy={deletion.isBusy}
           message={deletion.message}

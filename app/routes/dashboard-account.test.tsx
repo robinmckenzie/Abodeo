@@ -1037,6 +1037,33 @@ describe("a signed-in account's projects (AD #41)", () => {
       expect(accountProject(server, "a1")).toBeTruthy();
     });
 
+    it("says its appointment stays for one, and nothing of appointments for none", async () => {
+      const server = fakeServer({ session: ada });
+      server.appointmentsAnswer = {
+        status: "ok",
+        appointments: [
+          {
+            id: "e1",
+            title: "Site visit",
+            notes: "",
+            allDay: true,
+            start: "2026-11-02",
+            end: "2026-11-03",
+          },
+        ],
+      };
+      const dialog = await openDeleteWindow(server);
+      expect(
+        within(dialog).getByText(/^Its appointment stays in Google Calendar/),
+      ).toBeTruthy();
+      await click(within(dialog).getByRole("button", { name: "Cancel" }));
+      cleanup();
+
+      const empty = fakeServer({ session: ada });
+      const emptyDialog = await openDeleteWindow(empty);
+      expect(within(emptyDialog).queryByText(/Google Calendar/)).toBeNull();
+    });
+
     it("puts the project in the Bin on confirming, closing it and taking it from the list", async () => {
       const server = fakeServer({ session: ada });
       const dialog = await openDeleteWindow(server);

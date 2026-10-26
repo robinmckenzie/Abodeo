@@ -30,6 +30,20 @@ export function listLosses(
   return losses;
 }
 
+// What happens to the project's appointments, which stay in Google Calendar.
+// Null when their number is not known, as on the Bin page, and then nothing
+// is said of how many. Nothing is said if there are none.
+export function describeAppointmentsKept(count: number | null) {
+  if (count === 0) return null;
+  const subject =
+    count === null
+      ? "Any appointments stay"
+      : count === 1
+        ? "Its appointment stays"
+        : "Its appointments stay";
+  return `${subject} in Google Calendar and ${count === 1 ? "is" : "are"} no longer shown in Abodeo.`;
+}
+
 export function isPastBinPeriod(deletedAt: string, nowMs: number) {
   return nowMs - Date.parse(deletedAt) >= binPeriodMs;
 }

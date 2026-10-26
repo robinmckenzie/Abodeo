@@ -244,6 +244,7 @@ export default function Bin() {
         <DeleteProjectDialog
           project={deleting.project.project}
           imageCount={state.imageCounts[deleting.project.project.id] ?? 0}
+          appointmentCount={null}
           mode="permanent"
           isBusy={deleting.isBusy}
           message={deleting.message}
