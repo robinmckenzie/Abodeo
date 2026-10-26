@@ -30,9 +30,9 @@ const defaultSender = "onboarding@resend.dev";
 
 export const visitAlertTimeout = 3000;
 
-// The cooldown when VISIT_ALERT_COOLDOWN_MINUTES is not set. A provisional
-// default.
-export const defaultCooldownMinutes = 360;
+// The cooldown when VISIT_ALERT_COOLDOWN_MINUTES is not set: none, because
+// every visit matters to Robin.
+export const defaultCooldownMinutes = 0;
 
 // The hourly limit when VISIT_ALERT_HOURLY_LIMIT is not set.
 export const defaultHourlyLimit = 20;

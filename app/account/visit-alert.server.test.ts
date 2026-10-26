@@ -14,7 +14,7 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: [],
-  cooldownMinutes: 360,
+  cooldownMinutes: 0,
   hourlyLimit: 20,
 };
 
@@ -57,8 +57,8 @@ describe("readVisitAlertSettings", () => {
 describe("readVisitAlertSettings cooldown", () => {
   const env = { RESEND_API_KEY: "k", VISIT_ALERT_TO: "robin@example.com" };
 
-  it("is 360 minutes unless a whole number of minutes is set", () => {
-    expect(readVisitAlertSettings(env)?.cooldownMinutes).toBe(360);
+  it("is 0 (none) unless a whole number of minutes is set", () => {
+    expect(readVisitAlertSettings(env)?.cooldownMinutes).toBe(0);
     for (const [text, hours] of [
       ["1", 1],
       ["0", 0],
@@ -72,7 +72,7 @@ describe("readVisitAlertSettings cooldown", () => {
       expect(
         readVisitAlertSettings({ ...env, VISIT_ALERT_COOLDOWN_MINUTES: bad })
           ?.cooldownMinutes,
-      ).toBe(360);
+      ).toBe(0);
     }
   });
 });

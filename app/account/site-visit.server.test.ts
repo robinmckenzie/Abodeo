@@ -16,7 +16,7 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: ["robin"],
-  cooldownMinutes: 360,
+  cooldownMinutes: 0,
   hourlyLimit: 20,
 };
 
@@ -204,7 +204,7 @@ describe("handleSiteVisitRequest", () => {
         city: "Leeds",
       },
       true,
-      { cooldownMinutes: 360, hourlyLimit: 20 },
+      { cooldownMinutes: 0, hourlyLimit: 20 },
     );
   });
 
@@ -220,7 +220,7 @@ describe("handleSiteVisitRequest", () => {
     expect(store.recordVisit).toHaveBeenCalledWith(
       expect.objectContaining({ isBot: true }),
       false,
-      { cooldownMinutes: 360, hourlyLimit: 20 },
+      { cooldownMinutes: 0, hourlyLimit: 20 },
     );
   });
 
@@ -246,7 +246,7 @@ describe("handleSiteVisitRequest", () => {
     });
 
     expect(store.recordVisit).toHaveBeenCalledWith(expect.anything(), false, {
-      cooldownMinutes: 360,
+      cooldownMinutes: 0,
       hourlyLimit: 20,
     });
   });
