@@ -12,23 +12,19 @@ const deletedAt = "2026-10-22T00:00:00.000Z";
 const at = (offsetMs: number) => Date.parse(deletedAt) + offsetMs;
 
 describe("listing what is lost", () => {
-  it("gives the counts where the project has any", () => {
-    const tasks = [1, 2, 3].map((n) => ({
-      id: String(n),
-      title: "T",
-      isDone: false,
-    }));
-    expect(listLosses({ tasks }, 2)).toEqual([
+  const task = (n: number) => ({ id: String(n), title: "T", isDone: false });
+
+  it("gives the counts of the tasks and images the project has", () => {
+    expect(listLosses({ tasks: [1, 2, 3].map(task) }, 2)).toEqual([
       "3 tasks",
       "2 images",
-      "its assignee and due date",
     ]);
-    expect(listLosses({ tasks: tasks.slice(0, 1) }, 1)[0]).toBe("1 task");
-    expect(listLosses({ tasks: [] }, 0)).toEqual([
-      "its tasks",
-      "its images",
-      "its assignee and due date",
-    ]);
+    expect(listLosses({ tasks: [task(1)] }, 1)).toEqual(["1 task", "1 image"]);
+    expect(listLosses({ tasks: [task(1)] }, 0)).toEqual(["1 task"]);
+  });
+
+  it("lists nothing for a project with neither", () => {
+    expect(listLosses({ tasks: [] }, 0)).toEqual([]);
   });
 });
 

@@ -17,18 +17,17 @@ export function describeBinPeriod() {
     : count(Math.round(binPeriodMs / hourMs), "hour");
 }
 
-// What will be lost with the project, as a list. The counts are given where
-// the project has any.
+// What will be lost with the project, as a list: its tasks and images, where
+// it has any. Empty if it has neither.
 export function listLosses(
   project: Pick<Project, "tasks">,
   imageCount: number,
 ) {
   const taskCount = project.tasks.length;
-  return [
-    taskCount > 0 ? count(taskCount, "task") : "its tasks",
-    imageCount > 0 ? count(imageCount, "image") : "its images",
-    "its assignee and due date",
-  ];
+  const losses: string[] = [];
+  if (taskCount > 0) losses.push(count(taskCount, "task"));
+  if (imageCount > 0) losses.push(count(imageCount, "image"));
+  return losses;
 }
 
 export function isPastBinPeriod(deletedAt: string, nowMs: number) {

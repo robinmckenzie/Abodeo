@@ -1,6 +1,6 @@
 // The "Are you sure?" window for deleting a project (AD #62 Delete Projects),
 // over the dashboard or the Bin page. It names the project and lists what
-// will be lost, and Cancel has the focus, so that a stray Enter does not
+// it has that will be lost, and Cancel has the focus, so that a stray Enter does not
 // delete anything.
 import { useId, useLayoutEffect, useRef } from "react";
 
@@ -35,6 +35,7 @@ export function DeleteProjectDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const headingId = useId();
   const isPermanent = mode === "permanent";
+  const losses = listLosses(project, imageCount);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -64,12 +65,16 @@ export function DeleteProjectDialog({
           ? `Delete “${project.title}” permanently?`
           : `Delete “${project.title}”?`}
       </h2>
-      <p>You will lose:</p>
-      <ul>
-        {listLosses(project, imageCount).map((loss) => (
-          <li key={loss}>{loss}</li>
-        ))}
-      </ul>
+      {losses.length > 0 && (
+        <>
+          <p>You will lose:</p>
+          <ul>
+            {losses.map((loss) => (
+              <li key={loss}>{loss}</li>
+            ))}
+          </ul>
+        </>
+      )}
       {mode !== "browser" && (
         <p>
           Its appointments stay in Google Calendar and are no longer shown in

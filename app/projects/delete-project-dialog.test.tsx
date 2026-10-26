@@ -49,16 +49,21 @@ describe("the delete window", () => {
     ).toBeTruthy();
     expect(screen.getByText("3 tasks")).toBeTruthy();
     expect(screen.getByText("2 images")).toBeTruthy();
-    expect(screen.getByText("its assignee and due date")).toBeTruthy();
     expect(
       screen.getByText(/appointments stay in Google Calendar/),
     ).toBeTruthy();
   });
 
-  it("lists tasks and images without counts where there are none", () => {
-    renderDialog({ project: { title: "Empty", tasks: [] }, imageCount: 0 });
-    expect(screen.getByText("its tasks")).toBeTruthy();
-    expect(screen.getByText("its images")).toBeTruthy();
+  it("leaves out what the project does not have", () => {
+    renderDialog({
+      project: { title: "Empty", tasks: [] },
+      imageCount: 0,
+    });
+    expect(screen.queryByText("You will lose:")).toBeNull();
+    expect(screen.queryByRole("listitem")).toBeNull();
+    expect(
+      screen.getByText(/appointments stay in Google Calendar/),
+    ).toBeTruthy();
   });
 
   it("says the project can be restored from the Bin for 2 days, when signed in", () => {
