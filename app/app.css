@@ -1175,6 +1175,7 @@ body:has(.dashboard) {
 /* Its text cannot be selected, so that clicking quickly through the months,
    which the browser reads as double clicks, does not select the month. */
 .due-date-picker {
+  position: relative;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1274,7 +1275,9 @@ body:has(.dashboard) {
 }
 
 .due-date-clear {
-  margin-top: 0.5rem;
+  position: absolute;
+  top: -0.125rem;
+  right: 0;
   padding: 0.125rem 0.625rem;
   border: 0;
   border-radius: 999px;
