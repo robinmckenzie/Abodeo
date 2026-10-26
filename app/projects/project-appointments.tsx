@@ -126,8 +126,17 @@ function SignedInAppointments({
       <div className="project-appointments-header">
         <h3 className="task-heading">Appointments</h3>
         {state.status === "ready" && !appointments.isFormOpen && (
-          <button type="button" onClick={() => void appointments.openForm()}>
-            Add appointment
+          <button
+            type="button"
+            className="project-appointments-add"
+            aria-label="Add appointment"
+            title="Add appointment"
+            onClick={() => void appointments.openForm()}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="8.5" />
+              <path d="M5.5 10h9M10 5.5v9" />
+            </svg>
           </button>
         )}
       </div>

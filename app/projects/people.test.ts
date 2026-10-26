@@ -5,11 +5,16 @@ import {
   checkPersonName,
   countAssignedProjects,
   derivePeopleFromProjects,
+  describePerson,
+  findSubtitle,
   findAssigneeName,
   isKnownAssignee,
   mapAssigneesByName,
+  movePerson,
+  normalisePersonJobTitle,
   normalisePersonName,
   parsePeople,
+  readPeople,
   removePerson,
   renamePerson,
   serialisePeople,
@@ -24,6 +29,19 @@ const people: Person[] = [andy, boris];
 describe("person names", () => {
   it("drops surrounding spaces and joins runs of spaces", () => {
     expect(normalisePersonName("  Mary   Ann \t Lee ")).toBe("Mary Ann Lee");
+  });
+
+  it("keeps a cut job title loadable when the cut falls on a space", () => {
+    const title = normalisePersonJobTitle(
+      "Senior heating and ventilation engineer trainee",
+    );
+    expect(title).toBe(title.trimEnd());
+    expect(
+      readPeople({
+        version: 1,
+        people: [{ id: "p1", name: "", jobTitle: title }],
+      }),
+    ).not.toBeNull();
   });
 
   it("accepts a name as it would be kept", () => {
@@ -216,5 +234,107 @@ describe("matching people by name", () => {
       [{ id: "b1", name: "andy" }],
     );
     expect([...mapped]).toEqual([["x1", "b1"]]);
+  });
+});
+
+describe("job titles", () => {
+  it("adds a person with a tidied job title, or none", () => {
+    expect(addPerson(people, "c1", "Clement", "  Site   manager ")).toEqual({
+      ok: true,
+      people: [
+        andy,
+        boris,
+        { id: "c1", name: "Clement", jobTitle: "Site manager" },
+      ],
+    });
+    expect(addPerson(people, "c1", "Clement", "  ")).toEqual({
+      ok: true,
+      people: [andy, boris, { id: "c1", name: "Clement" }],
+    });
+  });
+
+  it("sets and clears a job title when renaming", () => {
+    const titled = renamePerson(people, "andy", "Andy", "Plumber");
+    expect(titled).toEqual({
+      ok: true,
+      people: [{ ...andy, jobTitle: "Plumber" }, boris],
+    });
+    expect(
+      renamePerson((titled as { people: Person[] }).people, "andy", "Andy"),
+    ).toEqual({ ok: true, people });
+  });
+
+  it("keeps a job title through saving and reading", () => {
+    const titled = [{ ...andy, jobTitle: "Plumber" }, boris];
+    expect(parsePeople(serialisePeople(titled))).toEqual(titled);
+  });
+});
+
+describe("moving a person", () => {
+  it("moves them to a place in the list", () => {
+    expect(movePerson(people, "andy", 1)).toEqual({
+      ok: true,
+      people: [boris, andy],
+    });
+    expect(movePerson(people, "boris", 0)).toEqual({
+      ok: true,
+      people: [boris, andy],
+    });
+  });
+
+  it("keeps a move to the same place as it is, and refuses someone not in the list", () => {
+    expect(movePerson(people, "andy", 0)).toEqual({ ok: true, people });
+    expect(movePerson(people, "nobody", 0)).toEqual({
+      ok: false,
+      problem: "not-found",
+    });
+  });
+});
+
+describe("a person with only a job title", () => {
+  it("is added and renamed with an empty name when there is a job title", () => {
+    const added = addPerson(people, "c1", " ", "Plumber");
+    expect(added).toEqual({
+      ok: true,
+      people: [andy, boris, { id: "c1", name: "", jobTitle: "Plumber" }],
+    });
+    expect(renamePerson(people, "andy", "", "Plumber")).toEqual({
+      ok: true,
+      people: [{ id: "andy", name: "", jobTitle: "Plumber" }, boris],
+    });
+  });
+
+  it("needs a name or a job title", () => {
+    expect(addPerson(people, "c1", " ", " ")).toEqual({
+      ok: false,
+      problem: "blank",
+    });
+    expect(renamePerson(people, "andy", "")).toEqual({
+      ok: false,
+      problem: "blank",
+    });
+  });
+
+  it("does not clash with another person who has no name", () => {
+    const first = { id: "x1", name: "", jobTitle: "Plumber" };
+    expect(addPerson([first], "x2", "", "Electrician").ok).toBe(true);
+  });
+
+  it("is called by the job title, with no subtitle", () => {
+    const person = { id: "x1", name: "", jobTitle: "Plumber" };
+    expect(describePerson(person)).toBe("Plumber");
+    expect(findSubtitle(person)).toBeUndefined();
+    expect(findSubtitle({ ...andy, jobTitle: "Plumber" })).toBe("Plumber");
+    expect(findAssigneeName([person], "x1")).toBe("Plumber");
+  });
+
+  it("keeps an empty name through saving and reading, only with a job title", () => {
+    const titled = [{ id: "x1", name: "", jobTitle: "Plumber" }];
+    expect(parsePeople(serialisePeople(titled))).toEqual(titled);
+    expect(
+      parsePeople(
+        JSON.stringify({ version: 1, people: [{ id: "x1", name: "" }] }),
+      ),
+    ).toBeNull();
   });
 });

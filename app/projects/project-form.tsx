@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { DueDatePicker } from "./due-date-picker";
 import {
+  describePerson,
+  findSubtitle,
   isKnownAssignee,
   personNameMaxLength,
   unassignedName,
@@ -102,7 +104,10 @@ export function ProjectForm({
     };
   }, []);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
-  const options = [{ id: unassignedId, name: unassignedName }, ...people];
+  const options: Person[] = [
+    { id: unassignedId, name: unassignedName },
+    ...people,
+  ];
   // Someone no longer in the list shows as Unassigned.
   const assigned = isKnownAssignee(people, values.assignee)
     ? values.assignee
@@ -232,7 +237,14 @@ export function ProjectForm({
                     }}
                   />
                   <AssigneeIcon isSelected={assigned === assignee.id} />
-                  <span>{assignee.name}</span>
+                  <span>
+                    {describePerson(assignee)}
+                    {findSubtitle(assignee) && (
+                      <span className="assignee-job-title">
+                        {findSubtitle(assignee)}
+                      </span>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>

@@ -47,17 +47,23 @@ function reportPeopleFailure(code: string | undefined) {
 // checked by the store, which says what is wrong with it.
 function readOperation(body: unknown): PeopleOperation | undefined {
   if (typeof body !== "object" || body === null) return undefined;
-  const { op, id, name, expectedCount, dryRun } = body as Record<
-    string,
-    unknown
-  >;
+  const { op, id, name, jobTitle, toIndex, expectedCount, dryRun } =
+    body as Record<string, unknown>;
   switch (op) {
     case "establish":
       return { op };
     case "add":
     case "rename":
-      return isPersonId(id) && typeof name === "string"
-        ? { op, id, name }
+      if (!isPersonId(id) || typeof name !== "string") return undefined;
+      if (jobTitle !== undefined && typeof jobTitle !== "string") {
+        return undefined;
+      }
+      return { op, id, name, ...(jobTitle !== undefined && { jobTitle }) };
+    case "move":
+      return isPersonId(id) &&
+        Number.isInteger(toIndex) &&
+        (toIndex as number) >= 0
+        ? { op, id, toIndex: toIndex as number }
         : undefined;
     case "remove": {
       if (!isPersonId(id)) return undefined;

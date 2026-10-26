@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { recheckInterval, type AccountView } from "../account/use-account";
 import {
   addAccountPerson,
+  moveAccountPerson,
   countAccountAssignedProjects,
   establishAccountPeople,
   loadAccountPeople,
@@ -19,6 +20,7 @@ import {
 import { createPersonId, type Person } from "./people";
 import {
   addStoredPerson,
+  moveStoredPerson,
   countStoredAssignedProjects,
   loadPeople,
   removeStoredPerson,
@@ -88,12 +90,19 @@ export type PeopleSource = {
   // already added.
   addPerson(
     name: string,
+    jobTitle?: string,
   ): Promise<
     { ok: true; person: Person } | { ok: false; reason: PersonFailure }
   >;
   renamePerson(
     id: string,
     name: string,
+    jobTitle?: string,
+  ): Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
+  // Moves the person to the place in the list once they are taken out of it.
+  movePerson(
+    id: string,
+    toIndex: number,
   ): Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
   // How many projects removing the person would set to Unassigned, and how
   // many could not be read and would be left as they are.
@@ -275,10 +284,16 @@ export function usePeople(
   return {
     view,
 
-    async addPerson(name) {
+    async addPerson(name, jobTitle) {
       const id = createPersonId();
       if (accountId) {
-        const result = await addAccountPerson(accountId, id, name);
+        const result = await addAccountPerson(
+          accountId,
+          id,
+          name,
+          fetch,
+          jobTitle,
+        );
         if (!result.ok) {
           noteFailure(result.reason);
           return result;
@@ -289,7 +304,7 @@ export function usePeople(
           person: result.people.find((person) => person.id === id)!,
         };
       }
-      const result = await addStoredPerson(id, name);
+      const result = await addStoredPerson(id, name, jobTitle);
       if (!result.ok) return { ok: false, reason: fromStorage(result.reason) };
       refreshPeople();
       return {
@@ -298,9 +313,15 @@ export function usePeople(
       };
     },
 
-    async renamePerson(id, name) {
+    async renamePerson(id, name, jobTitle) {
       if (accountId) {
-        const result = await renameAccountPerson(accountId, id, name);
+        const result = await renameAccountPerson(
+          accountId,
+          id,
+          name,
+          fetch,
+          jobTitle,
+        );
         if (!result.ok) {
           noteFailure(result.reason);
           return result;
@@ -308,7 +329,23 @@ export function usePeople(
         showChange(accountId, result);
         return { ok: true };
       }
-      const result = await renameStoredPerson(id, name);
+      const result = await renameStoredPerson(id, name, jobTitle);
+      if (!result.ok) return { ok: false, reason: fromStorage(result.reason) };
+      refreshPeople();
+      return { ok: true };
+    },
+
+    async movePerson(id, toIndex) {
+      if (accountId) {
+        const result = await moveAccountPerson(accountId, id, toIndex);
+        if (!result.ok) {
+          noteFailure(result.reason);
+          return result;
+        }
+        showChange(accountId, result);
+        return { ok: true };
+      }
+      const result = await moveStoredPerson(id, toIndex);
       if (!result.ok) return { ok: false, reason: fromStorage(result.reason) };
       refreshPeople();
       return { ok: true };

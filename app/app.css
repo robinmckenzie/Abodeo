@@ -681,9 +681,14 @@ body:has(.dashboard) {
   gap: 0.625rem;
 }
 
+/* The sizes of the name and job title in the Assigned To list. */
 .project-bar-assignee {
   color: #6b665c;
-  font-size: 0.9rem;
+}
+
+.project-bar-job-title {
+  display: block;
+  font-size: 0.8125rem;
 }
 
 /* A calendar page whose spiral's rings stand above its top edge, with the
@@ -987,6 +992,13 @@ body:has(.dashboard) {
   border-radius: 8px;
   color: #6b665c;
   cursor: pointer;
+}
+
+/* The job title is a smaller line under the name. */
+.assignee-job-title {
+  display: block;
+  font-size: 0.8125rem;
+  opacity: 0.8;
 }
 
 /* Lighter text and icon, darker on hover, and fully dark when selected. */
@@ -1563,6 +1575,7 @@ body:has(.dashboard) {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-top: 1rem;
 }
 
 .project-form-footer p {
@@ -2314,6 +2327,56 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   overflow-wrap: anywhere;
 }
 
+.people-row {
+  position: relative;
+}
+
+.people-row.is-dragged {
+  opacity: 0.4;
+}
+
+/* Where a dragged person would go. */
+.people-row.drops-before::before,
+.people-row.drops-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: #1a1a1a;
+}
+
+.people-row.drops-before::before {
+  top: -1px;
+}
+
+.people-row.drops-after::after {
+  bottom: -1px;
+}
+
+/* The people row's pill buttons would otherwise restyle the task buttons. */
+.people-row .task-button {
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+}
+
+.people-row .task-button:hover:not([aria-disabled]) {
+  background: #ebe6da;
+}
+
+.people-row:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
+  opacity: 0;
+}
+
+.people-job-title {
+  display: block;
+  color: #6b665c;
+  font-size: 0.8125rem;
+}
+
 .people-row input,
 .people-add input {
   padding: 0.3rem 0.5rem;
@@ -2412,6 +2475,35 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .project-appointments button:hover:not(:disabled) {
   background: #f6f3ec;
+}
+
+/* The add button is the images' add button: a thin circle with a plus. */
+.project-appointments .project-appointments-add {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: -0.125rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #6b665c;
+}
+
+.project-appointments .project-appointments-add:hover:not(:disabled) {
+  background: #ebe6da;
+  color: #1a1a1a;
+}
+
+.project-appointments-add svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .project-appointments button:disabled {

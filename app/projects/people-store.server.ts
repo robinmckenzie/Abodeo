@@ -7,6 +7,7 @@
 import type { Queryable } from "../account/account-profile.server";
 import {
   addPerson,
+  movePerson,
   derivePeopleFromProjects,
   readPeople,
   removePerson,
@@ -260,12 +261,39 @@ export function createPeopleStore(
               operation.id,
               operation.expectedCount,
             );
+          case "move": {
+            const change = movePerson(
+              locked.people,
+              operation.id,
+              operation.toIndex,
+            );
+            if (!change.ok) return describeProblem(change);
+            const isChanged =
+              serialisePeople(change.people) !== serialisePeople(locked.people);
+            return {
+              kind: "done",
+              people: change.people,
+              revision: isChanged
+                ? await saveList(client, userId, change.people)
+                : locked.revision,
+            };
+          }
           case "add":
           case "rename": {
             const change =
               operation.op === "add"
-                ? addPerson(locked.people, operation.id, operation.name)
-                : renamePerson(locked.people, operation.id, operation.name);
+                ? addPerson(
+                    locked.people,
+                    operation.id,
+                    operation.name,
+                    operation.jobTitle,
+                  )
+                : renamePerson(
+                    locked.people,
+                    operation.id,
+                    operation.name,
+                    operation.jobTitle,
+                  );
             if (!change.ok) return describeProblem(change);
             const isChanged =
               serialisePeople(change.people) !== serialisePeople(locked.people);

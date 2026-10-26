@@ -6,6 +6,7 @@ import {
   parseProject,
   serialiseProject,
   sortProjects,
+  sortProjectsByDueDate,
   type Project,
 } from "./projects";
 
@@ -113,6 +114,22 @@ describe("projects", () => {
     // never makes a project unreadable.
     const json = JSON.stringify({ ...saved(), assignee: "zed" });
     expect(parseProject("a", json)?.assignee).toBe("zed");
+  });
+
+  it("lists projects by due date, then those without one by title", () => {
+    const make = (id: string, title: string, dueDate: string | null) => ({
+      ...project,
+      id,
+      title,
+      dueDate,
+    });
+    const sorted = sortProjectsByDueDate([
+      make("a", "Zed", null),
+      make("b", "Later", "2026-12-01"),
+      make("c", "apple", null),
+      make("d", "Sooner", "2026-11-01"),
+    ]);
+    expect(sorted.map((p) => p.id)).toEqual(["d", "b", "c", "a"]);
   });
 
   it("lists projects oldest first", () => {

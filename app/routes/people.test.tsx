@@ -70,7 +70,10 @@ const names = () =>
     .map((row) => row.querySelector(".people-name")?.textContent);
 const floatingMessage = () =>
   document.querySelector(".floating-message")?.textContent;
-const addBox = () => screen.getByRole("textbox", { name: "Add a person" });
+const addBox = () =>
+  screen.getByRole("textbox", {
+    name: "Add a person (required unless only job title known)",
+  });
 
 async function press(name: string | RegExp) {
   await act(async () => {
@@ -121,7 +124,7 @@ describe("the People screen", () => {
   });
 
   it.each([
-    ["a blank name", " ", "Enter a name."],
+    ["a blank name", " ", "Enter a name or a job title."],
     ["a name that is too long", "x".repeat(41), "Use 40 characters or fewer."],
     [
       "a name already in the list",
@@ -148,14 +151,18 @@ describe("the People screen", () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Rename Andy");
-    let box = screen.getByRole("textbox", { name: "Name for Andy" });
+    let box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     expect((box as HTMLInputElement).value).toBe("Andy");
     fireEvent.change(box, { target: { value: "Anders" } });
     fireEvent.keyDown(box, { key: "Escape" });
     expect(names()).toEqual(["Andy", "Boris"]);
 
     await press("Rename Andy");
-    box = screen.getByRole("textbox", { name: "Name for Andy" });
+    box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "Anders" } });
     await act(async () => {
       fireEvent.keyDown(box, { key: "Enter" });
@@ -167,7 +174,9 @@ describe("the People screen", () => {
     await saveAssignedProject("Shed", "andy");
     await renderPeople();
     await press("Rename Andy");
-    const box = screen.getByRole("textbox", { name: "Name for Andy" });
+    const box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "Anders" } });
     await press("Save");
     const loaded = loadProjects();
@@ -178,21 +187,32 @@ describe("the People screen", () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Rename Andy");
-    const box = screen.getByRole("textbox", { name: "Name for Andy" });
+    const box = screen.getByRole("textbox", {
+      name: "Name for Andy (required unless only job title known)",
+    });
     fireEvent.change(box, { target: { value: "boris" } });
     await press("Save");
     expect(screen.getByRole("alert").textContent).toBe(
       "Someone with that name is already in the list.",
     );
-    expect(screen.getByRole("textbox", { name: "Name for Andy" })).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", {
+        name: "Name for Andy (required unless only job title known)",
+      }),
+    ).toBeTruthy();
   });
 
-  it("removes someone with no projects at once", async () => {
+  it("asks before removing someone with no projects", async () => {
     savePeople("Andy", "Boris");
     await renderPeople();
     await press("Remove Andy");
+    const dialog = screen.getByRole("alertdialog", { name: "Remove Andy" });
+    expect(dialog.textContent).toContain(
+      "Andy is not assigned to any project.",
+    );
+    expect(names()).toEqual(["Andy", "Boris"]);
+    await press("Remove");
     expect(names()).toEqual(["Boris"]);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
   it("asks before removing someone assigned to projects, saying how many", async () => {
@@ -248,7 +268,11 @@ describe("the People screen", () => {
     refreshPeople();
     await renderPeople();
     expect(screen.getByRole("alert").textContent).toMatch(/cannot be read/);
-    expect(screen.queryByRole("textbox", { name: "Add a person" })).toBeNull();
+    expect(
+      screen.queryByRole("textbox", {
+        name: "Add a person (required unless only job title known)",
+      }),
+    ).toBeNull();
     expect(localStorage.getItem(peopleKey)).toBe("{damaged");
   });
 

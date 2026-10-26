@@ -128,6 +128,23 @@ export function parseProject(id: string, json: string | null): Project | null {
   }
 }
 
+// Earliest due date first, then those without a due date by title. Equal ones
+// keep a stable order. This is the order the dashboard shows.
+export function sortProjectsByDueDate(projects: Project[]) {
+  return [...projects].sort((a, b) => {
+    if (a.dueDate !== b.dueDate) {
+      if (a.dueDate === null) return 1;
+      if (b.dueDate === null) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    }
+    return (
+      a.title.localeCompare(b.title, undefined, { sensitivity: "base" }) ||
+      a.createdAt.localeCompare(b.createdAt) ||
+      a.id.localeCompare(b.id)
+    );
+  });
+}
+
 // Oldest first. Projects created in the same millisecond keep a stable order.
 export function sortProjects(projects: Project[]) {
   return [...projects].sort(

@@ -5,6 +5,7 @@
 import {
   addPerson,
   countAssignedProjects,
+  movePerson,
   derivePeopleFromProjects,
   removePerson,
   renamePerson,
@@ -65,12 +66,20 @@ async function changeList(
   });
 }
 
-export function addStoredPerson(id: string, name: string) {
-  return changeList((people) => addPerson(people, id, name));
+export function addStoredPerson(id: string, name: string, jobTitle?: string) {
+  return changeList((people) => addPerson(people, id, name, jobTitle));
 }
 
-export function renameStoredPerson(id: string, name: string) {
-  return changeList((people) => renamePerson(people, id, name));
+export function renameStoredPerson(
+  id: string,
+  name: string,
+  jobTitle?: string,
+) {
+  return changeList((people) => renamePerson(people, id, name, jobTitle));
+}
+
+export function moveStoredPerson(id: string, toIndex: number) {
+  return changeList((people) => movePerson(people, id, toIndex));
 }
 
 // How many readable projects are assigned to the person.

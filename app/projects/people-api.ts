@@ -20,8 +20,11 @@ export type PeopleResponse = {
 // One change at a time, applied to the list as saved now. Sending an add or a
 // remove again, as after a lost answer, changes nothing more.
 export type PeopleOperation =
-  | { op: "add"; id: string; name: string }
-  | { op: "rename"; id: string; name: string }
+  | { op: "add"; id: string; name: string; jobTitle?: string }
+  // A rename also sets the job title, and clears it if none is sent.
+  | { op: "rename"; id: string; name: string; jobTitle?: string }
+  // toIndex is the place in the list once the person is taken out of it.
+  | { op: "move"; id: string; toIndex: number }
   // dryRun only counts the projects that would be set to Unassigned.
   // expectedCount is the count the person confirmed: if it has changed, nothing
   // is changed.

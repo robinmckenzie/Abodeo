@@ -15,7 +15,7 @@ import {
   writeAccountHint,
   type LoadResult,
 } from "./project-storage";
-import { sortProjects, type Project } from "./projects";
+import { sortProjectsByDueDate, type Project } from "./projects";
 
 let current: LoadResult | null = null;
 const listeners = new Set<() => void>();
@@ -250,7 +250,7 @@ export function useProjectsSource(
         const shown = current.projects.find(({ id }) => id === project.id);
         if (shown && shown.updatedAt > project.updatedAt) return current;
         const others = current.projects.filter(({ id }) => id !== project.id);
-        const projects = sortProjects([...others, project]);
+        const projects = sortProjectsByDueDate([...others, project]);
         writeAccountHint(
           current.accountId,
           hasOwnAccountProjects(
