@@ -22,6 +22,7 @@ const localAccountVariables = [
   "VISIT_ALERT_TO",
   "VISIT_ALERT_FROM",
   "VISIT_ALERT_IGNORE_LABELS",
+  "VISIT_ALERT_COOLDOWN_HOURS",
 ];
 
 export default defineConfig({

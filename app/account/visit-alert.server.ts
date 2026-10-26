@@ -10,6 +10,8 @@ export type VisitAlertSettings = {
   from: string;
   // Lower case labels that never send an email, such as Robin's own.
   ignoredLabels: string[];
+  // No second email for a label within this many hours.
+  cooldownHours: number;
 };
 
 export type VisitAlert = {
@@ -25,8 +27,20 @@ const defaultSender = "onboarding@resend.dev";
 
 export const visitAlertTimeout = 3000;
 
+// The cooldown when VISIT_ALERT_COOLDOWN_HOURS is not set. A provisional
+// default.
+export const defaultCooldownHours = 6;
+
 function read(env: Environment, name: string) {
   return env[name]?.trim() || undefined;
+}
+
+// Whole hours, 0 or more. Anything else uses the default.
+function readCooldownHours(env: Environment) {
+  const text = read(env, "VISIT_ALERT_COOLDOWN_HOURS");
+  return text !== undefined && /^\d{1,4}$/.test(text)
+    ? Number(text)
+    : defaultCooldownHours;
 }
 
 export function readVisitAlertSettings(
@@ -43,6 +57,7 @@ export function readVisitAlertSettings(
       .split(",")
       .map((label) => label.trim().toLowerCase())
       .filter((label) => label !== ""),
+    cooldownHours: readCooldownHours(env),
   };
 }
 

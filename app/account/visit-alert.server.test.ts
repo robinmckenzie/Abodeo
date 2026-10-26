@@ -14,6 +14,7 @@ const settings: VisitAlertSettings = {
   to: "robin@example.com",
   from: "onboarding@resend.dev",
   ignoredLabels: [],
+  cooldownHours: 6,
 };
 
 const alert: VisitAlert = {
@@ -49,6 +50,29 @@ describe("readVisitAlertSettings", () => {
         VISIT_ALERT_IGNORE_LABELS: " Robin, Test ,, ",
       })?.ignoredLabels,
     ).toEqual(["robin", "test"]);
+  });
+});
+
+describe("readVisitAlertSettings cooldown", () => {
+  const env = { RESEND_API_KEY: "k", VISIT_ALERT_TO: "robin@example.com" };
+
+  it("is 6 hours unless a whole number of hours is set", () => {
+    expect(readVisitAlertSettings(env)?.cooldownHours).toBe(6);
+    for (const [text, hours] of [
+      ["1", 1],
+      ["0", 0],
+    ] as const) {
+      expect(
+        readVisitAlertSettings({ ...env, VISIT_ALERT_COOLDOWN_HOURS: text })
+          ?.cooldownHours,
+      ).toBe(hours);
+    }
+    for (const bad of ["soon", "-2", "1.5", ""]) {
+      expect(
+        readVisitAlertSettings({ ...env, VISIT_ALERT_COOLDOWN_HOURS: bad })
+          ?.cooldownHours,
+      ).toBe(6);
+    }
   });
 });
 

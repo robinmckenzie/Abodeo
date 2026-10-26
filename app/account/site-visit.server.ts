@@ -14,10 +14,11 @@ import {
   withTimeout,
 } from "./account-profile.server";
 import { readLabel } from "./usage-label.server";
-import { sendVisitAlert, type VisitAlertSettings } from "./visit-alert.server";
-
-// No second email for a label within this long. A provisional default.
-export const alertCooldownHours = 6;
+import {
+  defaultCooldownHours,
+  sendVisitAlert,
+  type VisitAlertSettings,
+} from "./visit-alert.server";
 
 // No more than this many emails in any hour, however many labels are sent,
 // because anyone can send a visit.
@@ -33,8 +34,13 @@ export type Visit = {
 
 export type VisitStore = {
   // Adds the visit, and says whether it is the one to email about: only when
-  // canEmail, and neither the label's cooldown nor the hourly limit applies.
-  recordVisit(visit: Visit, canEmail: boolean): Promise<boolean>;
+  // canEmail, and neither the label's cooldown (in hours) nor the hourly
+  // limit applies.
+  recordVisit(
+    visit: Visit,
+    canEmail: boolean,
+    cooldownHours: number,
+  ): Promise<boolean>;
 };
 
 export type VisitDependencies = {
@@ -75,7 +81,7 @@ export function readVisitPlace(headers: Headers) {
 
 export function createVisitStore(database: HistoryDatabase): VisitStore {
   return {
-    async recordVisit(visit, canEmail) {
+    async recordVisit(visit, canEmail, cooldownHours) {
       const client = await database.connect();
       try {
         await client.query("begin", []);
@@ -96,7 +102,7 @@ export function createVisitStore(database: HistoryDatabase): VisitStore {
                  select count(*) from site_visit
                  where emailed and visited_at > clock_timestamp() - interval '1 hour'
                ) < $3 as ok`,
-            [visit.label, alertCooldownHours, alertHourlyLimit],
+            [visit.label, cooldownHours, alertHourlyLimit],
           );
           shouldEmail = rows[0]?.ok === true;
         }
@@ -182,7 +188,11 @@ export async function handleSiteVisitRequest(
     const canEmail =
       alerts !== undefined && isAlertCandidate(visit, alerts.ignoredLabels);
     const shouldEmail = await withTimeout(
-      store.recordVisit(visit, canEmail),
+      store.recordVisit(
+        visit,
+        canEmail,
+        alerts?.cooldownHours ?? defaultCooldownHours,
+      ),
       timeout,
     );
     if (shouldEmail && alerts) {
