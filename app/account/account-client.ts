@@ -3,6 +3,7 @@
 // sign-in reported as unavailable instead of waiting for ever.
 import {
   accountActivityPath,
+  siteVisitPath,
   accountProfilePath,
   accountStatusPath,
   authBasePath,
@@ -168,4 +169,12 @@ export async function signOut(fetchFn: Fetch = fetch) {
 export async function reportActivity(fetchFn: Fetch = fetch) {
   const response = await sendJson(fetchFn, accountActivityPath, {});
   if (!response.ok) throw new Error("Activity was not recorded.");
+}
+
+// Tells the server that the page was opened, whether or not anyone is signed
+// in (AD #94). The label travels in its cookie. welcome says that the address
+// asked for the welcome screen.
+export async function reportVisit(welcome: boolean, fetchFn: Fetch = fetch) {
+  const response = await sendJson(fetchFn, siteVisitPath, { welcome });
+  if (!response.ok) throw new Error("The visit was not recorded.");
 }

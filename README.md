@@ -287,6 +287,31 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   database, before the new code is deployed. It adds the columns and replaces the visit index.
 - If the label cannot be read or saved, the app works and the record has an empty label.
 
+### Visits before sign-in
+
+AD #94 Log Visits Before Sign-In. Each browser tab that opens the app reports one visit to
+`POST /api/visit`, whether or not anyone is signed in, so that Robin can see whether a shared link
+was opened. The row, in `site_visit`, has the server's time, the [usage label](#usage-labels),
+whether the address had `?welcome`, a bot flag, and the country and city that Vercel gives. It never
+has the IP address or the user agent.
+
+- The browser reports it, once per tab, because the label's cookie is sent only to `/api`. A
+  reload or a move between pages is not another visit. Visits are not recorded on previews, with
+  JavaScript off (as for most link-preview crawlers), or while the account store is down.
+- An email goes to Robin through Resend for a visit that is not from a bot and either has a label
+  that is not ignored, or has `?welcome` and no label, which is the link given to someone new. A
+  label gets at most one email every 6 hours, and the app sends at most 5 emails an hour in all.
+  A failed email loses the email, not the visit.
+- Nothing is sent without the settings below. In production set them in Vercel. In `.env.local`
+  they are optional, and leaving them out means development sends nothing.
+
+    | Variable | Meaning |
+    | --- | --- |
+    | `RESEND_API_KEY` | A Resend API key. A secret: never commit it |
+    | `VISIT_ALERT_TO` | Where the email goes. With Resend's test sender, only the Resend account's own address |
+    | `VISIT_ALERT_FROM` | Optional sender. Defaults to `onboarding@resend.dev` |
+    | `VISIT_ALERT_IGNORE_LABELS` | Optional, comma-separated labels that never send an email, such as Robin's own |
+
 ### Calendar test
 
 The account panel's "Create test appointment" proves that Abodeo can add appointments to Google
@@ -420,6 +445,13 @@ from auth_user u
 left join auth_account a on a.user_id = u.id
 left join user_profile p on p.user_id = u.id
 left join calendar_link c on c.user_id = u.id;
+
+-- Version: v1.94.0
+--
+-- Visits before sign-in, newest first, with the label ('' if none) and whether Robin was emailed.
+select visited_at, label, welcome, is_bot, country, city, emailed
+from site_visit
+order by visited_at desc;
 
 -- Version: v1.51.0
 --

@@ -1,4 +1,4 @@
--- Version: v1.62.0
+-- Version: v1.94.0
 
 -- Create script for Abodeo's account tables. Run it in the Neon SQL Editor
 -- for each account store: production (DATABASE_URL) and abodeo-local (used
@@ -20,6 +20,8 @@
 -- project_image, project_image_bytes (AD #48): images, details apart from
 -- bytes. Removing a project or account removes its images.
 -- account_people (AD #61): one row per account, the ordered people list.
+-- site_visit (AD #94): a visit before sign-in: time, label, ?welcome, bot
+-- flag, host's country and city, emailed. No account, IP or user agent.
 
 create table if not exists auth_user (
     id text primary key,
@@ -167,4 +169,15 @@ create table if not exists account_people (
     user_id text primary key references auth_user (id) on delete cascade,
     data jsonb not null,
     revision bigint not null default 1
+);
+
+create table if not exists site_visit (
+    id bigint generated always as identity primary key,
+    visited_at timestamptz not null default now(),
+    label text not null default '' check (char_length(label) <= 30),
+    welcome boolean not null,
+    is_bot boolean not null,
+    country text not null default '',
+    city text not null default '',
+    emailed boolean not null default false
 );

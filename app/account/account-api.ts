@@ -8,6 +8,9 @@ export const accountProfilePath = "/api/account/profile";
 // Where the page reports a click or keypress, for the visit history.
 export const accountActivityPath = "/api/account/activity";
 
+// Where the page reports a visit, signed in or not (AD #94).
+export const siteVisitPath = "/api/visit";
+
 // Where sign-in and sign-out return to, so that neither the welcome screen
 // nor the returning-visitor logo sequence plays first.
 export const accountReturnPath = "/dashboard";
