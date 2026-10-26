@@ -232,8 +232,21 @@ describe("Dashboard", () => {
     expect(shortcuts()).toEqual([
       "TToggle tuning panel",
       "ESwitch window / in place",
+      "MShow or hide a failed-save message",
       "EscClose open project",
     ]);
+  });
+
+  it("shows and hides a failed-save message on the open project with M, in development", async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    act(() => screen.getByRole("button", { name: "Close" }).focus());
+    const note = "Not saved: Abodeo cannot reach your projects right now.";
+    expect(screen.queryByText(note)).toBeNull();
+    fireEvent.keyDown(window, { key: "m" });
+    expect(screen.getByText(note)).toBeTruthy();
+    fireEvent.keyDown(window, { key: "m" });
+    expect(screen.queryByText(note)).toBeNull();
   });
 
   it("shows that there are no projects yet", async () => {

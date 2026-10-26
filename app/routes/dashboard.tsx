@@ -5,7 +5,7 @@ import type { Route } from "./+types/dashboard";
 import { useAccount } from "../account/use-account";
 import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
-import { useIsTextFieldFocused } from "../keyboard";
+import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
@@ -982,6 +982,34 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpenInPlace]);
 
+  // Development only, for looking at how the form shows a failed save: M puts
+  // the "cannot reach your projects" message on the open project, and again
+  // takes it off. Not in the deployed app.
+  const isOpenRef = useRef(open !== null);
+  const toggleTestMessageRef = useRef(() => {});
+  useEffect(() => {
+    isOpenRef.current = open !== null;
+    toggleTestMessageRef.current = () =>
+      setOpen(
+        (current) =>
+          current && {
+            ...current,
+            message: current.message ? null : describeFailure("unreachable"),
+          },
+      );
+  });
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "m" || event.repeat) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isTextField(event.target) || !isOpenRef.current) return;
+      toggleTestMessageRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const form = open && (
     <ProjectForm
       values={open.values}
@@ -1290,6 +1318,15 @@ export default function Dashboard() {
             ),
             isShown: !isTextFieldFocused,
           },
+          ...(import.meta.env.DEV
+            ? [
+                {
+                  keyboardKeyLabel: "M",
+                  action: "Show or hide a failed-save message",
+                  isShown: open !== null && !isTextFieldFocused,
+                },
+              ]
+            : []),
           {
             keyboardKeyLabel: "Esc",
             action: "Close open project",
