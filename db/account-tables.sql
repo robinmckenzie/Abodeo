@@ -1,69 +1,25 @@
 -- Version: v1.62.0
---
--- "Create script" for Sign-in accounts and profiles for Abodeo (AD #6 Sign in with Google).
---
--- Run this once in the Neon SQL Editor for each account store: production
--- (the database DATABASE_URL points to) and abodeo-local, used by
--- npm run dev. It is safe to run again. The app never creates these tables.
---
--- The auth_ tables are Better Auth's user, session, account and verification
--- tables, renamed and with snake_case columns, as "user" is a reserved word.
--- user_profile, calendar_link, account_sign_in, account_visit, project and
--- project_defaults_received are Abodeo's own. Deleting a row from auth_user
--- deletes that account's sessions, Google link, profile, calendar link,
--- history, projects and people.
---
--- What is kept: Google's permanent account ID (auth_account.account_id), and
--- the name and email from the first sign-in. The token, scope, image,
--- IP address and user agent columns exist because Better Auth expects them,
--- but the app always leaves them empty.
---
--- calendar_link (AD #10 Prove Calendar Access) keeps the ID of the account's
--- Abodeo calendar in Google Calendar, so that the Calendar test reuses it.
--- No Calendar token is ever kept.
---
--- account_sign_in and account_visit (AD #46 Sign-in History) keep the time of
--- each sign-in, and each visit's start and last activity, so that Robin can
--- see when and for how long testers used Abodeo. Only the account and the
--- server's times are kept: no IP address, browser or device details.
---
--- label (AD #51 Label Account Usage) is the self-declared name a person gave
--- their browser with ?label=NAME, or '' if none. It is stored on every usage
--- record, so that Robin can tell who used an account. It is not used for
--- access. A visit belongs to one label: people using one account at once under
--- different labels each have their own visit. Records from before the label
--- have ''. The alter table statements below add the column to tables created
--- before it, and the visit index is replaced by one that includes it.
---
--- project and project_defaults_received (AD #41 Access Projects Across
--- Devices) keep a signed-in account's projects and their tasks, so that they
--- can be used on every device where the person signs in. data is a project's
--- saved form, as the browser keeps it, so the same version rules apply.
--- revision changes on every write, so that two saves at once cannot both
--- apply. project_defaults_received records which default projects the
--- account has received, as each browser does for itself.
---
--- deleted_at (AD #62 Delete Projects) is when a project was put in the Bin, or
--- null for a project that is shown. A binned project keeps its tasks and
--- images, and can be restored until it is cleared for good: the dashboard's
--- next load or save of the account's projects clears those binned for more
--- than the cooling-off period, and Delete permanently clears one at once.
---
--- project_image and project_image_bytes (AD #48 Add Images To Projects) keep
--- the images added to an account's projects. project_image holds each
--- image's details, its caption, and the sizes that count towards the
--- account's 100 MB; project_image_bytes holds the original and the
--- thumbnail, so that the bytes can move elsewhere later without touching the
--- details. An image id is made by the browser, so a retry is recognisable,
--- and content_hash tells a retry from a different image with the same id.
--- Removing a project, or the account, removes its images.
---
--- account_people (AD #61 Manage People) keeps the people an account's projects
--- can be assigned to. One row per account holds the whole ordered list as
--- data: {"version": 1, "people": [{"id": "...", "name": "..."}]}. A project
--- saves only a person's id, so a rename changes no project. revision changes
--- on every change. An account with no row has not saved a list yet, and the
--- app shows the people its projects are already assigned to until it does.
+
+-- Create script for Abodeo's account tables. Run it in the Neon SQL Editor
+-- for each account store: production (DATABASE_URL) and abodeo-local (used
+-- by npm run dev). Safe to run again. The app never creates these tables.
+-- Keep this file under about 7 KB: Neon's editor truncates longer pastes.
+
+-- auth_ tables: Better Auth's user, session, account and verification
+-- tables, renamed with snake_case columns. The token, scope, image, IP and
+-- user agent columns exist because Better Auth expects them; the app leaves
+-- them empty. Deleting an auth_user row deletes everything of that account.
+-- calendar_link (AD #10): the ID of the account's Abodeo calendar. No token.
+-- account_sign_in, account_visit (AD #46, #51): sign-in and visit times, and
+-- the self-declared label ('' if none). No IP address or device details.
+-- project, project_defaults_received (AD #41): an account's projects. data
+-- is the saved form; revision changes on every write.
+-- deleted_at (AD #62): when a project was put in the Bin, or null. Binned
+-- projects are cleared for good by the dashboard's next load or save once
+-- past the cooling-off period, or at once by Delete permanently.
+-- project_image, project_image_bytes (AD #48): images, details apart from
+-- bytes. Removing a project or account removes its images.
+-- account_people (AD #61): one row per account, the ordered people list.
 
 create table if not exists auth_user (
     id text primary key,
