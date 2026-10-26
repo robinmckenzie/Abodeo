@@ -175,6 +175,12 @@ export async function reportActivity(fetchFn: Fetch = fetch) {
 // in (AD #94). The label travels in its cookie. welcome says that the address
 // asked for the welcome screen.
 export async function reportVisit(welcome: boolean, fetchFn: Fetch = fetch) {
-  const response = await sendJson(fetchFn, siteVisitPath, { welcome });
+  // keepalive lets the report finish if the visitor leaves the page at once.
+  const response = await sendRequest(fetchFn, siteVisitPath, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ welcome }),
+    keepalive: true,
+  });
   if (!response.ok) throw new Error("The visit was not recorded.");
 }
