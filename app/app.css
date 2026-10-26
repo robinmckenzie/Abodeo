@@ -2669,11 +2669,18 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* Delete, at the foot of the right column of an opened project's form, so
-   that only what is in that column moves it: outlined, like Cancel, so that
-   it stands back from the save. */
+   that only what is in that column moves it. The column is as tall as the
+   left one, so its row goes to the bottom of it, with at least a rem above.
+   The button is outlined, like Cancel, so that it stands back from the
+   save. */
+.project-form-delete-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
 .project-form-fields .project-form-delete {
-  align-self: flex-end;
-  margin-top: 1rem;
   padding: 0.55rem 1.15rem;
   border: 0;
   border-radius: 999px;
