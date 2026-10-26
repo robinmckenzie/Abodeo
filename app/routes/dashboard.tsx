@@ -224,6 +224,8 @@ export default function Dashboard() {
   const expandedBarRef = useRef<ExpandedProjectBarHandle>(null);
   // Saves a task title being edited when the project closes.
   // How many appointments the open project shows, null if not shown.
+  // How many images the open project shows, null if not shown.
+  const imageCountRef = useRef<number | null>(null);
   const appointmentCountRef = useRef<number | null>(null);
   const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
 
@@ -422,7 +424,9 @@ export default function Dashboard() {
       title: open.values.title,
       tasks: open.values.tasks,
       imageCount:
-        view.kind === "account" ? (view.imageCounts[open.id] ?? 0) : 0,
+        view.kind === "account"
+          ? (imageCountRef.current ?? view.imageCounts[open.id] ?? 0)
+          : 0,
       appointmentCount: appointmentCountRef.current,
       mode: view.kind === "account" ? "bin" : "browser",
       isBusy: false,
@@ -1017,6 +1021,9 @@ export default function Dashboard() {
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
+            onCountChange={(count) => {
+              imageCountRef.current = count;
+            }}
             onLatestImageChange={(imageId) => {
               if (view.kind === "account" && open.id !== null) {
                 source.showLatestImage(view.generation, open.id, imageId);

@@ -1340,6 +1340,30 @@ describe("images on the dashboard (AD #48)", () => {
     expect(server.images.accounts.size).toBe(0);
   });
 
+  it("counts images added since the project was opened in the delete window", async () => {
+    const server = fakeServer({ session: ada });
+    await server.projects.store.create("ada", "a1", {
+      title: "Shed",
+      ...fields,
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    await drop([png("a.png")]);
+    await click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete “Shed”?" });
+    expect(within(dialog).getByText("1 image")).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await drop([png("b.png")]);
+    await click(screen.getByRole("button", { name: "Delete" }));
+    expect(
+      within(screen.getByRole("dialog", { name: "Delete “Shed”?" })).getByText(
+        "2 images",
+      ),
+    ).toBeTruthy();
+  });
+
   it("adds every picture dropped on the open project, refusing what is not one", async () => {
     const server = fakeServer({ session: ada });
     await server.projects.store.create("ada", "a1", {
