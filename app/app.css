@@ -816,26 +816,33 @@ body:has(.dashboard) {
 }
 
 .project-bar.is-expanded {
-  padding: 1.25rem 1.5rem 0.5rem;
+  position: relative;
+  padding: 1.25rem 1.5rem 1.5rem;
   border: 1px solid #cfc8b8;
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 4px 18px rgb(26 26 26 / 0.08);
 }
 
-/* A new project's bar has no arrow, so it keeps space below Create. */
+/* A new project's bar has no arrow, so it keeps a little less space below
+   Create. */
 .project-bar.is-expanded:not(:has(> .project-bar-collapse)) {
   padding-bottom: 1.25rem;
 }
 
 /* The expanded bar's upward arrow at the bottom centre, styled as the
-   form's close button. */
+   form's close button. It takes no room of its own: it sits in the bottom
+   padding, level with the Delete button's row, which is at the right. */
 .project-bar-collapse {
+  position: absolute;
+  bottom: 0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
-  margin: 0.5rem auto 0;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 50%;
