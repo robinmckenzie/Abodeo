@@ -4,7 +4,6 @@ import type { Route } from "./+types/people";
 import { useAccount } from "../account/use-account";
 import { AppMenu } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
-import deleteIcon from "../images/delete-circle.svg";
 import { FloatingMessages, useFloatingMessages } from "../projects/floating-messages";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
@@ -146,7 +145,7 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
               <button type="button" className="task-button" disabled={locked || index === 0} aria-label={`Move ${name} up`} onClick={() => void move(person.id, index - 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg></button>
               <button type="button" className="task-button" disabled={locked || index === people.length - 1} aria-label={`Move ${name} down`} onClick={() => void move(person.id, index + 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg></button>
             </span>
-            <button type="button" className="people-delete" aria-label={`Delete ${name}`} disabled={locked} onClick={() => void startRemoval(person)}><img src={deleteIcon} alt="" width="26" height="26" /></button>
+            <button type="button" className="task-button task-button-delete" aria-label={`Delete ${name}`} disabled={locked} onClick={() => void startRemoval(person)}><DeleteIcon /></button>
           </div>
           {removal?.person.id === person.id && <div className="people-confirm" role="alertdialog" aria-label={`Remove ${name}`}>
             {removal.notice && <p>{removal.notice}</p>}<p>{describeRemoval(removal)}</p><div><button type="button" disabled={locked} onClick={() => void finishRemoval(removal)}>Remove</button><button type="button" disabled={locked} onClick={() => setRemoval(null)}>Cancel</button></div>
@@ -167,4 +166,8 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
       })}
     </ul>}<FloatingMessages boxes={boxes} />
   </div>;
+}
+
+function DeleteIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" /><path d="M7.5 8.5h9M10 8.5V7h4v1.5M8.5 8.5l.6 8h5.8l.6-8M10.7 11v3.5M13.3 11v3.5" /></svg>;
 }

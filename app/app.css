@@ -1497,17 +1497,17 @@ body:has(.dashboard) {
 .task-button {
   display: grid;
   place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.875rem;
+  height: 1.875rem;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 50%;
   background: none;
   color: #6b665c;
   cursor: pointer;
 }
 
-.task-button:hover:not([aria-disabled]) {
+.task-button:hover:not([aria-disabled], :disabled) {
   background: #ebe6da;
   color: #1a1a1a;
 }
@@ -1527,21 +1527,11 @@ body:has(.dashboard) {
   stroke-linejoin: round;
 }
 
-/* The delete button is the image buttons' thin circle, with the plus turned
-   45 degrees to make an X. It keeps the other task buttons' hover. */
-.task-button-circled-x {
-  border-radius: 50%;
-}
-
-.task-button-circled-x svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  stroke-width: 1;
-}
-
-.task-button-circled-x svg path {
-  transform: rotate(45deg);
-  transform-origin: center;
+/* The bin on tasks and People. */
+.task-button-delete svg {
+  width: 1.625rem;
+  height: 1.625rem;
+  stroke-width: 1.15;
 }
 
 .task-undo {
@@ -2481,24 +2471,23 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .people-panel {
   max-width: 780px;
   padding: 1.5rem;
-  border: 1px solid #d9d5cb;
-  border-radius: 20px;
-  background: #fffdf8;
+  border: 1px solid #e7e2d6;
+  border-radius: 12px;
+  background: #fff;
 }
 .people-panel h3 { margin: 0 0 0.75rem; font-size: 1.25rem; }
-.people-panel hr { border: 0; border-top: 1px solid #ded9ce; margin: 1.25rem 0 0.5rem; }
+.people-panel hr { border: 0; border-top: 1px solid #e7e2d6; margin: 1.25rem 0 0.5rem; }
 .people-quick-add { display: flex; gap: 0.75rem; }
-.people-panel input { min-width: 0; width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #aaa497; border-radius: 9px; background: transparent; }
-.people-quick-add input { flex: 1; border-radius: 999px; }
-.people-quick-add button { padding: 0.5rem 1rem; border: 1px solid #aaa497; border-radius: 999px; background: transparent; cursor: pointer; }
+.people-panel input { min-width: 0; width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: #fff; }
+.people-quick-add input { flex: 1; }
+.people-quick-add button { padding: 0.5rem 1rem; border: 1px solid #1a1a1a; border-radius: 6px; background: #fff; cursor: pointer; }
 .people-panel .people-list { margin: 0.5rem 0 0; gap: 0.25rem; }
-.people-item { position: relative; border-radius: 10px; padding: 0.375rem; }
+.people-item { position: relative; border-radius: 8px; padding: 0.375rem; }
 .people-item:hover, .people-item.is-expanded { background: #f7f5ef; }
 .people-compact-row { display: flex; align-items: center; gap: 0.625rem; min-height: 48px; }
 .people-expand { display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 0.4rem 0; cursor: pointer; }
 .people-expand > svg { width: 24px; height: 24px; fill: none; stroke: #6b665c; stroke-width: 1.25; flex-shrink: 0; }
-.people-delete, .people-swap { display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.people-delete { width: 32px; height: 32px; }
+.people-swap { display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #6b665c; cursor: pointer; }
 .people-swap { width: 30px; height: 30px; margin-bottom: 6px; align-self: end; }
 .people-swap svg { width: 28px; height: 28px; fill: none; stroke: #6b665c; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
 .people-editor { padding: 0.5rem 0.5rem 0.5rem 2.5rem; }
@@ -2509,7 +2498,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .people-save-status { padding: 0.25rem 0.5rem 0.25rem 2.5rem; color: #6b665c; font-size: 0.8125rem; }
 .people-save-invalid, .people-save-failed { color: #9b2c1f; }
 .people-save-status button { margin-left: 0.75rem; }
-.people-item .people-confirm { max-width: 420px; margin: 0.25rem 0 0.5rem auto; padding: 0.75rem; border: 1px solid #aaa497; border-radius: 10px; background: #fffdf8; justify-content: flex-end; }
+.people-item .people-confirm { max-width: 420px; margin: 0.25rem 0 0.5rem auto; padding: 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: #fff; justify-content: flex-end; }
 .people-confirm > div { display: flex; gap: 0.5rem; }
 .people-item.is-dragged { opacity: 0.4; }
 .people-item.drops-before::before, .people-item.drops-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: #6b665c; }
