@@ -1,7 +1,7 @@
 // The people API between the server and the browser, for a signed-in account's
 // list of people (AD #61 Manage People). Both sides import it, so it uses
 // neither Node nor browser APIs.
-import type { Person, PersonNameProblem } from "./people";
+import type { Person, PersonNameProblem, PersonDetails } from "./people";
 
 export const peoplePath = "/api/people";
 
@@ -20,6 +20,7 @@ export type PeopleResponse = {
 // One change at a time, applied to the list as saved now. Sending an add or a
 // remove again, as after a lost answer, changes nothing more.
 export type PeopleOperation =
+  | ({ op: "details"; id: string } & PersonDetails)
   | { op: "add"; id: string; name: string; jobTitle?: string }
   // A rename also sets the job title, and clears it if none is sent.
   | { op: "rename"; id: string; name: string; jobTitle?: string }

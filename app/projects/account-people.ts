@@ -2,7 +2,7 @@
 // the people endpoints (AD #61 Manage People). Like the account's projects, it
 // is only ever held in memory, never in browser storage. Every request names
 // the account the page is working for.
-import { readPeople, type Person, type PersonNameProblem } from "./people";
+import { readPeople, type Person, type PersonNameProblem, type PersonDetails } from "./people";
 import {
   peoplePath,
   type PeopleOperation,
@@ -76,7 +76,7 @@ function readNameProblem(answer: Answer): PeopleFailure | null {
   if (error === "duplicate_name") return "duplicate";
   if (error === "invalid_name") {
     const problem = (answer.body as { problem?: unknown }).problem;
-    return problem === "too-long" ? "too-long" : "blank";
+    return problem === "invalid-contact" ? "invalid-contact" : problem === "too-long" ? "too-long" : "blank";
   }
   return null;
 }
@@ -117,6 +117,10 @@ export function renameAccountPerson(
   jobTitle?: string,
 ) {
   return change(accountId, { op: "rename", id, name, jobTitle }, fetchFn);
+}
+
+export function updateAccountPersonDetails(accountId: string, id: string, details: PersonDetails, fetchFn: Fetch = fetch) {
+  return change(accountId, { op: "details", id, ...details }, fetchFn);
 }
 
 export function moveAccountPerson(

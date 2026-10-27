@@ -10,6 +10,7 @@ export function describePersonFailure(reason: PersonFailure) {
     case "blank":
     case "too-long":
     case "duplicate":
+    case "invalid-contact":
       return personNameMessages[reason satisfies PersonNameProblem];
     case "not-found":
       return "That person is no longer in the list.";

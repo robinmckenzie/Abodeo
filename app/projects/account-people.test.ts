@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   addAccountPerson,
+  moveAccountPerson,
   countAccountAssignedProjects,
   establishAccountPeople,
   loadAccountPeople,
   removeAccountPerson,
   renameAccountPerson,
+  updateAccountPersonDetails,
 } from "./account-people";
 import { handlePeopleRequest } from "./people-handler.server";
 import { createPeopleStore } from "./people-store.server";
@@ -53,6 +55,21 @@ function createServer(assignees: Record<string, string> = {}) {
 }
 
 describe("an account's people", () => {
+  it("roundtrips all contact details through the real API/store, preserving IDs, order and assignments", async () => {
+    const { fetchFn, fake } = createServer({ p1: "andy", p2: "boris" });
+    const details = { name: "Andrew", jobTitle: "Builder", phone: "+44 (0) 1234", email: "andrew@example.test" };
+    expect(await updateAccountPersonDetails("ada", "andy", details, fetchFn)).toMatchObject({ ok: true });
+    expect(await loadAccountPeople("ada", fetchFn)).toMatchObject({ people: [{ id: "andy", ...details }, { id: "boris", name: "Boris" }] });
+    await renameAccountPerson("ada", "andy", "Andy", fetchFn, "Electrician");
+    await moveAccountPerson("ada", "andy", 1, fetchFn);
+    expect(await loadAccountPeople("ada", fetchFn)).toMatchObject({ people: [{ id: "boris" }, { id: "andy", name: "Andy", phone: details.phone, email: details.email }] });
+    expect(fake.projects.map(row => (row.data as { assignee: string }).assignee)).toEqual(["andy", "boris"]);
+    expect(await updateAccountPersonDetails("ada", "andy", { ...details, email: "invalid" }, fetchFn)).toEqual({ ok: false, reason: "invalid-contact" });
+    await updateAccountPersonDetails("ada", "andy", { ...details, phone: "", email: "" }, fetchFn);
+    const loaded = await loadAccountPeople("ada", fetchFn);
+    expect(loaded.ok && loaded.people[1]).toEqual({ id: "andy", name: "Andrew", jobTitle: "Builder" });
+    expect(await loadAccountPeople("other-account", fetchFn)).toMatchObject({ ok: false, reason: "account-changed" });
+  });
   it("loads the list, derived from the projects until one is saved", async () => {
     const { fetchFn } = createServer({ p1: "boris" });
     expect(await loadAccountPeople("ada", fetchFn)).toEqual({

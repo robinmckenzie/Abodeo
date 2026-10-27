@@ -28,11 +28,13 @@ type SignedIn = Extract<AccountView, { kind: "signed-in" }>;
 export function AccountControl({
   account,
   onBeforeLeave,
+  onLeaveFailed,
 }: {
   account: Account;
   onBeforeLeave: () => Promise<boolean>;
+  onLeaveFailed?: () => void;
 }) {
-  const calendar = useCalendarTest({ onBeforeLeave });
+  const calendar = useCalendarTest({ onBeforeLeave, onLeaveFailed });
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
   const { view, message } = account;

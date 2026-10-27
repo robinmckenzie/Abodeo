@@ -428,7 +428,7 @@ describe("the project store", () => {
         project("p2", "Fence", { assignee: "x2" }),
       ];
       const browser = [
-        { id: "x1", name: "Anders" },
+        { id: "x1", name: "Anders", jobTitle: "Builder", phone: "+44 1234", email: "anders@example.test" },
         { id: "x2", name: "Boris" },
       ];
 

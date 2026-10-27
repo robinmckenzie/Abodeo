@@ -21,11 +21,13 @@ export function AppMenu({
   current,
   account,
   onBeforeLeave,
+  onLeaveFailed,
 }: {
   current: MenuScreen;
   account: Account;
   // Gets the screen ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
+  onLeaveFailed?: () => void;
 }) {
   const navigate = useNavigate();
   const shownScreens = screens.filter(
@@ -34,7 +36,7 @@ export function AppMenu({
 
   return (
     <>
-      <AccountControl account={account} onBeforeLeave={onBeforeLeave} />
+      <AccountControl account={account} onBeforeLeave={onBeforeLeave} onLeaveFailed={onLeaveFailed} />
       <nav className="app-menu" aria-label="Main">
         <ul className="app-menu-list">
           {shownScreens.map(({ path, name }) => (

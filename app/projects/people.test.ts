@@ -31,17 +31,18 @@ describe("person names", () => {
     expect(normalisePersonName("  Mary   Ann \t Lee ")).toBe("Mary Ann Lee");
   });
 
-  it("keeps a cut job title loadable when the cut falls on a space", () => {
+  it("rejects overlength titles without truncating entered text", () => {
     const title = normalisePersonJobTitle(
       "Senior heating and ventilation engineer trainee",
     );
-    expect(title).toBe(title.trimEnd());
+    expect(title).toBe("Senior heating and ventilation engineer trainee");
+    expect(addPerson([], "p1", "", title)).toMatchObject({ ok: false, problem: "too-long" });
     expect(
       readPeople({
         version: 1,
         people: [{ id: "p1", name: "", jobTitle: title }],
       }),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   it("accepts a name as it would be kept", () => {

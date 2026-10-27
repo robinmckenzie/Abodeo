@@ -149,20 +149,36 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
 
 ### People
 
-AD #61 Manage People. The code is in `app/projects/people*.ts`, `account-people.ts`,
+AD #61 Manage People and AD #90 People Page Rework. The code is in `app/projects/people*.ts`, `account-people.ts`,
 `use-people.ts` and `app/routes/people.tsx`.
 
 - The application menu (the Projects and People links below the account area, shown on every
   screen with the sign-in button) has a People entry, which opens
-  the People screen at `/people`. There people are added, renamed and removed. A project saves
+  the People screen at `/people`. There people are added, edited, reordered and removed. A project saves
   only a person's id, so a rename changes no project. Unassigned is always the first option in
   Assigned To, and is not a person: it cannot be added, renamed or removed.
-- A name is trimmed, has runs of spaces joined, and is 1 to 40 characters, different from every
+- Quick-add takes one input. Enter or Add creates a person immediately. Whole titles in the local
+  dictionary (`people-quick-add.ts`) become Job Title, ignoring case and surrounding whitespace;
+  everything else stays entirely in Name. Failed creation keeps the original text for retry.
+- Click a person's row to expand the inline editor, or use its button from the keyboard. One
+  editor opens at a time; clicking outside collapses it. Name and Job Title are side by side
+  with a circular Swap control that exchanges both values together, even when one is empty.
+- Name or Job Title is required. Each allows up to 40 characters; overlength text is rejected,
+  never truncated. Optional Phone number (100 characters) and Email (254 characters, basic format
+  validation) can be cleared. Contacts are available in the People editor.
+- Valid edits save after a 500 ms pause, without closing the editor. Pending, invalid and failed
+  edits stay visible on collapsed rows and are retained when switching or reordering. Retry sends
+  failed edits again. Invalid edits leave saved details intact; late responses cannot replace newer
+  typing. Leaving attempts valid saves, then warns before unresolved edits or quick-add text are
+  lost. Reload uses the browser's native warning, which cannot wait for network saves to finish.
+  An explicit Leave decision also covers the subsequent router navigation or sign-out reload;
+  editing pauses during departure and protection resumes if departure fails.
+- A nonblank name is trimmed, has runs of spaces joined, and is 1 to 40 characters, different from every
   other name whatever the case, and not "Unassigned". The same rules apply in the browser and on
   the server.
 - The list is kept where the projects are: signed out, in the browser (`abodeo-people`); signed
   in, in the account (`account_people`, one row holding the whole list, reached through
-  `/api/people`, which is read with GET and changed with POST: add, rename, remove and
+  `/api/people`, which is read with GET and changed with POST: add, rename, details, move, remove and
   establish). A new list starts empty. A store whose projects are already assigned to Andy, Boris
   or Clement starts with those people, saved the first time it is read. The default projects are
   all Unassigned, so receiving them once resets any edits to received default projects.
@@ -170,7 +186,7 @@ AD #61 Manage People. The code is in `app/projects/people*.ts`, `account-people.
   assigned to are shown, and the list is saved by the first change to it, by moving the browser's
   projects in, or once the offer to move them has been settled.
 - A text box below the people in Assigned To adds a person and assigns them to the open project.
-- Removing someone assigned to projects asks first, saying how many, and then sets those projects
+- Delete always asks first near the row's Delete control, including at zero projects. It says how many projects are affected, and then sets those projects
   to Unassigned. The server counts them (a dry run), and a removal sent with that count changes
   nothing, and answers with the new count, if the count has changed since. Projects that cannot
   be read are left as they are, and are reported. In the browser, removal sets the projects one

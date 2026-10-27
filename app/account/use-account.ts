@@ -80,11 +80,13 @@ export function forgetLastKnownAccount() {
 export function useAccount({
   onBeforeLeave,
   onLeaving,
+  onLeaveFailed,
 }: {
   // Gets the page ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
   // Just before sign-in or sign-out leaves the page.
   onLeaving?: (action: "sign-in" | "sign-out") => void;
+  onLeaveFailed?: () => void;
 }): Account {
   const location = useLocation();
   const navigate = useNavigate();
@@ -96,12 +98,14 @@ export function useAccount({
   const viewRef = useRef(view);
   const onBeforeLeaveRef = useRef(onBeforeLeave);
   const onLeavingRef = useRef(onLeaving);
+  const onLeaveFailedRef = useRef(onLeaveFailed);
   const recheckRef = useRef(() => {});
   useEffect(() => {
     viewRef.current = view;
     if (view.kind !== "checking") lastKnownView = view;
     onBeforeLeaveRef.current = onBeforeLeave;
     onLeavingRef.current = onLeaving;
+    onLeaveFailedRef.current = onLeaveFailed;
   });
 
   // Removes the sign-in error from the address, so that a reload does not
@@ -224,6 +228,7 @@ export function useAccount({
         window.location.assign(address);
       } catch {
         setMessage(signInUnavailableMessage);
+        onLeaveFailedRef.current?.();
       }
     });
 
@@ -234,6 +239,7 @@ export function useAccount({
         await sendSignOut();
       } catch {
         setMessage(signOutFailedMessage);
+        onLeaveFailedRef.current?.();
         return;
       }
       announceSignOut();
