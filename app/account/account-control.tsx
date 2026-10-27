@@ -98,7 +98,7 @@ export function AccountControl({
           {/* The link waits for the account, so that it opens the right one. */}
           {calendar.result === "created" && view.kind === "signed-in" && (
             <>
-              {" "}
+              <br />
               <a
                 href={buildGoogleCalendarAddress(view.email)}
                 target="_blank"
