@@ -65,9 +65,11 @@ export type CalendarTest = {
 
 export function useCalendarTest({
   onBeforeLeave,
+  onLeaveFailed,
 }: {
   // Gets the page ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
+  onLeaveFailed?: () => void;
 }): CalendarTest {
   const location = useLocation();
   const navigate = useNavigate();
@@ -81,8 +83,10 @@ export function useCalendarTest({
   );
   const [isLeaving, setIsLeaving] = useState(false);
   const onBeforeLeaveRef = useRef(onBeforeLeave);
+  const onLeaveFailedRef = useRef(onLeaveFailed);
   useEffect(() => {
     onBeforeLeaveRef.current = onBeforeLeave;
+    onLeaveFailedRef.current = onLeaveFailed;
   });
 
   const isResultInAddress =
@@ -110,6 +114,7 @@ export function useCalendarTest({
           window.location.assign(await requestCalendarAddress());
         } catch {
           setResult("failed");
+          onLeaveFailedRef.current?.();
         }
       } finally {
         setIsLeaving(false);

@@ -9,6 +9,8 @@ import {
   derivePeopleFromProjects,
   removePerson,
   renamePerson,
+  updatePersonDetails,
+  type PersonDetails,
   type ListChange,
   type Person,
 } from "./people";
@@ -80,6 +82,10 @@ export function renameStoredPerson(
 
 export function moveStoredPerson(id: string, toIndex: number) {
   return changeList((people) => movePerson(people, id, toIndex));
+}
+
+export function updateStoredPersonDetails(id: string, details: PersonDetails) {
+  return changeList(people => updatePersonDetails(people, id, details));
 }
 
 // How many readable projects are assigned to the person.

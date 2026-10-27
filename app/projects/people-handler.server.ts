@@ -47,9 +47,12 @@ function reportPeopleFailure(code: string | undefined) {
 // checked by the store, which says what is wrong with it.
 function readOperation(body: unknown): PeopleOperation | undefined {
   if (typeof body !== "object" || body === null) return undefined;
-  const { op, id, name, jobTitle, toIndex, expectedCount, dryRun } =
+  const { op, id, name, jobTitle, phone, email, toIndex, expectedCount, dryRun } =
     body as Record<string, unknown>;
   switch (op) {
+    case "details":
+      if (!isPersonId(id) || typeof name !== "string" || typeof jobTitle !== "string" || typeof phone !== "string" || typeof email !== "string") return undefined;
+      return { op, id, name, jobTitle, phone, email };
     case "establish":
       return { op };
     case "add":

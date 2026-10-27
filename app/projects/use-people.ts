@@ -15,9 +15,10 @@ import {
   loadAccountPeople,
   removeAccountPerson,
   renameAccountPerson,
+  updateAccountPersonDetails,
   type AccountPeopleChange,
 } from "./account-people";
-import { createPersonId, type Person } from "./people";
+import { createPersonId, type Person, type PersonDetails } from "./people";
 import {
   addStoredPerson,
   moveStoredPerson,
@@ -25,6 +26,7 @@ import {
   loadPeople,
   removeStoredPerson,
   renameStoredPerson,
+  updateStoredPersonDetails,
   type PeopleLoad,
 } from "./people-management";
 import { isPeopleKey } from "./people-storage";
@@ -91,6 +93,7 @@ export type PeopleSource = {
   addPerson(
     name: string,
     jobTitle?: string,
+    id?: string,
   ): Promise<
     { ok: true; person: Person } | { ok: false; reason: PersonFailure }
   >;
@@ -99,6 +102,7 @@ export type PeopleSource = {
     name: string,
     jobTitle?: string,
   ): Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
+  updateDetails(id: string, details: PersonDetails): Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
   // Moves the person to the place in the list once they are taken out of it.
   movePerson(
     id: string,
@@ -284,8 +288,7 @@ export function usePeople(
   return {
     view,
 
-    async addPerson(name, jobTitle) {
-      const id = createPersonId();
+    async addPerson(name, jobTitle, id = createPersonId()) {
       if (accountId) {
         const result = await addAccountPerson(
           accountId,
@@ -311,6 +314,19 @@ export function usePeople(
         ok: true,
         person: result.people.find((person) => person.id === id)!,
       };
+    },
+
+    async updateDetails(id, details) {
+      if (accountId) {
+        const result = await updateAccountPersonDetails(accountId, id, details);
+        if (!result.ok) { noteFailure(result.reason); return result; }
+        showChange(accountId, result);
+        return { ok: true };
+      }
+      const result = await updateStoredPersonDetails(id, details);
+      if (!result.ok) return { ok: false, reason: fromStorage(result.reason) };
+      refreshPeople();
+      return { ok: true };
     },
 
     async renamePerson(id, name, jobTitle) {

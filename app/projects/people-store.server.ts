@@ -12,6 +12,7 @@ import {
   readPeople,
   removePerson,
   renamePerson,
+  updatePersonDetails,
   serialisePeople,
   startingPeople,
   type ListChange,
@@ -280,6 +281,12 @@ export function createPeopleStore(
                 ? await saveList(client, userId, change.people)
                 : locked.revision,
             };
+          }
+          case "details": {
+            const changed = updatePersonDetails(locked.people, operation.id, operation);
+            if (!changed.ok) return describeProblem(changed);
+            const revision = await saveList(client, userId, changed.people);
+            return { kind: "done", people: changed.people, revision };
           }
           case "add":
           case "rename": {

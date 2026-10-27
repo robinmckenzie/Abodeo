@@ -6,7 +6,7 @@ import { isPersonId, unassignedId, type Project } from "./projects";
 
 // A person has a name, a job title or both: the name is empty when only the
 // job title is known, and the job title is left out when there is none.
-export type Person = { id: string; name: string; jobTitle?: string };
+export type Person = { id: string; name: string; jobTitle?: string; phone?: string; email?: string };
 
 export const unassignedName = "Unassigned";
 export const personNameMaxLength = 40;
@@ -22,12 +22,13 @@ export const startingPeople: readonly Person[] = [
 // The version of the saved form of the list, in the browser and in an account.
 export const peopleVersion = 1;
 
-export type PersonNameProblem = "blank" | "too-long" | "duplicate";
+export type PersonNameProblem = "blank" | "too-long" | "duplicate" | "invalid-contact";
 
 export const personNameMessages: Record<PersonNameProblem, string> = {
   blank: "Enter a name or a job title.",
   "too-long": `Use ${personNameMaxLength} characters or fewer.`,
   duplicate: "Someone with that name is already in the list.",
+  "invalid-contact": "Use a phone number of at most 100 characters and a valid email of at most 254 characters.",
 };
 
 // Surrounding spaces are dropped and runs of spaces become one.
@@ -35,11 +36,38 @@ export function normalisePersonName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 
-// A job title is tidied like a name and cut to its length. Empty is none.
+// A job title is tidied like a name. Validation rejects overlength text.
 export function normalisePersonJobTitle(jobTitle: string | undefined) {
-  return normalisePersonName(jobTitle ?? "")
-    .slice(0, personJobTitleMaxLength)
-    .trimEnd();
+  return normalisePersonName(jobTitle ?? "");
+}
+
+export type PersonDetails = { name: string; jobTitle: string; phone: string; email: string };
+
+export function readPersonDetails(person: Omit<Person, "id">): PersonDetails {
+  return { name: person.name, jobTitle: person.jobTitle ?? "", phone: person.phone ?? "", email: person.email ?? "" };
+}
+
+export function checkPersonDetails(details: PersonDetails, others: readonly Person[]) {
+  const jobTitle = normalisePersonJobTitle(details.jobTitle);
+  if (jobTitle.length > personJobTitleMaxLength) return { ok: false as const, problem: "too-long" as const };
+  const name = checkPersonName(details.name, others, jobTitle !== "");
+  if (!name.ok) return name;
+  const phone = details.phone.trim();
+  const email = details.email.trim();
+  if (phone.length > 100 || email.length > 254 || (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return { ok: false as const, problem: "invalid-contact" as const };
+  }
+  return { ok: true as const, details: { name: name.name, jobTitle, phone, email } };
+}
+
+export function updatePersonDetails(people: readonly Person[], id: string, details: PersonDetails): ListChange {
+  if (!people.some(person => person.id === id)) return { ok: false, problem: "not-found" };
+  const checked = checkPersonDetails(details, people.filter(person => person.id !== id));
+  if (!checked.ok) return checked;
+  const { name, jobTitle, phone, email } = checked.details;
+  return { ok: true, people: people.map(person => person.id !== id ? person : {
+    id, name, ...(jobTitle && { jobTitle }), ...(phone && { phone }), ...(email && { email }),
+  }) };
 }
 
 function withJobTitle(person: Person, jobTitle: string | undefined): Person {
@@ -94,6 +122,7 @@ export function addPerson(
   jobTitle?: string,
 ): ListChange {
   if (!isPersonId(id)) return { ok: false, problem: "not-found" };
+  if (normalisePersonJobTitle(jobTitle).length > personJobTitleMaxLength) return { ok: false, problem: "too-long" };
   const existing = people.find((person) => person.id === id);
   if (existing) {
     // A retry of an add that was received.
@@ -119,6 +148,7 @@ export function renamePerson(
   name: string,
   jobTitle?: string,
 ): ListChange {
+  if (normalisePersonJobTitle(jobTitle).length > personJobTitleMaxLength) return { ok: false, problem: "too-long" };
   if (!people.some((person) => person.id === id)) {
     return { ok: false, problem: "not-found" };
   }
@@ -132,7 +162,7 @@ export function renamePerson(
     ok: true,
     people: people.map((person) =>
       person.id === id
-        ? withJobTitle({ id, name: checked.name }, jobTitle)
+        ? withJobTitle({ id, name: checked.name, ...(person.phone && { phone: person.phone }), ...(person.email && { email: person.email }) }, jobTitle)
         : person,
     ),
   };
@@ -202,9 +232,7 @@ export function derivePeopleFromProjects(
 export function serialisePeople(people: readonly Person[]) {
   return JSON.stringify({
     version: peopleVersion,
-    people: people.map(({ id, name, jobTitle }) =>
-      jobTitle ? { id, name, jobTitle } : { id, name },
-    ),
+    people: people.map(({ id, name, jobTitle, phone, email }) => ({ id, name, ...(jobTitle && { jobTitle }), ...(phone && { phone }), ...(email && { email }) })),
   });
 }
 
@@ -227,12 +255,18 @@ export function readPeople(saved: unknown): Person[] | null {
   }
   const people: Person[] = [];
   for (const entry of value.people) {
-    const { id, name, jobTitle } = (entry ?? {}) as {
+    const { id, name, jobTitle, phone, email } = (entry ?? {}) as {
       id?: unknown;
       name?: unknown;
       jobTitle?: unknown;
+      phone?: unknown;
+      email?: unknown;
     };
     if (!isPersonId(id) || typeof name !== "string") return null;
+    if ((phone !== undefined && typeof phone !== "string") || (email !== undefined && typeof email !== "string")) return null;
+    const contacts = { ...(typeof phone === "string" && phone && { phone }), ...(typeof email === "string" && email && { email }) };
+    const contactCheck = checkPersonDetails({ name, jobTitle: typeof jobTitle === "string" ? jobTitle : "", phone: typeof phone === "string" ? phone : "", email: typeof email === "string" ? email : "" }, people);
+    if (!contactCheck.ok || (phone !== undefined && contactCheck.details.phone !== phone) || (email !== undefined && contactCheck.details.email !== email)) return null;
     const checked = checkPersonName(
       name,
       people,
@@ -241,7 +275,7 @@ export function readPeople(saved: unknown): Person[] | null {
     if (!checked.ok || checked.name !== name) return null;
     if (people.some((person) => person.id === id)) return null;
     if (jobTitle === undefined) {
-      people.push({ id, name });
+      people.push({ id, name, ...contacts });
       continue;
     }
     if (
@@ -251,7 +285,7 @@ export function readPeople(saved: unknown): Person[] | null {
     ) {
       return null;
     }
-    people.push({ id, name, jobTitle });
+    people.push({ id, name, jobTitle, ...contacts });
   }
   return people;
 }
