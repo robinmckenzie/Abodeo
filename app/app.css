@@ -1512,7 +1512,7 @@ body:has(.dashboard) {
   color: #1a1a1a;
 }
 
-.task-button[aria-disabled] {
+.task-button:is([aria-disabled], :disabled) {
   opacity: 0.35;
   cursor: default;
 }
