@@ -2330,66 +2330,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   list-style: none;
 }
 
-.people-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: 8px;
-}
-
-.people-row:hover {
-  background: #f7f5ef;
-}
-
 .people-name {
   flex: 1;
   overflow-wrap: anywhere;
-}
-
-.people-row {
-  position: relative;
-}
-
-.people-row.is-dragged {
-  opacity: 0.4;
-}
-
-/* Where a dragged person would go. */
-.people-row.drops-before::before,
-.people-row.drops-after::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  border-radius: 1px;
-  background: #1a1a1a;
-}
-
-.people-row.drops-before::before {
-  top: -1px;
-}
-
-.people-row.drops-after::after {
-  bottom: -1px;
-}
-
-/* The people row's pill buttons would otherwise restyle the task buttons. */
-.people-row .task-button {
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-}
-
-.people-row .task-button:hover:not([aria-disabled]) {
-  background: #ebe6da;
-}
-
-.people-row:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
-  opacity: 0;
 }
 
 .people-job-title {
@@ -2398,61 +2341,12 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   font-size: 0.8125rem;
 }
 
-.people-row input,
-.people-add input {
-  padding: 0.3rem 0.5rem;
-  border: 1px solid #8a857a;
-  border-radius: 6px;
-  background: transparent;
-}
-
-.people-row input {
-  flex: 1;
-  min-width: 0;
-}
-
-.people-row button,
-.people-add button,
 .people-confirm button {
   padding: 0.3rem 0.75rem;
   border: 1px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
-}
-
-.people-edit-label {
-  flex-basis: 100%;
-  margin: 0;
-  color: #6b665c;
-  font-size: 0.8125rem;
-}
-
-.people-row .people-error {
-  flex-basis: 100%;
-  margin: 0;
-}
-
-.people-add {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.people-add label {
-  flex-basis: 100%;
-  color: #6b665c;
-  font-size: 0.8125rem;
-}
-
-.people-add input {
-  flex: 1;
-}
-
-.people-add .people-error {
-  flex-basis: 100%;
-  margin: 0;
 }
 
 .people-confirm {
