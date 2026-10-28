@@ -544,6 +544,12 @@ body:has(.app-layout) {
   scroll-padding-top: var(--screen-title-height);
 }
 
+/* Keeps room for the scroll bar, so that content does not move when one
+   appears. */
+html:has(.app-layout) {
+  scrollbar-gutter: stable;
+}
+
 /* Development only. Fixed at the bottom right of the window, out of the
    toolbar's way. */
 .default-projects-panel {
@@ -924,6 +930,7 @@ body:has(.app-layout) {
 }
 
 .project-window {
+  scrollbar-gutter: stable;
   width: min(44rem, calc(100vw - 3rem));
   max-height: calc(100dvh - 3rem);
   padding: 1.25rem 1.75rem 1.5rem;
@@ -2376,6 +2383,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .people-hint,
 .people-empty {
   color: #6b665c;
+}
+
+/* The gap under the title is the same on every screen. */
+.people-hint {
+  margin-top: 0;
 }
 
 .people-list {
