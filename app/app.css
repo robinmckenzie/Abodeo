@@ -331,8 +331,8 @@ body:has(.app-layout) {
 
 /* The column stays where it is while the panel scrolls, above the sticky
    title so that the account panel opens over it. That panel then has the
-   window's height to fit in, and scrolls within it: 15.5rem is where it
-   starts, under the logo and the account button. */
+   window's height to fit in, and scrolls within it: it starts 16rem down,
+   under the logo and the account button, and 1rem is left below it. */
 @media (min-width: 40.01rem) {
   .app-layout > header {
     position: sticky;
@@ -344,8 +344,8 @@ body:has(.app-layout) {
   }
 
   .app-layout .account-panel {
-    max-height: calc(100vh - 16.5rem);
-    max-height: calc(100dvh - 16.5rem);
+    max-height: calc(100vh - 17rem);
+    max-height: calc(100dvh - 17rem);
     overflow-y: auto;
   }
 }
