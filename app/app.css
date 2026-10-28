@@ -538,6 +538,10 @@ body:has(.app-layout) {
   top: 0;
   z-index: 1;
   background: #fdfcf8;
+  /* The background runs the panel's full width, so that the shadow of an
+     open project is hidden by the title edge to edge, not only under it. */
+  box-shadow: 0 0 0 100vmax #fdfcf8;
+  clip-path: inset(0 -100vmax);
 }
 
 :root:has([data-sticky-titles]) {
