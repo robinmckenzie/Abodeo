@@ -115,6 +115,8 @@ type OpenProject = {
   values: ProjectFields;
   message: FormMessage;
   barHeight: number;
+  // Its place in the list when it opened, which it keeps in place while open.
+  slot?: number;
   isLoading?: boolean;
   hasConflict?: boolean;
   // A new project's values as sent by each Create, for a retry.
@@ -562,7 +564,7 @@ export default function Dashboard() {
     };
   };
 
-  const openProject = (project: Project, barHeight: number) => {
+  const openProject = (project: Project, barHeight: number, slot?: number) => {
     closeForNextProject();
     const { id } = project;
     const key = createOpeningKey();
@@ -606,6 +608,7 @@ export default function Dashboard() {
         ? { text: "Loading the latest copy…", isError: false }
         : null,
       barHeight,
+      slot,
       isLoading: opened.account !== undefined,
     });
   };
@@ -849,6 +852,17 @@ export default function Dashboard() {
   const list = isAccountReady
     ? view.projects
     : (browserProjects?.projects ?? []);
+  // In place, the opened project keeps its slot while open, even if a new due
+  // date would sort it elsewhere, so that the page does not jump. It moves to
+  // its sorted place once closed.
+  const shownList = (() => {
+    if (!isInPlace || !open?.id || open.slot === undefined) return list;
+    const others = list.filter((project) => project.id !== open.id);
+    const opened = list.find((project) => project.id === open.id);
+    if (!opened) return list;
+    others.splice(Math.min(open.slot, others.length), 0, opened);
+    return others;
+  })();
   const barThumbnails = useBarThumbnails(
     isAccountReady ? view.accountId : null,
     isAccountReady ? view.latestImageIds : noLatestImageIds,
@@ -1220,7 +1234,7 @@ export default function Dashboard() {
           </p>
         )}
         <ul className="project-list" aria-label="Projects">
-          {list.map((project) => {
+          {shownList.map((project, index) => {
             const closingBar = closing.find((bar) => bar.id === project.id);
             if (isInPlace && open?.id === project.id) {
               return (
@@ -1243,7 +1257,7 @@ export default function Dashboard() {
                 hasUnsavedChanges={unsavedIds.has(project.id)}
                 isInert={isAddingInPlace}
                 thumbnailUrl={barThumbnails[project.id]}
-                onOpen={(barHeight) => openProject(project, barHeight)}
+                onOpen={(barHeight) => openProject(project, barHeight, index)}
               />
             );
           })}

@@ -1305,19 +1305,14 @@ describe("Dashboard people (AD #61)", () => {
   it("offers only Unassigned, and a box to add someone, in a new browser", async () => {
     await renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(assigneeLabels()).toEqual(["Unassigned", "Add a person"]);
+    expect(assigneeLabels()).toEqual(["Unassigned"]);
   });
 
   it("offers the people in the list", async () => {
     savePeople("Dora", "Eli");
     await renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(assigneeLabels()).toEqual([
-      "Unassigned",
-      "Dora",
-      "Eli",
-      "Add a person",
-    ]);
+    expect(assigneeLabels()).toEqual(["Unassigned", "Dora", "Eli"]);
   });
 
   it("starts a browser's list with those its projects are assigned to", async () => {
@@ -1338,7 +1333,7 @@ describe("Dashboard people (AD #61)", () => {
     await renderDashboard();
     expect(bars().map((bar) => bar.textContent)).toEqual(["BorisOld shed"]);
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(assigneeLabels()).toEqual(["Unassigned", "Boris", "Add a person"]);
+    expect(assigneeLabels()).toEqual(["Unassigned", "Boris"]);
   });
 
   it("adds a person from a new project's form and creates the project assigned to them", async () => {
@@ -1375,7 +1370,9 @@ describe("Dashboard people (AD #61)", () => {
       target: { value: "Dora" },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Add a person" }), {
+        key: "Enter",
+      });
     });
     await closeForm();
     expect(bars().map((bar) => bar.textContent)).toEqual(["DoraShed"]);
@@ -1389,12 +1386,14 @@ describe("Dashboard people (AD #61)", () => {
       target: { value: "dora" },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Add a person" }), {
+        key: "Enter",
+      });
     });
     expect(
       screen.getByText("Someone with that name is already in the list."),
     ).toBeTruthy();
-    expect(assigneeLabels()).toEqual(["Unassigned", "Dora", "Add a person"]);
+    expect(assigneeLabels()).toEqual(["Unassigned", "Dora"]);
   });
 
   it("shows a renamed person's new name on the project", async () => {

@@ -1454,7 +1454,9 @@ describe("images on the dashboard (AD #48)", () => {
     await drag("dragenter");
     const dataTransfer = await drag("dragover");
     expect(dataTransfer.dropEffect).toBe("copy");
-    expect(document.querySelector(".projects-screen.is-drop-target")).not.toBeNull();
+    expect(
+      document.querySelector(".projects-screen.is-drop-target"),
+    ).not.toBeNull();
     await drag("dragend");
     expect(document.querySelector(".is-drop-target")).toBeNull();
   });
@@ -1540,7 +1542,7 @@ describe("a signed-in account's people (AD #61)", () => {
     const group = screen.getByRole("group", { name: "Assigned to" });
     expect(
       [...group.querySelectorAll("label")].map((label) => label.textContent),
-    ).toEqual(["Unassigned", "Dora", "Add a person"]);
+    ).toEqual(["Unassigned", "Dora"]);
     expect(
       (screen.getByRole("radio", { name: "Dora" }) as HTMLInputElement).checked,
     ).toBe(true);
@@ -1557,7 +1559,11 @@ describe("a signed-in account's people (AD #61)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
       target: { value: "Dora" },
     });
-    await click(screen.getByRole("button", { name: "Add" }));
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Add a person" }), {
+        key: "Enter",
+      });
+    });
     await settle();
 
     const read = await server.people.read("ada");

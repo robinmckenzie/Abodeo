@@ -108,11 +108,20 @@ export function ProjectForm({
       isMountedRef.current = false;
     };
   }, []);
+  const assigneeOptionsRef = useRef<HTMLDivElement>(null);
+  const isScrollPending = useRef(false);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
   const options: Person[] = [
     { id: unassignedId, name: unassignedName },
     ...people,
   ];
+  // A newly added person is at the foot of the list: scroll it into view.
+  useEffect(() => {
+    const list = assigneeOptionsRef.current;
+    if (!list || !isScrollPending.current) return;
+    isScrollPending.current = false;
+    list.scrollTop = list.scrollHeight;
+  }, [people.length]);
   // Someone no longer in the list shows as Unassigned.
   const assigned = isKnownAssignee(people, values.assignee)
     ? values.assignee
@@ -215,7 +224,7 @@ export function ProjectForm({
         <div className="project-form-side">
           <fieldset className="assignee-list">
             <legend>Assigned to</legend>
-            <div className="assignee-options">
+            <div className="assignee-options" ref={assigneeOptionsRef}>
               {options.map((assignee, index) => (
                 <label
                   key={assignee.id}
@@ -256,7 +265,10 @@ export function ProjectForm({
                 place={options.length}
                 onAdd={async (name) => {
                   const startedFor = projectKeyRef.current;
+                  // Set first, as the list may grow before the call returns.
+                  isScrollPending.current = true;
                   const result = await onAddPerson(name);
+                  if (!result.ok) isScrollPending.current = false;
                   // The latest onChange, as the form may have changed while
                   // the person was being added.
                   if (
@@ -468,37 +480,27 @@ function AddPersonBox({
 
   return (
     <div className="assignee-add arrives-in-turn" style={arriveAt(place)}>
-      <label htmlFor={id} className="assignee-add-label">
-        Add a person
-      </label>
-      <div className="assignee-add-row">
-        <input
-          id={id}
-          name="new-person"
-          value={name}
-          maxLength={personNameMaxLength + 10}
-          autoComplete="off"
-          aria-invalid={problem !== null}
-          aria-describedby={problem ? `${id}-problem` : undefined}
-          onChange={(event) => {
-            setName(event.target.value);
-            setProblem(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            void add();
-          }}
-        />
-        <button
-          type="button"
-          className="button-secondary button-small"
-          disabled={isAdding}
-          onClick={() => void add()}
-        >
-          Add
-        </button>
-      </div>
+      <input
+        id={id}
+        name="new-person"
+        className="task-entry"
+        value={name}
+        placeholder="Add a person"
+        aria-label="Add a person"
+        maxLength={personNameMaxLength + 10}
+        autoComplete="off"
+        aria-invalid={problem !== null}
+        aria-describedby={problem ? `${id}-problem` : undefined}
+        onChange={(event) => {
+          setName(event.target.value);
+          setProblem(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          void add();
+        }}
+      />
       {problem && (
         <p id={`${id}-problem`} className="assignee-add-error" role="alert">
           {describePersonFailure(problem)}
