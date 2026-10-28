@@ -29,7 +29,7 @@ import {
 import {
   FloatingMessages,
   useFloatingMessages,
-} from "../projects/floating-messages";
+} from "../ui/floating-messages";
 import {
   areAllTypesUnsupported,
   noProjectOpenMessage,

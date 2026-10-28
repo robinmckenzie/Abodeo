@@ -9,7 +9,7 @@ import {
   describeBinPeriod,
   listLosses,
 } from "./delete-project";
-import { raiseFloatingMessages } from "./floating-messages";
+import { raiseFloatingMessages } from "../ui/floating-messages";
 import type { Project } from "./projects";
 
 // "bin" puts a signed-in account's project in the Bin; "permanent" removes a

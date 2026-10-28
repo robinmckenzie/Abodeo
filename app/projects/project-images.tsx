@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { raiseFloatingMessages } from "./floating-messages";
+import { raiseFloatingMessages } from "../ui/floating-messages";
 import {
   captionChangedElsewhereMessage,
   captionTooLongMessage,

@@ -23,7 +23,7 @@ import { DeleteProjectDialog } from "../projects/delete-project-dialog";
 import {
   FloatingMessages,
   useFloatingMessages,
-} from "../projects/floating-messages";
+} from "../ui/floating-messages";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Bin - Abodeo" },

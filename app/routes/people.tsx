@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Route } from "./+types/people";
-import { FloatingMessages, useFloatingMessages } from "../projects/floating-messages";
+import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
 import { describePersonFailure } from "../projects/people-messages";

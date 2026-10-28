@@ -2,7 +2,7 @@
 // dashboard, which keeps focus inside it while it is open.
 import { useLayoutEffect, useRef } from "react";
 
-import { raiseFloatingMessages } from "./floating-messages";
+import { raiseFloatingMessages } from "../ui/floating-messages";
 
 export function ProjectWindow({
   onClose,

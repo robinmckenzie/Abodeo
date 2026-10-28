@@ -2157,8 +2157,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   transform: scaleX(-1);
 }
 
-/* Messages about images, over everything, as a popover in the top layer: a
-   stack at the bottom centre, newest at the bottom. */
+/* Shared: floating messages (app/ui/floating-messages.tsx), used by every
+   screen. Messages over everything, as a popover in the top layer: a stack at
+   the bottom centre, newest at the bottom. */
 .floating-messages {
   position: fixed;
   inset: auto 0 1.5rem 0;
