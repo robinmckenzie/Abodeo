@@ -2,6 +2,7 @@
 // an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
+import { calculateBarScrollEnd, calculateBarTopLimit } from "./bar-scroll";
 import { describeDueDate } from "./due-date";
 import { DueDateIcon } from "./due-date-icon";
 import { findAssigneeName, findSubtitle, type Person } from "./people";
@@ -182,15 +183,30 @@ export function ExpandedProjectBar({
     // the bar itself moves up if a project above it squashes closed. Down
     // only as far as needed to show the bar, but up if its top would
     // otherwise be out of sight.
+    // A sticky title covers the top of the window, so the bar's top is kept
+    // below it.
+    const stickyOffset =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).scrollPaddingTop,
+      ) || 0;
+    const findBarTop = () => bar.getBoundingClientRect().top + page.scrollTop;
     const findTopEnd = () =>
-      bar.getBoundingClientRect().top + page.scrollTop - scrollMargin;
-    const findEnd = () => {
-      const topEnd = findTopEnd();
-      const end = scrollsToPageEnd
-        ? page.scrollHeight - page.clientHeight
-        : topEnd + height + 2 * scrollMargin - page.clientHeight;
-      return Math.min(Math.max(start, end), topEnd);
-    };
+      calculateBarTopLimit({
+        barTop: findBarTop(),
+        stickyOffset,
+        margin: scrollMargin,
+      });
+    const findEnd = () =>
+      calculateBarScrollEnd({
+        start,
+        barTop: findBarTop(),
+        height,
+        viewportHeight: page.clientHeight,
+        pageEnd: page.scrollHeight - page.clientHeight,
+        scrollsToPageEnd,
+        stickyOffset,
+        margin: scrollMargin,
+      });
     if (!canAnimate(bar)) {
       page.scrollTop = findEnd();
       // Again once a project above, closed at once, has gone.

@@ -1,11 +1,10 @@
 // The signed-in account, if any. It is kept apart from projects, tasks,
 // assignees and settings: nothing here reads or changes them, though the
-// dashboard is told just before sign-in or sign-out leaves the page. It is
-// looked up
-// once the page has loaded, so a slow or failed lookup never holds the page
-// up, and again when the window comes back into use, when the session is due
-// to end, and when another tab signs out, so that a session that has ended
-// stops being shown.
+// current screen is told just before sign-in or sign-out leaves the page. It
+// is looked up once the page has loaded, by the shared layout, so a slow or
+// failed lookup never holds the page up, and again when the window comes
+// back into use, when the session is due to end, and when another tab signs
+// out, so that a session that has ended stops being shown.
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -67,16 +66,6 @@ export const recheckInterval = 10_000;
 // Other tabs hear of a sign-out on this channel.
 const channelName = "abodeo-account";
 
-// What the last screen settled on. Each screen looks the account up for
-// itself, so a screen reached from within the app starts from this and
-// shows no gap while its own lookup runs. The server and the first screen
-// load start from "checking", so that what is rendered agrees.
-let lastKnownView: AccountView = { kind: "checking" };
-
-export function forgetLastKnownAccount() {
-  lastKnownView = { kind: "checking" };
-}
-
 export function useAccount({
   onBeforeLeave,
   onLeaving,
@@ -90,7 +79,7 @@ export function useAccount({
 }): Account {
   const location = useLocation();
   const navigate = useNavigate();
-  const [view, setView] = useState<AccountView>(lastKnownView);
+  const [view, setView] = useState<AccountView>({ kind: "checking" });
   const [message, setMessage] = useState<string | null>(() =>
     hasSignInError(location.search) ? signInFailedMessage : null,
   );
@@ -102,7 +91,6 @@ export function useAccount({
   const recheckRef = useRef(() => {});
   useEffect(() => {
     viewRef.current = view;
-    if (view.kind !== "checking") lastKnownView = view;
     onBeforeLeaveRef.current = onBeforeLeave;
     onLeavingRef.current = onLeaving;
     onLeaveFailedRef.current = onLeaveFailed;

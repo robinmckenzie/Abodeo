@@ -24,6 +24,7 @@ import { binPeriodMs } from "../projects/projects-api";
 import { handleProjectsRequest } from "../projects/project-handler.server";
 import { newProjectFields } from "../projects/projects";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
+import { withAppLayout } from "../test-routes";
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
@@ -92,10 +93,12 @@ function fakeServer({ isSignedIn = true } = {}) {
 }
 
 async function renderBin() {
-  const Stub = createRoutesStub([
-    { path: "/bin", Component: Bin },
-    { path: "/dashboard", Component: () => <p>Dashboard</p> },
-  ]);
+  const Stub = createRoutesStub(
+    withAppLayout([
+      { path: "/bin", Component: Bin },
+      { path: "/dashboard", Component: () => <p>Dashboard</p> },
+    ]),
+  );
   render(<Stub initialEntries={["/bin"]} />);
   for (let i = 0; i < 5; i++) await act(async () => {});
 }

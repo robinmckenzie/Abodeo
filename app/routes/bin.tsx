@@ -4,12 +4,8 @@
 // anything, so a project past the period stays here, and can be restored,
 // until the dashboard does.
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
 
 import type { Route } from "./+types/bin";
-import { useAccount } from "../account/use-account";
-import { AppMenu } from "../app-menu";
-import logo from "../images/abodeo-home-logo.jpeg";
 import {
   deleteAccountProjectPermanently,
   loadAccountBin,
@@ -21,11 +17,13 @@ import {
   describeBinTimeLeft,
   isPastBinPeriod,
 } from "../projects/delete-project";
+import { useScreenAccount } from "../screen-context";
+import { ScreenPanel } from "../screen-panel";
 import { DeleteProjectDialog } from "../projects/delete-project-dialog";
 import {
   FloatingMessages,
   useFloatingMessages,
-} from "../projects/floating-messages";
+} from "../ui/floating-messages";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Bin - Abodeo" },
@@ -48,9 +46,9 @@ const clockInterval = 60 * 1000;
 const failureMessage = "Not deleted: Abodeo could not delete this project.";
 
 export default function Bin() {
-  // Nothing on this screen is left unsaved.
-  const leaveBin = async () => true;
-  const account = useAccount({ onBeforeLeave: leaveBin });
+  // Nothing on this screen is left unsaved, so it registers nothing to do
+  // before leaving.
+  const account = useScreenAccount();
   const accountId = account.view.kind === "signed-in" ? account.view.id : null;
   const [loaded, setLoaded] = useState<{
     accountId: string;
@@ -146,24 +144,8 @@ export default function Bin() {
   };
 
   return (
-    <div className="dashboard bin-page">
-      <header>
-        <h1>
-          <Link to="/dashboard">
-            <img
-              src={logo}
-              alt="Abodeo - Your home, sorted."
-              width={997}
-              height={868}
-            />
-          </Link>
-        </h1>
-        <AppMenu current="/bin" account={account} onBeforeLeave={leaveBin} />
-      </header>
-      <main>
-        <div className="dashboard-toolbar">
-          <h2>Bin</h2>
-        </div>
+    <>
+      <ScreenPanel title="Bin" className="bin-page">
         {account.view.kind === "checking" && <p role="status">Loading…</p>}
         {(account.view.kind === "signed-out" ||
           account.view.kind === "not-configured") && (
@@ -239,7 +221,7 @@ export default function Bin() {
             )}
           </>
         )}
-      </main>
+      </ScreenPanel>
       {deleting && state.status === "ready" && (
         <DeleteProjectDialog
           project={deleting.project.project}
@@ -253,7 +235,7 @@ export default function Bin() {
         />
       )}
       <FloatingMessages boxes={messageBoxes} />
-    </div>
+    </>
   );
 }
 

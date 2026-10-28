@@ -24,6 +24,7 @@ import { peopleKey } from "../projects/people-storage";
 import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
+import { withAppLayout } from "../test-routes";
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
 beforeAll(() => {
@@ -55,7 +56,9 @@ afterEach(() => {
 
 // Waits for the sign-in check, which comes before projects are shown.
 async function renderDashboard(state?: unknown) {
-  const Stub = createRoutesStub([{ path: "/dashboard", Component: Dashboard }]);
+  const Stub = createRoutesStub(
+    withAppLayout([{ path: "/dashboard", Component: Dashboard }]),
+  );
   const rendered = render(
     <Stub initialEntries={[{ pathname: "/dashboard", state }]} />,
   );
@@ -1411,10 +1414,12 @@ describe("Dashboard people (AD #61)", () => {
   });
 
   it("goes to the People screen from the application menu, saving the open project first", async () => {
-    const Stub = createRoutesStub([
-      { path: "/dashboard", Component: Dashboard },
-      { path: "/people", Component: () => <p>People screen</p> },
-    ]);
+    const Stub = createRoutesStub(
+      withAppLayout([
+        { path: "/dashboard", Component: Dashboard },
+        { path: "/people", Component: () => <p>People screen</p> },
+      ]),
+    );
     render(<Stub initialEntries={["/dashboard"]} />);
     await act(async () => {});
     await addProject("Shed");
