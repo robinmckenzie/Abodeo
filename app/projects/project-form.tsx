@@ -341,13 +341,12 @@ export function ProjectForm({
         {!isNew && onDelete && (
           <button
             type="button"
-            className="icon-button project-form-delete"
-            aria-label="Delete project"
-            title="Delete project"
+            className="button-delete button-small project-form-delete"
             disabled={isReadOnly}
             onClick={onDelete}
           >
             <BinIcon />
+            Delete project
           </button>
         )}
         <p
