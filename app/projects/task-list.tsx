@@ -5,6 +5,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { calculateDragScroll } from "./drag-scroll";
+import { ArrowIcon, BinIcon, DragHandleIcon } from "../ui/icons";
 import { canAnimate } from "./project-bar";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
 import {
@@ -430,14 +431,7 @@ export function TaskList({
                   }}
                   onDragEnd={endDrag}
                 >
-                  <svg viewBox="0 0 10 16">
-                    <circle cx="3" cy="3" r="1.25" />
-                    <circle cx="7" cy="3" r="1.25" />
-                    <circle cx="3" cy="8" r="1.25" />
-                    <circle cx="7" cy="8" r="1.25" />
-                    <circle cx="3" cy="13" r="1.25" />
-                    <circle cx="7" cy="13" r="1.25" />
-                  </svg>
+                  <DragHandleIcon />
                 </span>
                 <input
                   type="checkbox"
@@ -511,14 +505,14 @@ export function TaskList({
                     focusKey={`${task.id}-1`}
                     isDisabled={index === 0}
                     onClick={() => moveBy(task, -1)}
-                    path="M8 13V3M4 7l4-4 4 4"
+                    direction="up"
                   />
                   <TaskButton
                     label={`Move ${task.title} down`}
                     focusKey={`${task.id}1`}
                     isDisabled={index === tasks.length - 1}
                     onClick={() => moveBy(task, 1)}
-                    path="M8 3v10M4 9l4 4 4-4"
+                    direction="down"
                   />
                   <TaskButton
                     label={`Delete ${task.title}`}
@@ -540,6 +534,7 @@ export function TaskList({
               ref={undoRef}
               id={`${id}-undo`}
               type="button"
+              className="button-secondary button-small"
               aria-label={`Undo deleting ${deleted.task.title}`}
               onClick={undoDelete}
             >
@@ -615,7 +610,7 @@ function TaskButton({
   focusKey,
   isDisabled = false,
   onClick,
-  path,
+  direction,
   isDelete = false,
 }: {
   label: string;
@@ -623,16 +618,14 @@ function TaskButton({
   focusKey: string;
   isDisabled?: boolean;
   onClick: () => void;
-  // The shared circular bin design, in place of a move-arrow path.
-  path?: string;
+  // The way a move arrow points; a delete button has the bin instead.
+  direction?: "up" | "down";
   isDelete?: boolean;
 }) {
   return (
     <button
       type="button"
-      className={
-        isDelete ? "task-button task-button-delete" : "task-button"
-      }
+      className="icon-button"
       aria-label={label}
       aria-disabled={isDisabled || undefined}
       data-task-button={focusKey}
@@ -640,16 +633,7 @@ function TaskButton({
         if (!isDisabled) onClick();
       }}
     >
-      {isDelete ? (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9.5" />
-          <path d="M7.5 8.5h9M10 8.5V7h4v1.5M8.5 8.5l.6 8h5.8l.6-8M10.7 11v3.5M13.3 11v3.5" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d={path} />
-        </svg>
-      )}
+      {isDelete ? <BinIcon /> : <ArrowIcon direction={direction ?? "up"} />}
     </button>
   );
 }

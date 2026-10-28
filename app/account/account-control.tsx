@@ -187,12 +187,17 @@ function AccountPanel({
               onChange={(event) => setDraft(event.target.value)}
               disabled={isSaving}
             />
-            <button type="submit" disabled={isSaving}>
+            <button
+              type="submit"
+              className="button-secondary button-small"
+              disabled={isSaving}
+            >
               Save
             </button>
             {view.preferredName !== null && (
               <button
                 type="button"
+                className="button-secondary button-small"
                 onClick={() => void save(null)}
                 disabled={isSaving}
               >
@@ -219,7 +224,7 @@ function AccountPanel({
       </p>
       <button
         type="button"
-        className="account-calendar-test"
+        className="button-secondary button-small account-calendar-test"
         disabled={account.isLeaving || calendar.isLeaving}
         onClick={calendar.createTestAppointment}
       >
@@ -250,7 +255,7 @@ function AccountPanel({
       </p>
       <button
         type="button"
-        className="account-sign-out"
+        className="button-secondary button-small account-sign-out"
         disabled={account.isLeaving || calendar.isLeaving}
         onClick={account.signOut}
       >

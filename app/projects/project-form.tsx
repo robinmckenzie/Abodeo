@@ -3,6 +3,7 @@
 // they behave the same and either can be removed later without touching it.
 import { useEffect, useId, useRef, useState } from "react";
 
+import { BinIcon, CloseIcon } from "../ui/icons";
 import { DueDatePicker } from "./due-date-picker";
 import {
   describePerson,
@@ -107,11 +108,20 @@ export function ProjectForm({
       isMountedRef.current = false;
     };
   }, []);
+  const assigneeOptionsRef = useRef<HTMLDivElement>(null);
+  const isScrollPending = useRef(false);
   const [calendarDate] = useState(() => getCalendarDate?.() ?? null);
   const options: Person[] = [
     { id: unassignedId, name: unassignedName },
     ...people,
   ];
+  // A newly added person is at the foot of the list: scroll it into view.
+  useEffect(() => {
+    const list = assigneeOptionsRef.current;
+    if (!list || !isScrollPending.current) return;
+    isScrollPending.current = false;
+    list.scrollTop = list.scrollHeight;
+  }, [people.length]);
   // Someone no longer in the list shows as Unassigned.
   const assigned = isKnownAssignee(people, values.assignee)
     ? values.assignee
@@ -191,13 +201,11 @@ export function ProjectForm({
           <div className="project-form-close-area">
             <button
               type="button"
-              className="project-form-close"
+              className="icon-button project-form-close"
               aria-label="Close"
               onClick={onClose}
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 3l10 10M13 3L3 13" />
-              </svg>
+              <CloseIcon />
             </button>
             {showsAutosaveNote && (
               <p className="project-form-autosave">
@@ -216,7 +224,7 @@ export function ProjectForm({
         <div className="project-form-side">
           <fieldset className="assignee-list">
             <legend>Assigned to</legend>
-            <div className="assignee-options">
+            <div className="assignee-options" ref={assigneeOptionsRef}>
               {options.map((assignee, index) => (
                 <label
                   key={assignee.id}
@@ -257,7 +265,10 @@ export function ProjectForm({
                 place={options.length}
                 onAdd={async (name) => {
                   const startedFor = projectKeyRef.current;
+                  // Set first, as the list may grow before the call returns.
+                  isScrollPending.current = true;
                   const result = await onAddPerson(name);
+                  if (!result.ok) isScrollPending.current = false;
                   // The latest onChange, as the form may have changed while
                   // the person was being added.
                   if (
@@ -330,21 +341,26 @@ export function ProjectForm({
           {tasks}
           {images}
           {appointments}
-          {!isNew && onDelete && (
-            <div className="project-form-delete-row">
-              <button
-                type="button"
-                className="project-form-delete"
-                disabled={isReadOnly}
-                onClick={onDelete}
-              >
-                Delete
-              </button>
-            </div>
-          )}
         </div>
       </div>
-      <div className="project-form-footer">
+      <div
+        className={
+          !isNew && onDelete
+            ? "project-form-footer has-delete"
+            : "project-form-footer"
+        }
+      >
+        {!isNew && onDelete && (
+          <button
+            type="button"
+            className="button-delete button-small project-form-delete"
+            disabled={isReadOnly}
+            onClick={onDelete}
+          >
+            <BinIcon />
+            Delete project
+          </button>
+        )}
         <p
           className={message?.isError ? "project-form-error" : undefined}
           role={message?.isError ? "alert" : "status"}
@@ -358,12 +374,14 @@ export function ProjectForm({
           <>
             <button
               type="button"
-              className="project-form-cancel"
+              className="button-secondary project-form-cancel"
               onClick={onClose}
             >
               Cancel
             </button>
-            <button type="submit">Create</button>
+            <button type="submit" className="button-main">
+              Create
+            </button>
           </>
         )}
       </div>
@@ -462,32 +480,27 @@ function AddPersonBox({
 
   return (
     <div className="assignee-add arrives-in-turn" style={arriveAt(place)}>
-      <label htmlFor={id} className="assignee-add-label">
-        Add a person
-      </label>
-      <div className="assignee-add-row">
-        <input
-          id={id}
-          name="new-person"
-          value={name}
-          maxLength={personNameMaxLength + 10}
-          autoComplete="off"
-          aria-invalid={problem !== null}
-          aria-describedby={problem ? `${id}-problem` : undefined}
-          onChange={(event) => {
-            setName(event.target.value);
-            setProblem(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            void add();
-          }}
-        />
-        <button type="button" disabled={isAdding} onClick={() => void add()}>
-          Add
-        </button>
-      </div>
+      <input
+        id={id}
+        name="new-person"
+        className="task-entry"
+        value={name}
+        placeholder="Add a person"
+        aria-label="Add a person"
+        maxLength={personNameMaxLength + 10}
+        autoComplete="off"
+        aria-invalid={problem !== null}
+        aria-describedby={problem ? `${id}-problem` : undefined}
+        onChange={(event) => {
+          setName(event.target.value);
+          setProblem(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          void add();
+        }}
+      />
       {problem && (
         <p id={`${id}-problem`} className="assignee-add-error" role="alert">
           {describePersonFailure(problem)}

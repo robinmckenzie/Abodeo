@@ -380,7 +380,7 @@ describe("ProjectForm's box to add a person (AD #61)", () => {
     const onChange = vi.fn();
     renderForm(true, null, { onAddPerson, onChange });
     fireEvent.change(box(), { target: { value: "Andy" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.keyDown(box(), { key: "Enter" });
     expect((await screen.findByRole("alert")).textContent).toBe(
       "Someone with that name is already in the list.",
     );

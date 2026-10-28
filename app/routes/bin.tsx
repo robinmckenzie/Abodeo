@@ -24,6 +24,7 @@ import {
   FloatingMessages,
   useFloatingMessages,
 } from "../ui/floating-messages";
+import { BinIcon } from "../ui/icons";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Bin - Abodeo" },
@@ -195,6 +196,7 @@ export default function Bin() {
                       </div>
                       <button
                         type="button"
+                        className="button-main"
                         disabled={busyId !== null}
                         onClick={() => void restore(binned)}
                       >
@@ -202,7 +204,7 @@ export default function Bin() {
                       </button>
                       <button
                         type="button"
-                        className="bin-delete"
+                        className="button-delete bin-delete"
                         disabled={busyId !== null}
                         onClick={() =>
                           setDeleting({
@@ -212,6 +214,7 @@ export default function Bin() {
                           })
                         }
                       >
+                        <BinIcon />
                         Delete permanently
                       </button>
                     </li>

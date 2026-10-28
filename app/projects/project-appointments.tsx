@@ -3,6 +3,8 @@
 // below the images. Signed out, a project has none, and this says so.
 import { useEffect, useId, useState } from "react";
 
+import { PlusIcon } from "../ui/icons";
+
 import {
   addOneHour,
   describeAppointmentProblem,
@@ -140,15 +142,12 @@ function SignedInAppointments({
         {state.status === "ready" && !appointments.isFormOpen && (
           <button
             type="button"
-            className="project-appointments-add"
+            className="icon-button project-appointments-add"
             aria-label="Add appointment"
             title="Add appointment"
             onClick={() => void appointments.openForm()}
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="10" r="8.5" />
-              <path d="M5.5 10h9M10 5.5v9" />
-            </svg>
+            <PlusIcon />
           </button>
         )}
       </div>
@@ -180,6 +179,7 @@ function SignedInAppointments({
           </p>
           <button
             type="button"
+            className="button-secondary button-small"
             onClick={() => void appointments.reconnect(false)}
           >
             Connect Google Calendar
@@ -352,15 +352,28 @@ function AppointmentForm({
         </p>
       )}
       <div className="appointment-form-buttons">
-        <button type="button" disabled={isSaving} onClick={() => void save()}>
+        <button
+          type="button"
+          className="button-secondary button-small"
+          disabled={isSaving}
+          onClick={() => void save()}
+        >
           Save
         </button>
         {isTokenEnded && (
-          <button type="button" onClick={onReconnect}>
+          <button
+            type="button"
+            className="button-secondary button-small"
+            onClick={onReconnect}
+          >
             Reconnect
           </button>
         )}
-        <button type="button" onClick={onCancel}>
+        <button
+          type="button"
+          className="button-secondary button-small"
+          onClick={onCancel}
+        >
           Cancel
         </button>
       </div>

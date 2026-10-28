@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { raiseFloatingMessages } from "../ui/floating-messages";
+import { ArrowIcon, BinIcon, PlusIcon } from "../ui/icons";
 import {
   captionChangedElsewhereMessage,
   captionTooLongMessage,
@@ -215,16 +216,13 @@ function SignedInImages({
         <h3 className="task-heading">Images</h3>
         <button
           type="button"
-          className="project-images-add"
+          className="icon-button project-images-add"
           disabled={state.status !== "ready" || state.isAdding}
           aria-label={state.isAdding ? "Adding images" : "Add image"}
           title="Add image"
           onClick={() => inputRef.current?.click()}
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <circle cx="10" cy="10" r="8.5" />
-            <path d="M5.5 10h9M10 5.5v9" />
-          </svg>
+          <PlusIcon />
         </button>
         <input
           ref={inputRef}
@@ -242,7 +240,11 @@ function SignedInImages({
       {state.status === "unavailable" && (
         <p className="project-images-note" role="alert">
           Abodeo cannot reach your images right now.{" "}
-          <button type="button" onClick={images.reload}>
+          <button
+            type="button"
+            className="button-secondary button-small"
+            onClick={images.reload}
+          >
             Try again
           </button>
         </p>
@@ -265,7 +267,7 @@ function SignedInImages({
         {state.hasOlder && (
           <button
             type="button"
-            className="image-timeline-older"
+            className="button-secondary button-small image-timeline-older"
             onClick={() => void showOlder()}
           >
             Show older images
@@ -509,15 +511,12 @@ function ImageEntry({
       </div>
       <button
         type="button"
-        className="project-images-remove"
+        className="icon-button project-images-remove"
         aria-label="Remove image"
         title="Remove image"
         onClick={onRemove}
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <circle cx="10" cy="10" r="8.5" />
-          <path d="M5.5 10h9M10 5.5v9" />
-        </svg>
+        <BinIcon />
       </button>
     </div>
   );
@@ -604,10 +603,7 @@ function ViewerStepButton({
       aria-disabled={onClick ? undefined : true}
       onClick={() => onClick?.()}
     >
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <circle cx="10" cy="10" r="8.5" />
-        <path d="M5.5 10h9M11 6.5l3.5 3.5M11 13.5l3.5-3.5" />
-      </svg>
+      <ArrowIcon direction={direction === "previous" ? "left" : "right"} />
     </button>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Route } from "./+types/people";
 import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
+import { ArrowIcon, BinIcon, DragHandleIcon, SwapIcon } from "../ui/icons";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
 import { describePersonFailure } from "../projects/people-messages";
@@ -113,7 +114,7 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
     <h3>Add person</h3>
     <form className="people-quick-add" noValidate onSubmit={event => { event.preventDefault(); void add(); }}>
       <input aria-label="Name or job title" placeholder="Name or job title..." value={controller.quickAdd} disabled={isDisabled || adding} autoComplete="off" onChange={event => { controller.setQuickAdd(event.target.value); setMessage(null); }} />
-      <button type="submit" disabled={isDisabled || adding}><span aria-hidden="true">＋ </span>Add</button>
+      <button type="submit" className="button-secondary" disabled={isDisabled || adding}><span aria-hidden="true">＋ </span>Add</button>
     </form>
     {message && <p className="people-error" role="alert">{message}</p>}<hr />
     {people.length === 0 ? <p className="people-empty">No people added yet.</p> : <ul className="people-list" aria-label="People"
@@ -129,39 +130,35 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
           onDragOver={event => { if (draggedId) { const box = event.currentTarget.getBoundingClientRect(); setDropIndex(event.clientY > box.top + box.height / 2 ? index + 1 : index); } }}>
           <div className="people-compact-row">
             <span className="task-drag" draggable={!locked} aria-hidden="true" title="Drag to reorder" onDragStart={event => { if (locked) { event.preventDefault(); return; } event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-abodeo-person", person.id); const row = event.currentTarget.closest("li"); if (row) event.dataTransfer.setDragImage(row, 12, 12); setDraggedId(person.id); }} onDragEnd={endDrag}>
-              <svg viewBox="0 0 10 16">{[3, 8, 13].flatMap(y => [3, 7].map(x => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.25" />))}</svg>
+              <DragHandleIcon />
             </span>
             <button type="button" className="people-expand" aria-label={`Details for ${name}`} aria-expanded={open} aria-controls={`person-${person.id}`} disabled={isDisabled} onClick={() => setExpanded(open ? null : person.id)}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>
               <span className="people-name">{name}{findSubtitle(person) && <span className="people-job-title">{findSubtitle(person)}</span>}</span>
             </button>
             <span className="task-controls">
-              <button type="button" className="task-button" disabled={locked || index === 0} aria-label={`Move ${name} up`} onClick={() => void move(person.id, index - 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg></button>
-              <button type="button" className="task-button" disabled={locked || index === people.length - 1} aria-label={`Move ${name} down`} onClick={() => void move(person.id, index + 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg></button>
+              <button type="button" className="icon-button" disabled={locked || index === 0} aria-label={`Move ${name} up`} onClick={() => void move(person.id, index - 1)}><ArrowIcon direction="up" /></button>
+              <button type="button" className="icon-button" disabled={locked || index === people.length - 1} aria-label={`Move ${name} down`} onClick={() => void move(person.id, index + 1)}><ArrowIcon direction="down" /></button>
             </span>
-            <button type="button" className="task-button task-button-delete" aria-label={`Delete ${name}`} disabled={locked} onClick={() => void startRemoval(person)}><DeleteIcon /></button>
+            <button type="button" className="icon-button" aria-label={`Delete ${name}`} disabled={locked} onClick={() => void startRemoval(person)}><BinIcon /></button>
           </div>
           {removal?.person.id === person.id && <div className="people-confirm" role="alertdialog" aria-label={`Remove ${name}`}>
-            {removal.notice && <p>{removal.notice}</p>}<p>{describeRemoval(removal)}</p><div><button type="button" disabled={locked} onClick={() => void finishRemoval(removal)}>Remove</button><button type="button" disabled={locked} onClick={() => setRemoval(null)}>Cancel</button></div>
+            {removal.notice && <p>{removal.notice}</p>}<p>{describeRemoval(removal)}</p><div><button type="button" className="button-delete button-small" disabled={locked} onClick={() => void finishRemoval(removal)}><BinIcon />Remove</button><button type="button" className="button-secondary button-small" disabled={locked} onClick={() => setRemoval(null)}>Cancel</button></div>
           </div>}
           {open && <div id={`person-${person.id}`} className="people-editor"><fieldset disabled={locked}>
             <div className="people-name-fields">
               <label>Name<input value={values.name} autoComplete="off" onChange={event => controller.edit(person, { ...values, name: event.target.value })} /></label>
-              <button type="button" className="people-swap" aria-label="Swap name and job title" onClick={() => controller.edit(person, { ...values, name: values.jobTitle, jobTitle: values.name })}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M6 8h12m-3-3 3 3-3 3M18 16H6m3-3-3 3 3 3" /></svg></button>
+              <button type="button" className="icon-button people-swap" aria-label="Swap name and job title" onClick={() => controller.edit(person, { ...values, name: values.jobTitle, jobTitle: values.name })}><SwapIcon /></button>
               <label>Job Title<input value={values.jobTitle} autoComplete="off" onChange={event => controller.edit(person, { ...values, jobTitle: event.target.value })} /></label>
             </div>
             <div className="people-contact-fields"><label>Phone number<input type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label><label>Email<input type="email" value={values.email} onChange={event => controller.edit(person, { ...values, email: event.target.value })} /></label></div>
           </fieldset></div>}
           {draft && <div className={`people-save-status people-save-${draft.status}`} role={draft.status === "invalid" || draft.status === "failed" ? "alert" : "status"}>
             {draft.status === "pending" ? "Not saved yet..." : draft.status === "saving" ? "Saving..." : draft.status === "saved" ? "Saved." : draft.problem}
-            {draft.status === "failed" && <button type="button" disabled={locked} onClick={() => void controller.save(person.id)}>Retry</button>}
+            {draft.status === "failed" && <button type="button" className="button-secondary button-small" disabled={locked} onClick={() => void controller.save(person.id)}>Retry</button>}
           </div>}
         </li>;
       })}
     </ul>}<FloatingMessages boxes={boxes} />
   </div>;
-}
-
-function DeleteIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" /><path d="M7.5 8.5h9M10 8.5V7h4v1.5M8.5 8.5l.6 8h5.8l.6-8M10.7 11v3.5M13.3 11v3.5" /></svg>;
 }
