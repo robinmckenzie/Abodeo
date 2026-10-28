@@ -146,12 +146,13 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
             {removal.notice && <p>{removal.notice}</p>}<p>{describeRemoval(removal)}</p><div><button type="button" className="button-delete button-small" disabled={locked} onClick={() => void finishRemoval(removal)}><BinIcon />Remove</button><button type="button" className="button-secondary button-small" disabled={locked} onClick={() => setRemoval(null)}>Cancel</button></div>
           </div>}
           {open && <div id={`person-${person.id}`} className="people-editor"><fieldset disabled={locked}>
-            <div className="people-name-fields">
-              <label>Name<input value={values.name} autoComplete="off" onChange={event => controller.edit(person, { ...values, name: event.target.value })} /></label>
+            <div className="people-details">
+              <label>Name<input className="field" value={values.name} autoComplete="off" onChange={event => controller.edit(person, { ...values, name: event.target.value })} /></label>
               <button type="button" className="icon-button people-swap" aria-label="Swap name and job title" onClick={() => controller.edit(person, { ...values, name: values.jobTitle, jobTitle: values.name })}><SwapIcon /></button>
-              <label>Job Title<input value={values.jobTitle} autoComplete="off" onChange={event => controller.edit(person, { ...values, jobTitle: event.target.value })} /></label>
+              <label>Job Title<input className="field" value={values.jobTitle} autoComplete="off" onChange={event => controller.edit(person, { ...values, jobTitle: event.target.value })} /></label>
+              <label>Email<input className="field" type="email" value={values.email} onChange={event => controller.edit(person, { ...values, email: event.target.value })} /></label>
+              <label>Phone number<input className="field" type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label>
             </div>
-            <div className="people-contact-fields"><label>Phone number<input type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label><label>Email<input type="email" value={values.email} onChange={event => controller.edit(person, { ...values, email: event.target.value })} /></label></div>
           </fieldset></div>}
           {draft && <div className={`people-save-status people-save-${draft.status}`} role={draft.status === "invalid" || draft.status === "failed" ? "alert" : "status"}>
             {draft.status === "pending" ? "Not saved yet..." : draft.status === "saving" ? "Saving..." : draft.status === "saved" ? "Saved." : draft.problem}

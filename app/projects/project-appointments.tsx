@@ -304,6 +304,7 @@ function AppointmentForm({
       <input
         id={`${id}-title`}
         type="text"
+        className="field"
         maxLength={maxTitleLength}
         value={fields.title}
         onChange={(event) => change({ title: event.target.value })}
@@ -312,6 +313,7 @@ function AppointmentForm({
       <label className="appointment-all-day">
         <input
           type="checkbox"
+          className="checkbox"
           checked={fields.allDay}
           onChange={(event) => changeAllDay(event.target.checked)}
         />
@@ -320,6 +322,7 @@ function AppointmentForm({
       <label htmlFor={`${id}-start`}>{fields.allDay ? "Day" : "Starts"}</label>
       <input
         id={`${id}-start`}
+        className="field"
         type={fields.allDay ? "date" : "datetime-local"}
         value={fields.start}
         onChange={(event) => changeStart(event.target.value)}
@@ -329,6 +332,7 @@ function AppointmentForm({
           <label htmlFor={`${id}-end`}>Ends</label>
           <input
             id={`${id}-end`}
+            className="field"
             type="datetime-local"
             value={fields.end}
             onChange={(event) => {
@@ -341,6 +345,7 @@ function AppointmentForm({
       <label htmlFor={`${id}-notes`}>Notes</label>
       <textarea
         id={`${id}-notes`}
+        className="field"
         rows={3}
         maxLength={maxNotesLength}
         value={fields.notes}

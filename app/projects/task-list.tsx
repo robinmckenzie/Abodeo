@@ -435,7 +435,7 @@ export function TaskList({
                 </span>
                 <input
                   type="checkbox"
-                  className="task-done"
+                  className="checkbox"
                   checked={task.isDone}
                   aria-label={`Mark ${task.title} as done`}
                   onChange={(event) => {
@@ -545,7 +545,7 @@ export function TaskList({
       </p>
       <textarea
         ref={entryRef}
-        className="task-entry"
+        className="field task-entry"
         rows={1}
         value={text}
         placeholder="Add tasks, one per line"
