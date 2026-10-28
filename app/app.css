@@ -5,10 +5,11 @@
   --list-width: 43rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
-     clear. */
+     clear. The last part of the gap is the fade under a sticky title. */
   --screen-top: 2.5rem;
   --title-row: 2.6rem;
-  --title-gap: 1.25rem;
+  --title-gap: 1.75rem;
+  --title-fade: 1.25rem;
   --screen-title-height: calc(
     var(--screen-top) + var(--title-row) + var(--title-gap)
   );
@@ -491,6 +492,7 @@ body:has(.app-layout) {
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow-x: clip;
   padding: 0 0.75rem 3rem;
 }
 
@@ -537,11 +539,34 @@ body:has(.app-layout) {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+/* The title's background runs the panel's full width, so that the shadow of
+   an open project is hidden edge to edge, not only under the title. The gap
+   at the bottom of the title is a fade, so that content disappears under the
+   title, and the first project, below it, is not faded. The panel clips the
+   extra width. */
+[data-sticky-titles] .screen-title::before,
+[data-sticky-titles] .screen-title::after {
+  content: "";
+  position: absolute;
+  left: -100vmax;
+  right: -100vmax;
+  pointer-events: none;
+}
+
+[data-sticky-titles] .screen-title::before {
+  top: 0;
+  bottom: var(--title-fade);
+  z-index: -1;
   background: #fdfcf8;
-  /* The background runs the panel's full width, so that the shadow of an
-     open project is hidden by the title edge to edge, not only under it. */
-  box-shadow: 0 0 0 100vmax #fdfcf8;
-  clip-path: inset(0 -100vmax);
+}
+
+[data-sticky-titles] .screen-title::after {
+  bottom: 0;
+  height: var(--title-fade);
+  z-index: -1;
+  background: linear-gradient(#fdfcf8, rgb(253 252 248 / 0));
 }
 
 :root:has([data-sticky-titles]) {
