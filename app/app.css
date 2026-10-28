@@ -1430,6 +1430,7 @@ html:has(.app-layout) {
 
 .project-form-fields > input {
   font-size: 1.0625rem;
+  font-weight: 700;
 }
 
 /* The notes box is as tall as its text, with room for a couple of lines when
