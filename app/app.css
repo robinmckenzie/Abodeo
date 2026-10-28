@@ -1,3 +1,19 @@
+/* Shared values (AD #99 Layout and Style Tidy). On the root, so that
+   anything in the top layer gets them wherever it is rendered. */
+:root {
+  --side-column: 13.5rem;
+  --list-width: 43rem;
+  /* A screen's title row: the space above it, its height, and the gap below
+     it. They add up to what the sticky title covers, which scrolling leaves
+     clear. */
+  --screen-top: 2.5rem;
+  --title-row: 2.6rem;
+  --title-gap: 1.25rem;
+  --screen-title-height: calc(
+    var(--screen-top) + var(--title-row) + var(--title-gap)
+  );
+}
+
 :root {
   color-scheme: light dark;
   font-family:
@@ -33,7 +49,7 @@ body {
 /* Matches the logo's own background, in dark mode as well, so that the
    crossfade between the two screens has no change of colour. */
 body:has(.welcome),
-body:has(.dashboard) {
+body:has(.app-layout) {
   background: #fdfcf8;
   color: #1a1a1a;
 }
@@ -283,35 +299,55 @@ body:has(.dashboard) {
     margin-top: 0;
   }
 }
-/* The form's controls stay light on the cream background in dark mode too.
-   A left-hand column holds the logo, and later perhaps a menu, so the list
-   never has to move below the logo. */
-.dashboard {
+/* The frame of every screen: a left-hand column with the logo, the account
+   area and the menu, then the screen's panel. The form's controls stay light
+   on the cream background in dark mode too. */
+.app-layout {
   position: relative;
   color-scheme: light;
   display: grid;
-  --side-column: 13.5rem;
   grid-template-columns: var(--side-column) minmax(0, 1fr);
 }
 
 /* Lower in priority than any class, so components set their own colours. */
-.dashboard :where(button, input, textarea) {
+.app-layout :where(button, input, textarea) {
   font: inherit;
   color: inherit;
 }
 
-.dashboard header {
+.app-layout > header {
   padding: 1rem 0.75rem 1rem 1.5rem;
 }
 
-.dashboard h1 {
+.app-layout h1 {
   margin: 0;
 }
 
-.dashboard h1 img {
+.app-layout h1 img {
   display: block;
   width: 11.25rem;
   height: auto;
+}
+
+/* The column stays where it is while the panel scrolls, above the sticky
+   title so that the account panel opens over it. That panel then has the
+   window's height to fit in, and scrolls within it: 15.5rem is where it
+   starts, under the logo and the account button. */
+@media (min-width: 40.01rem) {
+  .app-layout > header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .app-layout .account-panel {
+    max-height: calc(100vh - 16.5rem);
+    max-height: calc(100dvh - 16.5rem);
+    overflow-y: auto;
+  }
 }
 
 /* Who is signed in, below the logo. Plain small text with no picture or
@@ -444,49 +480,68 @@ body:has(.dashboard) {
   margin-top: 1rem;
 }
 
-/* Centred on the whole screen, as before the left-hand column, but never
-   reaching into it. 100% here is the width to the right of the column.
-   The left padding is small so that the list can come close to the logo.
-   The list itself is 43rem wide, and 44.5rem centres it, allowing for the
-   difference between the left and right padding. */
-.dashboard main {
+/* The right-hand side of a screen: the title row, then the content. The
+   panel takes all the room beside the column, and its content is held to the
+   list's width and centred in it, never reaching into the column. A screen
+   that needs more room overrides that one width. The space above the title is
+   in the title row, so that the title does not move when it sticks. */
+.screen-panel {
   min-height: 100vh;
   min-height: 100dvh;
-  width: min(45.25rem, 100%);
-  margin: 0 auto 0 max(0px, (100% - var(--side-column) - 44.5rem) / 2);
   display: flex;
   flex-direction: column;
-  padding: 2.5rem 1.5rem 3rem 0.75rem;
+  align-items: center;
+  padding: 0 0.75rem 3rem;
+}
+
+:where(.screen-panel) > * {
+  width: min(var(--list-width), 100%);
 }
 
 /* On a phone the left-hand column would leave too little room for the
    list, so the logo goes above it. */
 @media (max-width: 40rem) {
-  .dashboard {
+  :root {
+    --screen-top: 1rem;
+  }
+
+  .app-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard main {
+  .screen-panel {
     min-height: 0;
-    padding-left: 1.5rem;
-    padding-top: 1rem;
+    padding-inline: 1.5rem;
   }
 }
 
 /* Focus is only moved here for screen readers, so no outline is needed. */
-.dashboard main:focus {
+.screen-panel:focus {
   outline: none;
 }
 
-.dashboard-toolbar {
+.screen-title {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
   justify-content: flex-end;
   /* The height of Add project, so that a screen without it has its title in
      the same place. */
-  min-height: 2.6rem;
-  margin-bottom: 1.25rem;
+  min-height: var(--screen-title-height);
+  padding: var(--screen-top) 0 var(--title-gap);
+}
+
+/* The title stays in view while the content scrolls, and scrolling to
+   something stops below it. Off, it scrolls with the page. */
+[data-sticky-titles] .screen-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fdfcf8;
+}
+
+:root:has([data-sticky-titles]) {
+  scroll-padding-top: var(--screen-title-height);
 }
 
 /* Development only. Fixed at the bottom right of the window, out of the
@@ -540,21 +595,21 @@ body:has(.dashboard) {
   color: #6b675e;
 }
 
-.dashboard-toolbar .add-project {
+.screen-title .add-project {
   flex-shrink: 0;
 }
 
 /* The screen's title, level with Add project and at the left edge of the
    project boxes. */
-.dashboard-toolbar h2 {
+.screen-title h2 {
   align-self: center;
   margin: 0 auto 0 0;
 }
 
 /* While the account's projects are unavailable, Add project is disabled, and
    it and the development panel, which has nothing to act on, are hidden. */
-.dashboard-toolbar .add-project:disabled,
-.dashboard-toolbar .default-projects-panel:has(~ .add-project:disabled) {
+.screen-title .add-project:disabled,
+.screen-title .default-projects-panel:has(~ .add-project:disabled) {
   display: none;
 }
 
@@ -574,7 +629,7 @@ body:has(.dashboard) {
   background: #3a3833;
 }
 
-.dashboard :is(button, [role="button"]):focus-visible {
+.app-layout :is(button, [role="button"]):focus-visible {
   outline: 2px solid #1a1a1a;
   outline-offset: 3px;
 }
@@ -1036,7 +1091,7 @@ body:has(.dashboard) {
   position: fixed;
   top: 50%;
   left: 16px;
-  z-index: 1;
+  z-index: 2;
   width: 20rem;
   transform: translateY(-50%);
   font-size: 12px;
@@ -1075,6 +1130,7 @@ body:has(.dashboard) {
   position: fixed;
   left: 16px;
   bottom: 16px;
+  z-index: 2;
   max-width: calc(13.5rem - 16px);
   padding: 8px 10px;
   border: 1px solid #ddd;
@@ -1481,7 +1537,7 @@ body:has(.dashboard) {
 }
 
 /* Inside the row, so as not to cover the tasks above and below. */
-.dashboard :is(.task-title, .task-button):focus-visible {
+.app-layout :is(.task-title, .task-button):focus-visible {
   outline-offset: 0;
 }
 
@@ -2207,11 +2263,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   }
 }
 
-.dashboard.is-drop-target .project-window::backdrop {
+.projects-screen.is-drop-target .project-window::backdrop {
   background: rgb(26 26 26 / 0.55);
 }
 
-.dashboard.is-drop-target::after {
+.projects-screen.is-drop-target::after {
   content: "";
   position: fixed;
   inset: 0;
@@ -2220,12 +2276,12 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   pointer-events: none;
 }
 
-.dashboard.is-drop-target .project-bar.is-expanded {
+.projects-screen.is-drop-target .project-bar.is-expanded {
   position: relative;
   z-index: 11;
 }
 
-.dashboard.is-drop-target:has(.project-window)::after {
+.projects-screen.is-drop-target:has(.project-window)::after {
   display: none;
 }
 

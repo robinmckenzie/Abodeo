@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Link } from "react-router";
 import type { Route } from "./+types/people";
-import { useAccount } from "../account/use-account";
-import { AppMenu } from "../app-menu";
-import logo from "../images/abodeo-home-logo.jpeg";
 import { FloatingMessages, useFloatingMessages } from "../projects/floating-messages";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
 import { describePersonFailure } from "../projects/people-messages";
 import { usePeople } from "../projects/use-people";
 import { usePeopleDeparture } from "../projects/use-people-departure";
+import { useScreenAccount, useScreenLeave } from "../screen-context";
+import { ScreenPanel } from "../screen-panel";
 
 export const meta: Route.MetaFunction = () => [
   { title: "People - Abodeo" }, { name: "description", content: "Who projects can be assigned to." },
@@ -26,7 +24,8 @@ export function describeRemoval({ person, count, unreadable }: Pick<Removal, "pe
 export default function People() {
   const [stores] = useState(() => new Map<string, PeopleDrafts>());
   const departure = usePeopleDeparture(stores);
-  const account = useAccount({ onBeforeLeave: departure.leave, onLeaveFailed: departure.resume });
+  const account = useScreenAccount();
+  useScreenLeave({ onBeforeLeave: departure.leave, onLeaveFailed: departure.resume });
   const source = usePeople(account.view, { onAccountFailure: account.recheck });
   const { view } = source;
   const identity = account.view.kind === "signed-in" ? account.view.id : account.view.kind === "signed-out" || account.view.kind === "not-configured" ? "browser" : null;
@@ -41,19 +40,14 @@ export default function People() {
     }
   }, [identity, view, source, stores]);
   const controller = identity === null ? undefined : controllers.get(identity);
-  return <div className="dashboard people-page">
-    <header><h1><Link to="/dashboard"><img src={logo} alt="Abodeo - Your home, sorted." width={997} height={868} /></Link></h1>
-      <AppMenu current="/people" account={account} onBeforeLeave={departure.leave} onLeaveFailed={departure.resume} />
-    </header>
-    <main><div className="dashboard-toolbar"><h2>People</h2></div>
+  return <ScreenPanel title="People" className="people-page">
       <p className="people-hint">Projects can be assigned to the people listed here. {account.view.kind === "signed-in" ? "They are kept in your account." : "They are kept in this browser."}</p>
       {view.status === "loading" && <p role="status">Loading...</p>}
       {view.status === "unavailable" && <p role="alert">Your people cannot be loaded right now. Please try again later.</p>}
       {view.status === "unreadable" && <p role="alert">The saved list of people cannot be read, so it has been left as it is and cannot be changed.</p>}
       {view.status === "ready" && controller && <PeoplePanel key={controller.storeKey} controller={controller} people={view.people} disabled={departure.departing} />}
       {[...controllers].filter(([key, store]) => key !== identity && store.unresolved()).map(([key]) => <p key={key} role="alert">Unsaved People edits are retained for the previous account. Return to that account to correct or retry them before leaving.</p>)}
-    </main>
-  </div>;
+  </ScreenPanel>;
 }
 
 function PeoplePanel({ controller, people, disabled }: { controller: PeopleDrafts; people: Person[]; disabled: boolean }) {

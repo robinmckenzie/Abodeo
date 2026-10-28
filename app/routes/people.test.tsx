@@ -18,6 +18,7 @@ import { newProjectFields } from "../projects/projects";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { accountStatusPath, accountProfilePath, authBasePath } from "../account/account-api";
+import { withAppLayout } from "../test-routes";
 
 // Sign-in is not set up, so people are kept in the browser, as signed out.
 beforeEach(() => {
@@ -57,10 +58,12 @@ async function saveAssignedProject(title: string, assignee: string) {
 }
 
 async function renderPeople() {
-  const Stub = createRoutesStub([
-    { path: "/people", Component: People },
-    { path: "/dashboard", Component: () => <p>Dashboard</p> },
-  ]);
+  const Stub = createRoutesStub(
+    withAppLayout([
+      { path: "/people", Component: People },
+      { path: "/dashboard", Component: () => <p>Dashboard</p> },
+    ]),
+  );
   const rendered = render(<Stub initialEntries={["/people"]} />);
   await act(async () => {});
   return rendered;

@@ -36,6 +36,7 @@ import { makeJpeg, makePng } from "../projects/test-images";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
+import { withAppLayout } from "../test-routes";
 
 // The browser's own picture decoding is not available here.
 vi.mock("../projects/thumbnail", () => ({
@@ -219,7 +220,9 @@ function fakeServer(overrides: Partial<Server> = {}) {
 }
 
 async function renderDashboard(search = "") {
-  const Stub = createRoutesStub([{ path: "/dashboard", Component: Dashboard }]);
+  const Stub = createRoutesStub(
+    withAppLayout([{ path: "/dashboard", Component: Dashboard }]),
+  );
   render(<Stub initialEntries={[`/dashboard${search}`]} />);
   // Lets the account lookups finish.
   await act(async () => {});
@@ -1451,7 +1454,7 @@ describe("images on the dashboard (AD #48)", () => {
     await drag("dragenter");
     const dataTransfer = await drag("dragover");
     expect(dataTransfer.dropEffect).toBe("copy");
-    expect(document.querySelector(".dashboard.is-drop-target")).not.toBeNull();
+    expect(document.querySelector(".projects-screen.is-drop-target")).not.toBeNull();
     await drag("dragend");
     expect(document.querySelector(".is-drop-target")).toBeNull();
   });

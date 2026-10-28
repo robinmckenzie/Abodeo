@@ -12,6 +12,7 @@ import Dashboard from "./dashboard";
 import Home from "./home";
 import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshProjects } from "../projects/use-projects";
+import { withAppLayout } from "../test-routes";
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
 beforeAll(() => {
@@ -26,7 +27,7 @@ beforeAll(() => {
 function renderHome(path = "/", DashboardScreen = Dashboard) {
   const Stub = createRoutesStub([
     { path: "/", Component: Home },
-    { path: "/dashboard", Component: DashboardScreen },
+    ...withAppLayout([{ path: "/dashboard", Component: DashboardScreen }]),
   ]);
   render(<Stub initialEntries={[path]} />);
 }

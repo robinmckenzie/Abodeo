@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
 import type { Route } from "./+types/dashboard";
-import { useAccount } from "../account/use-account";
-import { AppMenu } from "../app-menu";
-import logo from "../images/abodeo-home-logo.jpeg";
 import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
+import { ScreenPanel } from "../screen-panel";
+import { useScreenAccount, useScreenLeave } from "../screen-context";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
   binAccountProject,
@@ -334,7 +333,8 @@ export default function Dashboard() {
     unsavedIdsRef.current = unsavedIds;
   });
 
-  const account = useAccount({
+  const account = useScreenAccount();
+  useScreenLeave({
     onBeforeLeave: prepareToLeave,
     onLeaving: () => {
       isLeavingRef.current = true;
@@ -1133,47 +1133,39 @@ export default function Dashboard() {
   );
 
   return (
-    <div className={isDropTarget ? "dashboard is-drop-target" : "dashboard"}>
+    <>
       <AssigneeTuningPanel />
-      <header>
-        <h1>
-          <img
-            src={logo}
-            alt="Abodeo - Your home, sorted."
-            width={997}
-            height={868}
-          />
-        </h1>
-        <AppMenu
-          current="/dashboard"
-          account={account}
-          onBeforeLeave={prepareToLeave}
-        />
-      </header>
-      <main ref={mainRef} tabIndex={-1}>
-        <div className="dashboard-toolbar" inert={isAddingInPlace}>
-          <h2>Projects</h2>
-          {/* Replaced by false when the app is built for deployment, which
-              leaves the panel out. Hidden in development too, unless
-              VITE_SHOW_DEVELOPMENT_PANEL=true is set in .env.local. */}
-          {import.meta.env.DEV &&
-            import.meta.env.VITE_SHOW_DEVELOPMENT_PANEL === "true" && (
-              <DefaultProjectsPanel
-                isSignedIn={view.kind === "account"}
-                onBeforeChange={() => {
-                  if (view.kind === "browser") closeProject();
-                }}
-              />
-            )}
-          <button
-            type="button"
-            className="add-project"
-            disabled={isAccountUnavailable}
-            onClick={openNewProject}
-          >
-            Add project
-          </button>
-        </div>
+      <ScreenPanel
+        title="Projects"
+        className={isDropTarget ? "projects-screen is-drop-target" : "projects-screen"}
+        ref={mainRef}
+        tabIndex={-1}
+        isTitleInert={isAddingInPlace}
+        actions={
+          <>
+            {/* Replaced by false when the app is built for deployment, which
+                leaves the panel out. Hidden in development too, unless
+                VITE_SHOW_DEVELOPMENT_PANEL=true is set in .env.local. */}
+            {import.meta.env.DEV &&
+              import.meta.env.VITE_SHOW_DEVELOPMENT_PANEL === "true" && (
+                <DefaultProjectsPanel
+                  isSignedIn={view.kind === "account"}
+                  onBeforeChange={() => {
+                    if (view.kind === "browser") closeProject();
+                  }}
+                />
+              )}
+            <button
+              type="button"
+              className="add-project"
+              disabled={isAccountUnavailable}
+              onClick={openNewProject}
+            >
+              Add project
+            </button>
+          </>
+        }
+      >
         {view.kind === "browser" && view.result && !view.result.ok && (
           <p className="dashboard-notice" role="alert">
             This browser is not letting Abodeo use its storage, so projects
@@ -1279,7 +1271,7 @@ export default function Dashboard() {
         {!isInPlace && open && (
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
-      </main>
+      </ScreenPanel>
       {deletion && (
         <DeleteProjectDialog
           project={deletion}
@@ -1337,7 +1329,7 @@ export default function Dashboard() {
           },
         ]}
       />
-    </div>
+    </>
   );
 }
 

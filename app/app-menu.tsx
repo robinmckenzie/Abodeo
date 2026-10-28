@@ -17,6 +17,29 @@ const screens = [
 
 export type MenuScreen = (typeof screens)[number]["path"];
 
+// The click on a link to a screen, which lets the current screen save before
+// the app moves on. A link to the screen already shown does nothing.
+export function useScreenLinkClick(onBeforeLeave: () => Promise<boolean>) {
+  const navigate = useNavigate();
+  return (path: string, current: string) =>
+    async (event: React.MouseEvent<HTMLAnchorElement>) => {
+      // Opening in another tab or window is left to the browser.
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+      // Staying on the screen needs no leave.
+      if (path === current) return;
+      if (await onBeforeLeave()) void navigate(path);
+    };
+}
+
 export function AppMenu({
   current,
   account,
@@ -29,7 +52,7 @@ export function AppMenu({
   onBeforeLeave: () => Promise<boolean>;
   onLeaveFailed?: () => void;
 }) {
-  const navigate = useNavigate();
+  const getClickHandler = useScreenLinkClick(onBeforeLeave);
   const shownScreens = screens.filter(
     ({ path }) => path !== "/bin" || account.view.kind === "signed-in",
   );
@@ -44,25 +67,7 @@ export function AppMenu({
               <Link
                 to={path}
                 aria-current={path === current ? "page" : undefined}
-                onClick={async (event) => {
-                  // Opening in another tab or window is left to the browser.
-                  if (
-                    event.button !== 0 ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  ) {
-                    return;
-                  }
-                  // Staying on the screen needs no leave.
-                  if (path === current) {
-                    event.preventDefault();
-                    return;
-                  }
-                  event.preventDefault();
-                  if (await onBeforeLeave()) void navigate(path);
-                }}
+                onClick={getClickHandler(path, current)}
               >
                 {name}
               </Link>
