@@ -2,6 +2,7 @@
 // an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
+import { ArrowIcon } from "../ui/icons";
 import { calculateBarScrollEnd, calculateBarTopLimit } from "./bar-scroll";
 import { describeDueDate } from "./due-date";
 import { DueDateIcon } from "./due-date-icon";
@@ -321,13 +322,11 @@ export function ExpandedProjectBar({
       {hasCollapseButton && (
         <button
           type="button"
-          className="project-bar-collapse"
+          className="icon-button project-bar-collapse"
           aria-label="Close"
           onClick={squash}
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M10 14.5v-9M6.5 9l3.5-3.5M13.5 9l-3.5-3.5" />
-          </svg>
+          <ArrowIcon direction="up" />
         </button>
       )}
     </li>

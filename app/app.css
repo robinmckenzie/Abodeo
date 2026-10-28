@@ -1,6 +1,28 @@
 /* Shared values (AD #99 Layout and Style Tidy). On the root, so that
    anything in the top layer gets them wherever it is rendered. */
 :root {
+  /* Colours (AD #99): each used for one purpose, so that a change is made in
+     one place. */
+  --ink: #1a1a1a;
+  --ink-soft: #3a3833;
+  --paper: #fdfcf8;
+  --card: #fff;
+  --hover: #ece9e1;
+  --hover-red: #f8e9e6;
+  --row-tint: #f6f3ec;
+  --muted: #6b665c;
+  --red: #a12a2a;
+  --red-hover: #7e1f1f;
+  --outline: #cfc8b8;
+  --field-border: #ddd7c9;
+  --card-border: #e7e2d6;
+  /* Round icon buttons: the button, the icon in it, its line weight (in the
+     icon's 20 units), and the gap between the button's edge and the circle
+     drawn in it, which lines edges up. */
+  --icon-button-size: 1.75rem;
+  --icon-size: 1.375rem;
+  --icon-stroke: 1;
+  --icon-inset: calc((var(--icon-button-size) - var(--icon-size) * 0.9) / 2);
   --side-column: 13.5rem;
   --list-width: 43rem;
   /* A screen's title row: the space above it, its height, and the gap below
@@ -37,7 +59,7 @@
 body {
   margin: 0;
   background: #ffffff;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,8 +73,8 @@ body {
    crossfade between the two screens has no change of colour. */
 body:has(.welcome),
 body:has(.app-layout) {
-  background: #fdfcf8;
-  color: #1a1a1a;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .welcome {
@@ -278,7 +300,7 @@ body:has(.app-layout) {
 }
 
 .get-started:focus-visible {
-  outline: 3px solid #1a1a1a;
+  outline: 3px solid var(--ink);
   outline-offset: 4px;
 }
 
@@ -300,6 +322,7 @@ body:has(.app-layout) {
     margin-top: 0;
   }
 }
+
 /* The frame of every screen: a left-hand column with the logo, the account
    area and the menu, then the screen's panel. The form's controls stay light
    on the cream background in dark mode too. */
@@ -314,6 +337,118 @@ body:has(.app-layout) {
 .app-layout :where(button, input, textarea) {
   font: inherit;
   color: inherit;
+}
+
+/* Buttons (AD #99). Each kind is defined once, here. A main button is the
+   solid one. A secondary button is the pale outlined one, and a delete button
+   the same with red words and a bin. The small size is for where space is
+   tight. */
+.button-main,
+.button-secondary,
+.button-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 0.55rem 1.15rem;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.button-small {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.button-main {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.button-main:hover:not(:disabled) {
+  background: var(--ink-soft);
+}
+
+.button-secondary,
+.button-delete {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--outline);
+  color: var(--ink);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.button-delete {
+  color: var(--red);
+}
+
+.button-delete:hover:not(:disabled) {
+  background: var(--hover-red);
+}
+
+.button-delete svg {
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.button-main:disabled,
+.button-secondary:disabled,
+.button-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* A round button with an icon, from icons.tsx: a lighter icon that darkens
+   on hover, in a hover circle larger than the icon's circle. */
+.icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover:not([aria-disabled], :disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.icon-button:is([aria-disabled], :disabled) {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-button svg,
+.image-viewer-previous svg,
+.image-viewer-next svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button svg {
+  width: var(--icon-size);
+  height: var(--icon-size);
 }
 
 .app-layout > header {
@@ -361,7 +496,7 @@ body:has(.app-layout) {
      does not move when it appears. */
   min-height: 3.2rem;
   font-size: 0.85rem;
-  color: #3a3833;
+  color: var(--ink-soft);
 }
 
 .account p {
@@ -380,14 +515,14 @@ body:has(.app-layout) {
 }
 
 .account-button:hover:not(:disabled) {
-  background: #ece9e1;
+  background: var(--hover);
 }
 
 /* "Signed in as" above the name, so the button's text stays whole for
    screen readers. */
 .account-label {
   display: block;
-  color: #6b675e;
+  color: var(--muted);
 }
 
 .account-name {
@@ -395,12 +530,12 @@ body:has(.app-layout) {
 }
 
 .account-unavailable {
-  color: #6b675e;
+  color: var(--muted);
 }
 
 .account .account-message {
   margin-top: 0.5rem;
-  color: #8c2a1e;
+  color: var(--red);
 }
 
 /* Opens over the page beside the column, which is too narrow for it. */
@@ -420,9 +555,9 @@ body:has(.app-layout) {
   width: min(22rem, calc(100vw - 2rem));
   padding: 1rem 1.15rem;
   border-radius: 12px;
-  background: #fdfcf8;
+  background: var(--paper);
   box-shadow: 0 6px 24px rgb(26 26 26 / 0.14);
-  color: #1a1a1a;
+  color: var(--ink);
   line-height: 1.45;
 }
 
@@ -453,24 +588,11 @@ body:has(.app-layout) {
   padding: 0.3rem 0.5rem;
   border: 1px solid #8a857a;
   border-radius: 6px;
-  background: #fff;
+  background: var(--card);
 }
-
-.account-panel button:not(.account-button) {
-  padding: 0.3rem 0.75rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.account-panel button:hover:not(:disabled) {
-  background: #ece9e1;
-}
-
 .account .account-hint {
   margin-top: 0.4rem;
-  color: #6b675e;
+  color: var(--muted);
 }
 
 .account-save-message:empty {
@@ -559,14 +681,14 @@ body:has(.app-layout) {
   top: 0;
   bottom: var(--title-fade);
   z-index: -1;
-  background: #fdfcf8;
+  background: var(--paper);
 }
 
 [data-sticky-titles] .screen-title::after {
   bottom: 0;
   height: var(--title-fade);
   z-index: -1;
-  background: linear-gradient(#fdfcf8, rgb(253 252 248 / 0));
+  background: linear-gradient(var(--paper), rgb(253 252 248 / 0));
 }
 
 :root:has([data-sticky-titles]) {
@@ -593,33 +715,33 @@ html:has(.app-layout) {
   padding: 0.4rem 0.75rem;
   border: 1px dashed #8a857a;
   border-radius: 10px;
-  background: #fdfcf8;
+  background: var(--paper);
   font-size: 0.85rem;
 }
 
 .default-projects-label {
-  color: #6b675e;
+  color: var(--muted);
   font-weight: 500;
 }
 
 .default-projects-panel button {
   padding: 0.3rem 0.75rem;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--ink);
   border-radius: 999px;
   background: transparent;
-  color: #1a1a1a;
+  color: var(--ink);
   cursor: pointer;
 }
 
 .default-projects-panel button:hover:not(:disabled) {
-  background: #ece9e1;
+  background: var(--hover);
 }
 
 .default-projects-panel p {
   flex-basis: 100%;
   max-width: 32rem;
   margin: 0;
-  color: #3a3833;
+  color: var(--ink-soft);
 }
 
 .default-projects-panel p:empty {
@@ -627,7 +749,7 @@ html:has(.app-layout) {
 }
 
 .default-projects-note {
-  color: #6b675e;
+  color: var(--muted);
 }
 
 .screen-title .add-project {
@@ -647,25 +769,8 @@ html:has(.app-layout) {
 .screen-title .default-projects-panel:has(~ .add-project:disabled) {
   display: none;
 }
-
-.add-project,
-.project-form-footer button {
-  padding: 0.55rem 1.15rem;
-  border: 0;
-  border-radius: 999px;
-  background: #1a1a1a;
-  color: #fdfcf8;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.add-project:hover,
-.project-form-footer button:hover {
-  background: #3a3833;
-}
-
 .app-layout :is(button, [role="button"]):focus-visible {
-  outline: 2px solid #1a1a1a;
+  outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -673,8 +778,8 @@ html:has(.app-layout) {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
-  background: #f8e9e6;
-  color: #8c2a1e;
+  background: var(--hover-red);
+  color: var(--red);
 }
 
 /* The offer to move a browser's projects into the account: a question,
@@ -684,28 +789,18 @@ html:has(.app-layout) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-  background: #ece9e1;
-  color: #1a1a1a;
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.dashboard-move-offer .button-secondary:hover:not(:disabled) {
+  background: var(--paper);
 }
 
 .dashboard-move-offer p {
   flex: 1 1 20rem;
   margin: 0;
 }
-
-.dashboard-move-offer button {
-  padding: 0.4rem 1rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  background: transparent;
-  color: #1a1a1a;
-  cursor: pointer;
-}
-
-.dashboard-move-offer button:hover:not(:disabled) {
-  background: #fdfcf8;
-}
-
 /* Centred in the space below the button, as the dashboard's message was. */
 .dashboard-empty {
   margin: auto 0;
@@ -733,9 +828,9 @@ html:has(.app-layout) {
   align-items: baseline;
   column-gap: 1rem;
   padding: 1rem 1.25rem;
-  border: 1px solid #e7e2d6;
+  border: 1px solid var(--card-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
   text-align: left;
   cursor: pointer;
   transition:
@@ -744,7 +839,7 @@ html:has(.app-layout) {
 }
 
 .project-bar:not(.is-expanded) > button:hover {
-  border-color: #cfc8b8;
+  border-color: var(--outline);
   box-shadow: 0 2px 10px rgb(26 26 26 / 0.06);
 }
 
@@ -773,7 +868,7 @@ html:has(.app-layout) {
 
 /* The sizes of the name and job title in the Assigned To list. */
 .project-bar-assignee {
-  color: #6b665c;
+  color: var(--muted);
 }
 
 .project-bar-job-title {
@@ -795,7 +890,7 @@ html:has(.app-layout) {
   border-radius: 6px;
   background: linear-gradient(#fff, #f2f0ea);
   box-shadow: 0 1px 2px rgb(26 26 26 / 0.08);
-  color: #3a3833;
+  color: var(--ink-soft);
   line-height: 1;
 }
 
@@ -812,12 +907,12 @@ html:has(.app-layout) {
 }
 
 .due-date-icon-hole {
-  fill: #cfc8b8;
+  fill: var(--outline);
   stroke: none;
 }
 
 .due-date-icon-weekday {
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.5rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -852,7 +947,7 @@ html:has(.app-layout) {
   overflow: hidden;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: #4a463f;
+  color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
   mask-image: linear-gradient(to bottom, #000 1lh, transparent 2lh);
@@ -876,13 +971,13 @@ html:has(.app-layout) {
 .project-bar-tasks {
   grid-area: 3 / 2;
   margin-top: 0.25rem;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
 .project-bar-unsaved {
   grid-area: 1 / 3;
-  color: #a12a2a;
+  color: var(--red);
   font-size: 0.85rem;
 }
 
@@ -906,11 +1001,12 @@ html:has(.app-layout) {
 }
 
 .project-bar.is-expanded {
+  --bar-foot: 0.75rem;
   position: relative;
-  padding: 1.25rem 1.5rem 0.5rem;
-  border: 1px solid #cfc8b8;
+  padding: 1.25rem 1.5rem var(--bar-foot);
+  border: 1px solid var(--outline);
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 4px 18px rgb(26 26 26 / 0.08);
 }
 
@@ -920,42 +1016,22 @@ html:has(.app-layout) {
   padding-bottom: 1.25rem;
 }
 
-/* A message in the form's footer, such as a failed save, gets a line of its
-   own above the arrow. */
-.project-bar.is-expanded:has(.project-form-footer p:not(:empty)) {
+/* A message in a new project's footer, such as a failed save, gets room
+   below. An opened project's message has its own line above Delete. */
+.project-bar.is-expanded:has(.project-form-footer:not(.has-delete) p:not(:empty)) {
   padding-bottom: 2.5rem;
 }
 
-/* The expanded bar's upward arrow at the bottom centre, styled as the
-   form's close button. It takes no room of its own: it sits over the foot of
-   the form, in the middle, level with the Delete button's row, which is at
-   the right, and over the space under the shorter column. */
+/* The expanded bar's upward arrow at the bottom centre. It takes no room of
+   its own: it sits over the foot of the form, in the middle, level with the
+   Delete button, which is at the left. Both are as far from the bar's foot as
+   --bar-foot, and as tall as an icon button, so they are centred on each
+   other. */
 .project-bar-collapse {
   position: absolute;
-  bottom: 0.25rem;
+  bottom: var(--bar-foot);
   left: 50%;
   transform: translateX(-50%);
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-  cursor: pointer;
-}
-
-.project-bar-collapse svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .project-window {
@@ -965,8 +1041,8 @@ html:has(.app-layout) {
   padding: 1.25rem 1.75rem 1.5rem;
   border: 0;
   border-radius: 16px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--card);
+  color: var(--ink);
   box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
 }
 
@@ -987,7 +1063,7 @@ html:has(.app-layout) {
   margin-bottom: 1rem;
 }
 
-/* Level with the heading, which the close button is as tall as. */
+/* Level with the heading, whose line the close button is centred in. */
 .project-form-header h2 {
   line-height: 2rem;
 }
@@ -1004,7 +1080,7 @@ html:has(.app-layout) {
    readers. */
 .project-form-autosave {
   margin: 0.125rem 0 0;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.35;
   text-align: right;
@@ -1012,6 +1088,17 @@ html:has(.app-layout) {
 
 .project-form-autosave span {
   display: block;
+}
+
+/* The drawn circle's right-hand side is level with the fields' borders. */
+.project-form-close {
+  margin: 0.125rem calc(-1 * var(--icon-inset)) 0 0;
+}
+
+/* Delete, at the bottom left of the form, its circle level with the title's
+   left edge. */
+.project-form-delete {
+  margin-left: calc(-1 * var(--icon-inset));
 }
 
 .project-form h2 {
@@ -1024,35 +1111,6 @@ html:has(.app-layout) {
    stop 2.25 of the icon's 16 units short of the edge, counting their round
    ends. The button reaches past the edge by both, so the X's right-hand side
    is level with the fields' borders. */
-.project-form-close {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  margin-right: calc((0.875rem - 2rem) / 2 - 0.875rem * 2.25 / 16);
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-  cursor: pointer;
-}
-
-.project-form-close:hover,
-.project-bar-collapse:hover {
-  background: #f3f0e8;
-  color: #1a1a1a;
-}
-
-.project-form-close svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-}
-
 /* The assignees and the due date's calendar on the left, the title and notes
    on the right. */
 .project-form-body {
@@ -1082,7 +1140,7 @@ html:has(.app-layout) {
 .project-form-fields label {
   margin-bottom: 0.375rem;
   padding: 0;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1095,7 +1153,7 @@ html:has(.app-layout) {
   gap: 0.625rem;
   padding: 0.375rem 0.25rem;
   border-radius: 8px;
-  color: #6b665c;
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -1108,7 +1166,7 @@ html:has(.app-layout) {
 
 /* Lighter text and icon, darker on hover, and fully dark when selected. */
 .assignee-option:is(:hover, :has(input:checked)) {
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 /* As the form appears, its parts arrive one by one (see arriveAt in
@@ -1140,7 +1198,7 @@ html:has(.app-layout) {
   padding: 10px 12px 12px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
 }
 
@@ -1151,7 +1209,7 @@ html:has(.app-layout) {
 
 .assignee-tuning-panel p {
   margin: 0;
-  color: #6b665c;
+  color: var(--muted);
 }
 
 .assignee-tuning-panel button {
@@ -1171,8 +1229,8 @@ html:has(.app-layout) {
   padding: 8px 10px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--card);
+  color: var(--ink);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
   font-size: 12px;
 }
@@ -1246,7 +1304,7 @@ html:has(.app-layout) {
 }
 
 .assignee-option:hover {
-  background: #f7f5ef;
+  background: var(--row-tint);
 }
 
 /* Hidden, but still focusable and operated by keyboard; its icon shows the
@@ -1273,7 +1331,7 @@ html:has(.app-layout) {
 
 .assignee-option input:focus-visible + .assignee-icon {
   border-radius: 50%;
-  outline: 2px solid #1a1a1a;
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -1290,6 +1348,11 @@ html:has(.app-layout) {
   user-select: none;
 }
 
+.due-date-month .icon-button {
+  /* The larger hover circle takes the same room as the old one. */
+  margin: -0.125rem;
+}
+
 .due-date-month {
   display: flex;
   align-items: center;
@@ -1298,41 +1361,6 @@ html:has(.app-layout) {
   font-size: 0.875rem;
   font-weight: 500;
 }
-
-.due-date-month button {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  /* The larger hover circle takes the same room as the old one. */
-  margin: -0.125rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-  cursor: pointer;
-}
-
-.due-date-month button:hover {
-  background: #ebe6da;
-  color: #1a1a1a;
-}
-
-.due-date-month svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.due-date-previous svg {
-  transform: scaleX(-1);
-}
-
 .due-date-weekdays,
 .due-date-days {
   display: grid;
@@ -1341,7 +1369,7 @@ html:has(.app-layout) {
 }
 
 .due-date-weekdays {
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.6875rem;
   font-weight: 500;
 }
@@ -1367,38 +1395,26 @@ html:has(.app-layout) {
 }
 
 .due-date-days button:hover {
-  background: #f7f5ef;
+  background: var(--row-tint);
 }
 
 .due-date-days button.is-today {
-  border-color: #cfc8b8;
+  border-color: var(--outline);
 }
 
 .due-date-days button[aria-pressed="true"] {
-  border-color: #1a1a1a;
-  background: #1a1a1a;
-  color: #fdfcf8;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
-
+/* Clear sits level with the heading, at the right, where it takes no room
+   of its own. The heading is above the fieldset's content box, which this is
+   placed from: up by the heading's line and the space under it, and centred
+   on the line. */
 .due-date-clear {
   position: absolute;
-  /* The heading is above the fieldset's content box, which this is placed
-     from: up by the heading's line and the space under it, and centred on
-     the line. */
-  top: -1.5rem;
+  top: -1.6rem;
   right: 0;
-  padding: 0.125rem 0.625rem;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #4a463f;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.due-date-clear:hover {
-  background: #f1eee6;
 }
 
 .project-form-fields {
@@ -1418,14 +1434,14 @@ html:has(.app-layout) {
   width: 100%;
   margin-bottom: 1rem;
   padding: 0.625rem 0.75rem;
-  border: 1px solid #ddd7c9;
+  border: 1px solid var(--field-border);
   border-radius: 10px;
-  background: #fdfcf8;
+  background: var(--paper);
 }
 
 .project-form-fields > :is(input, textarea):focus-visible {
-  border-color: #1a1a1a;
-  outline: 1px solid #1a1a1a;
+  border-color: var(--ink);
+  outline: 1px solid var(--ink);
 }
 
 .project-form-fields > input {
@@ -1461,7 +1477,7 @@ html:has(.app-layout) {
 
 .task-heading {
   margin: 0 0 0.375rem;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1491,7 +1507,7 @@ html:has(.app-layout) {
 /* Only under the pointer, and not while the task is being edited, so that
    only one row is ever highlighted. Keyboard focus shows as a ring. */
 .task:hover:not(:has(.task-title-input)) {
-  background: #f6f3ec;
+  background: var(--row-tint);
 }
 
 .task.is-dragged {
@@ -1507,7 +1523,7 @@ html:has(.app-layout) {
   right: 0;
   height: 2px;
   border-radius: 1px;
-  background: #1a1a1a;
+  background: var(--ink);
 }
 
 .task.drops-before::before {
@@ -1538,12 +1554,12 @@ html:has(.app-layout) {
   width: 1.0625rem;
   height: 1.0625rem;
   margin: 0;
-  accent-color: #1a1a1a;
+  accent-color: var(--ink);
   cursor: pointer;
 }
 
 .task-done:focus-visible {
-  outline: 2px solid #1a1a1a;
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -1569,15 +1585,15 @@ html:has(.app-layout) {
 }
 
 .task-title-input {
-  border-color: #1a1a1a;
-  outline: 1px solid #1a1a1a;
-  background: #fff;
+  border-color: var(--ink);
+  outline: 1px solid var(--ink);
+  background: var(--card);
   resize: none;
   overflow: hidden;
 }
 
 /* Inside the row, so as not to cover the tasks above and below. */
-.app-layout :is(.task-title, .task-button):focus-visible {
+.app-layout :is(.task-title, .task .icon-button, .people-item .icon-button):focus-visible {
   outline-offset: 0;
 }
 
@@ -1589,69 +1605,19 @@ html:has(.app-layout) {
 .task:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
   opacity: 0;
 }
-
-.task-button {
-  display: grid;
-  place-items: center;
-  width: 1.875rem;
-  height: 1.875rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-  cursor: pointer;
-}
-
-.task-button:hover:not([aria-disabled], :disabled) {
-  background: #ebe6da;
-  color: #1a1a1a;
-}
-
-.task-button:is([aria-disabled], :disabled) {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.task-button svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 /* The bin on tasks and People. */
-.task-button-delete svg {
-  width: 1.625rem;
-  height: 1.625rem;
-  stroke-width: 1.15;
-}
-
 .task-undo {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
 .task-undo:not(:empty) {
   margin: 0.125rem 0 0.375rem;
 }
-
-.task-undo button {
-  padding: 0.125rem 0.5rem;
-  border: 1px solid #ddd7c9;
-  border-radius: 6px;
-  background: #fff;
-  color: #1a1a1a;
-  cursor: pointer;
-}
-
 /* One line high at first, growing a line at a time to 15, then scrolling. */
 /* Kept in view with space below it, as it grows and as tasks are added. */
 .task-entry {
@@ -1659,21 +1625,21 @@ html:has(.app-layout) {
   scroll-margin-bottom: 1rem;
   max-height: calc(15lh + 1.25rem + 2px);
   padding: 0.625rem 0.75rem;
-  border: 1px solid #ddd7c9;
+  border: 1px solid var(--field-border);
   border-radius: 10px;
-  background: #fdfcf8;
+  background: var(--paper);
   resize: none;
   overflow-y: auto;
 }
 
 .task-entry:focus-visible {
-  border-color: #1a1a1a;
-  outline: 1px solid #1a1a1a;
+  border-color: var(--ink);
+  outline: 1px solid var(--ink);
 }
 
 .task-failure {
   margin: 0;
-  color: #a12a2a;
+  color: var(--red);
   font-size: 0.875rem;
 }
 
@@ -1683,7 +1649,7 @@ html:has(.app-layout) {
 
 .project-form-hint {
   margin: -0.625rem 0 1rem;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -1700,19 +1666,28 @@ html:has(.app-layout) {
   font-size: 0.9rem;
 }
 
+/* With Delete in it, a message gets a line of its own above. */
+.project-form-footer.has-delete {
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+.project-form-footer.has-delete p {
+  order: -1;
+  flex: 1 0 100%;
+}
+
+.project-form-footer.has-delete p:not(:empty) {
+  margin-bottom: 0.5rem;
+}
+
+.project-form-footer.has-delete .project-form-message-actions {
+  margin-left: auto;
+}
+
 /* Cancel is outlined, to stand back from Create. */
-.project-form-footer .project-form-cancel {
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #1a1a1a;
-}
-
-.project-form-footer .project-form-cancel:hover {
-  background: #f1eee6;
-}
-
 .project-form-error {
-  color: #a12a2a;
+  color: var(--red);
 }
 
 /* An account's project, while its latest copy loads. */
@@ -1725,22 +1700,10 @@ html:has(.app-layout) {
   margin-top: 1rem;
 }
 
-/* Use saved version and Keep mine, outlined like Cancel. */
 .project-form-message-actions {
   display: flex;
   gap: 0.5rem;
 }
-
-.project-form-footer .project-form-message-actions button {
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #1a1a1a;
-}
-
-.project-form-footer .project-form-message-actions button:hover {
-  background: #f1eee6;
-}
-
 /* The crossfade between screens, for links with React Router's
    viewTransition: the old screen fades out as the new one fades in. */
 ::view-transition-group(root) {
@@ -1903,78 +1866,21 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .project-images .task-heading {
   margin: 0;
 }
-
-.project-images button {
-  padding: 0.25rem 0.625rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 6px;
-  background: #fff;
-  color: #1a1a1a;
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
+/* Add image and Remove image are round icon buttons. Remove image sits under
+   Add image: Add has no margin on its right, so that the two drawn circles
+   share a right-hand edge. */
+.project-images-add {
+  margin: -0.125rem 0 -0.125rem -0.125rem;
 }
 
-.project-images button:hover:not(:disabled) {
-  background: #f6f3ec;
-}
-
-/* The add button is the thin circle of the assignee icon, with a plus. The
-   remove button is the same turned 45 degrees, beside the caption box. Both,
-   like the task buttons and the date picker's month arrows, have a lighter
-   icon that darkens on hover, and a hover circle larger than the icon's. */
-.project-images .project-images-add,
-.project-images .project-images-remove {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-}
-
-.project-images .project-images-add:hover:not(:disabled),
-.project-images .project-images-remove:hover:not(:disabled) {
-  background: #ebe6da;
-  color: #1a1a1a;
-}
-
-/* The larger hover circle takes the same room as the old one. */
-.project-images .project-images-add {
-  margin: -0.125rem;
-}
-
-.project-images-add svg,
-.project-images-remove svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.project-images .project-images-remove {
-  flex: none;
+.project-images-remove {
   margin-top: 1.125rem;
 }
 
-.project-images-remove svg {
-  transform: rotate(45deg);
-}
-
-.project-images button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
+/* The larger hover circle takes the same room as the old one. */
 .project-images-note {
   margin: 0.375rem 0;
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
@@ -2016,11 +1922,6 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 /* More specific than the images' button rule, which would make the border dark,
    unlike the caption box's. */
-.project-images .image-entry-thumbnail {
-  border-color: #d8d3c6;
-  background: #f6f3ec;
-}
-
 .image-entry-thumbnail img {
   display: block;
   max-width: 100%;
@@ -2034,7 +1935,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .image-entry-details time {
   display: block;
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.8125rem;
 }
 
@@ -2058,7 +1959,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .image-entry-count {
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.75rem;
 }
 
@@ -2112,7 +2013,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .image-viewer-details time {
   margin-left: auto;
   flex-shrink: 0;
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.75rem;
   text-align: right;
 }
@@ -2137,7 +2038,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   background: rgb(255 255 255 / 0.26);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  color: #6b665c;
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -2151,8 +2052,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .image-viewer-previous:hover:not([aria-disabled]),
 .image-viewer-next:hover:not([aria-disabled]) {
-  background: #ebe6da;
-  color: #1a1a1a;
+  background: var(--hover);
+  color: var(--ink);
 }
 
 /* The dimmed arrow is faded by its colour, not by the button's opacity, which
@@ -2185,11 +2086,6 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-
-.image-viewer-previous svg {
-  transform: scaleX(-1);
-}
-
 /* Shared: floating messages (app/ui/floating-messages.tsx), used by every
    screen. Messages over everything, as a popover in the top layer: a stack at
    the bottom centre, newest at the bottom. */
@@ -2208,7 +2104,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   overflow: visible;
   border: 0;
   background: none;
-  color: #1a1a1a;
+  color: var(--ink);
   pointer-events: none;
 }
 
@@ -2219,9 +2115,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .floating-message {
   margin: 0;
   padding: 0.5rem 1rem;
-  border: 1px solid #e7e2d6;
+  border: 1px solid var(--card-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 4px 18px rgb(26 26 26 / 0.12);
   font-size: 0.9375rem;
   overflow-wrap: anywhere;
@@ -2262,7 +2158,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .image-entry-spinner-arc {
-  stroke: #6b665c;
+  stroke: var(--muted);
   stroke-linecap: round;
 }
 
@@ -2290,7 +2186,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .image-entry-pending-name {
   margin: 0;
   overflow: hidden;
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2332,7 +2228,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   width: 11.25rem;
   margin-top: 0.75rem;
   font-size: 1.1rem;
-  color: #3a3833;
+  color: var(--ink-soft);
 }
 
 .app-menu-list {
@@ -2350,7 +2246,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .app-menu-list a:hover {
-  background: #ece9e1;
+  background: var(--hover);
 }
 
 .app-menu-list a[aria-current="page"] {
@@ -2375,7 +2271,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .assignee-add-label {
   display: block;
   margin-bottom: 0.375rem;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -2396,19 +2292,10 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   border-radius: 6px;
   background: transparent;
 }
-
-.assignee-add-row button {
-  padding: 0.3rem 0.625rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-}
-
 .assignee-add-error,
 .people-error {
   margin: 0.25rem 0 0;
-  color: #9b2c1f;
+  color: var(--red);
   font-size: 0.8125rem;
 }
 
@@ -2416,7 +2303,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
    in the same place. */
 .people-hint,
 .people-empty {
-  color: #6b665c;
+  color: var(--muted);
 }
 
 /* The gap under the title is the same on every screen. */
@@ -2439,18 +2326,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .people-job-title {
   display: block;
-  color: #6b665c;
+  color: var(--muted);
   font-size: 0.8125rem;
 }
-
-.people-confirm button {
-  padding: 0.3rem 0.75rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-}
-
 .people-confirm {
   display: flex;
   flex-wrap: wrap;
@@ -2467,37 +2345,34 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .people-panel {
   max-width: 780px;
   padding: 1.5rem;
-  border: 1px solid #e7e2d6;
+  border: 1px solid var(--card-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
 }
 .people-panel h3 { margin: 0 0 0.75rem; font-size: 1.25rem; }
-.people-panel hr { border: 0; border-top: 1px solid #e7e2d6; margin: 1.25rem 0 0.5rem; }
+.people-panel hr { border: 0; border-top: 1px solid var(--card-border); margin: 1.25rem 0 0.5rem; }
 .people-quick-add { display: flex; gap: 0.75rem; }
-.people-panel input { min-width: 0; width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: #fff; }
+.people-panel input { min-width: 0; width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: var(--card); }
 .people-quick-add input { flex: 1; }
-.people-quick-add button { padding: 0.5rem 1rem; border: 1px solid #1a1a1a; border-radius: 6px; background: #fff; cursor: pointer; }
 .people-panel .people-list { margin: 0.5rem 0 0; gap: 0.25rem; }
 .people-item { position: relative; border-radius: 8px; padding: 0.375rem; }
-.people-item:hover, .people-item.is-expanded { background: #f7f5ef; }
+.people-item:hover, .people-item.is-expanded { background: var(--row-tint); }
 .people-compact-row { display: flex; align-items: center; gap: 0.625rem; min-height: 48px; }
 .people-expand { display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 0.4rem 0; cursor: pointer; }
-.people-expand > svg { width: 24px; height: 24px; fill: none; stroke: #6b665c; stroke-width: 1.25; flex-shrink: 0; }
-.people-swap { display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #6b665c; cursor: pointer; }
-.people-swap { width: 30px; height: 30px; margin-bottom: 6px; align-self: end; }
-.people-swap svg { width: 28px; height: 28px; fill: none; stroke: #6b665c; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
+.people-expand > svg { width: 24px; height: 24px; fill: none; stroke: var(--muted); stroke-width: 1.25; flex-shrink: 0; }
 .people-editor { padding: 0.5rem 0.5rem 0.5rem 2.5rem; }
 .people-editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.people-editor label { display: grid; gap: 0.25rem; color: #6b665c; font-size: 0.8125rem; min-width: 0; }
-.people-name-fields { display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); gap: 0.5rem; }
+.people-editor label { display: grid; gap: 0.25rem; color: var(--muted); font-size: 0.8125rem; min-width: 0; }
+.people-swap { margin-bottom: 6px; align-self: end; }
+.people-name-fields { display: grid; grid-template-columns: minmax(0, 1fr) var(--icon-button-size) minmax(0, 1fr); gap: 0.5rem; }
 .people-contact-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-top: 0.75rem; }
-.people-save-status { padding: 0.25rem 0.5rem 0.25rem 2.5rem; color: #6b665c; font-size: 0.8125rem; }
-.people-save-invalid, .people-save-failed { color: #9b2c1f; }
+.people-save-status { padding: 0.25rem 0.5rem 0.25rem 2.5rem; color: var(--muted); font-size: 0.8125rem; }
+.people-save-invalid, .people-save-failed { color: var(--red); }
 .people-save-status button { margin-left: 0.75rem; }
-.people-item .people-confirm { max-width: 420px; margin: 0.25rem 0 0.5rem auto; padding: 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: #fff; justify-content: flex-end; }
+.people-item .people-confirm { max-width: 420px; margin: 0.25rem 0 0.5rem auto; padding: 0.75rem; border: 1px solid #8a857a; border-radius: 6px; background: var(--card); justify-content: flex-end; }
 .people-confirm > div { display: flex; gap: 0.5rem; }
 .people-item.is-dragged { opacity: 0.4; }
-.people-item.drops-before::before, .people-item.drops-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: #6b665c; }
+.people-item.drops-before::before, .people-item.drops-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--muted); }
 .people-item.drops-before::before { top: -1px; }
 .people-item.drops-after::after { bottom: -1px; }
 
@@ -2515,64 +2390,20 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .project-appointments .task-heading {
   margin: 0;
 }
-
-.project-appointments button {
-  padding: 0.25rem 0.625rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 6px;
-  background: #fff;
-  color: #1a1a1a;
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.project-appointments button:hover:not(:disabled) {
-  background: #f6f3ec;
-}
-
-/* The add button is the images' add button: a thin circle with a plus. */
-.project-appointments .project-appointments-add {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+/* The add button is the images' add button. The larger hover circle takes the
+   same room as the old one. */
+.project-appointments-add {
   margin: -0.125rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #6b665c;
-}
-
-.project-appointments .project-appointments-add:hover:not(:disabled) {
-  background: #ebe6da;
-  color: #1a1a1a;
-}
-
-.project-appointments-add svg {
-  width: 1.375rem;
-  height: 1.375rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.project-appointments button:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .project-appointments-note {
   margin: 0.375rem 0;
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
 .project-appointments .appointment-error {
-  color: #9a2a1a;
+  color: var(--red);
 }
 
 .appointment-list {
@@ -2595,7 +2426,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .appointment-time,
 .appointment-notes {
-  color: #5a5548;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
@@ -2638,8 +2469,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   padding: 1.25rem 1.75rem 1.5rem;
   border: 0;
   border-radius: 16px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--card);
+  color: var(--ink);
   box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
 }
 
@@ -2662,7 +2493,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .delete-dialog-error {
-  color: #a12a2a;
+  color: var(--red);
 }
 
 .delete-dialog-buttons {
@@ -2671,41 +2502,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   gap: 0.75rem;
   margin-top: 1rem;
 }
-
-.delete-dialog-buttons button {
-  padding: 0.55rem 1.15rem;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.delete-dialog-buttons button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.delete-dialog-cancel {
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #1a1a1a;
-}
-
-.delete-dialog-cancel:hover:not(:disabled) {
-  background: #f1eee6;
-}
-
-.delete-dialog-confirm {
-  background: #a12a2a;
-  color: #fdfcf8;
-}
-
-.delete-dialog-confirm:hover:not(:disabled) {
-  background: #7e1f1f;
-}
-
 .delete-dialog button:focus-visible {
-  outline: 2px solid #1a1a1a;
+  outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -2714,32 +2512,10 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
    left one, so its row goes to the bottom of it, with at least a rem above.
    The button is outlined, like Cancel, so that it stands back from the
    save. */
-.project-form-delete-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: auto;
-  padding-top: 1rem;
-}
-
-.project-form-fields .project-form-delete {
-  padding: 0.55rem 1.15rem;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #a12a2a;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.project-form-fields .project-form-delete:hover:not(:disabled) {
-  background: #f8e9e6;
-}
-
 /* The link from the dashboard to the Bin. */
 .bin-link {
   align-self: center;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 
 .bin-list {
@@ -2757,7 +2533,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   gap: 0.5rem 1rem;
   padding: 0.85rem 1.1rem;
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
 }
 
 .bin-details {
@@ -2771,39 +2547,10 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .bin-time {
-  color: #6b675e;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 
 .bin-time.is-past {
-  color: #a12a2a;
-}
-
-.bin-row button {
-  padding: 0.45rem 1rem;
-  border: 0;
-  border-radius: 999px;
-  background: #1a1a1a;
-  color: #fdfcf8;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.bin-row button:hover:not(:disabled) {
-  background: #3a3833;
-}
-
-.bin-row button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.bin-row .bin-delete {
-  background: none;
-  box-shadow: inset 0 0 0 1px #cfc8b8;
-  color: #a12a2a;
-}
-
-.bin-row .bin-delete:hover:not(:disabled) {
-  background: #f8e9e6;
+  color: var(--red);
 }

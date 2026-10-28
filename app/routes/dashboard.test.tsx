@@ -1455,7 +1455,7 @@ describe("Dashboard deleting (AD #62)", () => {
       fireEvent.click(screen.getByRole("button", { name: new RegExp(title) }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete project" }));
     });
     return screen.getByRole("dialog", { name: `Delete “${title}”?` });
   }

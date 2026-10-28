@@ -10,6 +10,7 @@ import {
   listLosses,
 } from "./delete-project";
 import { raiseFloatingMessages } from "../ui/floating-messages";
+import { BinIcon } from "../ui/icons";
 import type { Project } from "./projects";
 
 // "bin" puts a signed-in account's project in the Bin; "permanent" removes a
@@ -107,7 +108,7 @@ export function DeleteProjectDialog({
         <button
           ref={cancelRef}
           type="button"
-          className="delete-dialog-cancel"
+          className="button-secondary delete-dialog-cancel"
           disabled={isBusy}
           onClick={onCancel}
         >
@@ -115,10 +116,11 @@ export function DeleteProjectDialog({
         </button>
         <button
           type="button"
-          className="delete-dialog-confirm"
+          className="button-delete delete-dialog-confirm"
           disabled={isBusy}
           onClick={onConfirm}
         >
+          <BinIcon />
           {isPermanent ? "Delete permanently" : "Delete"}
         </button>
       </div>

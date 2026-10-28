@@ -9,6 +9,8 @@
 // can be saved, years 0 to 9999, are ignored.
 import { useEffect, useId, useRef, useState } from "react";
 
+import { ArrowIcon } from "../ui/icons";
+
 import {
   addDays,
   addMonths,
@@ -142,7 +144,7 @@ export function DueDatePicker({
         <button
           type="button"
           name="dueDate-clear"
-          className="due-date-clear"
+          className="button-secondary button-small due-date-clear"
           onClick={() => {
             onChange(null);
             isMovingFocusRef.current = true;
@@ -168,14 +170,11 @@ function MonthButton({
     <button
       type="button"
       name={`dueDate-${direction}`}
-      className={`due-date-${direction}`}
+      className={`icon-button due-date-${direction}`}
       aria-label={direction === "previous" ? "Previous month" : "Next month"}
       onClick={onClick}
     >
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <circle cx="10" cy="10" r="8.5" />
-        <path d="M5.5 10h9M11 6.5l3.5 3.5M11 13.5l3.5-3.5" />
-      </svg>
+      <ArrowIcon direction={direction === "previous" ? "left" : "right"} />
     </button>
   );
 }

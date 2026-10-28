@@ -3,6 +3,7 @@
 // they behave the same and either can be removed later without touching it.
 import { useEffect, useId, useRef, useState } from "react";
 
+import { BinIcon, CloseIcon } from "../ui/icons";
 import { DueDatePicker } from "./due-date-picker";
 import {
   describePerson,
@@ -191,13 +192,11 @@ export function ProjectForm({
           <div className="project-form-close-area">
             <button
               type="button"
-              className="project-form-close"
+              className="icon-button project-form-close"
               aria-label="Close"
               onClick={onClose}
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 3l10 10M13 3L3 13" />
-              </svg>
+              <CloseIcon />
             </button>
             {showsAutosaveNote && (
               <p className="project-form-autosave">
@@ -330,21 +329,27 @@ export function ProjectForm({
           {tasks}
           {images}
           {appointments}
-          {!isNew && onDelete && (
-            <div className="project-form-delete-row">
-              <button
-                type="button"
-                className="project-form-delete"
-                disabled={isReadOnly}
-                onClick={onDelete}
-              >
-                Delete
-              </button>
-            </div>
-          )}
         </div>
       </div>
-      <div className="project-form-footer">
+      <div
+        className={
+          !isNew && onDelete
+            ? "project-form-footer has-delete"
+            : "project-form-footer"
+        }
+      >
+        {!isNew && onDelete && (
+          <button
+            type="button"
+            className="icon-button project-form-delete"
+            aria-label="Delete project"
+            title="Delete project"
+            disabled={isReadOnly}
+            onClick={onDelete}
+          >
+            <BinIcon />
+          </button>
+        )}
         <p
           className={message?.isError ? "project-form-error" : undefined}
           role={message?.isError ? "alert" : "status"}
@@ -358,12 +363,14 @@ export function ProjectForm({
           <>
             <button
               type="button"
-              className="project-form-cancel"
+              className="button-secondary project-form-cancel"
               onClick={onClose}
             >
               Cancel
             </button>
-            <button type="submit">Create</button>
+            <button type="submit" className="button-main">
+              Create
+            </button>
           </>
         )}
       </div>
@@ -484,7 +491,12 @@ function AddPersonBox({
             void add();
           }}
         />
-        <button type="button" disabled={isAdding} onClick={() => void add()}>
+        <button
+          type="button"
+          className="button-secondary button-small"
+          disabled={isAdding}
+          onClick={() => void add()}
+        >
           Add
         </button>
       </div>

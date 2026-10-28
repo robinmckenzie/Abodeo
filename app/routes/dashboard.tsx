@@ -1020,10 +1020,18 @@ export default function Dashboard() {
       messageActions={
         open.hasConflict && (
           <>
-            <button type="button" onClick={keepSavedVersion}>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={keepSavedVersion}
+            >
               Use saved version
             </button>
-            <button type="button" onClick={keepMine}>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={keepMine}
+            >
               Keep mine
             </button>
           </>
@@ -1157,7 +1165,7 @@ export default function Dashboard() {
               )}
             <button
               type="button"
-              className="add-project"
+              className="button-main add-project"
               disabled={isAccountUnavailable}
               onClick={openNewProject}
             >
@@ -1188,6 +1196,7 @@ export default function Dashboard() {
             </p>
             <button
               type="button"
+              className="button-secondary button-small"
               disabled={moveOffer.status === "moving"}
               onClick={moveProjects}
             >
@@ -1195,6 +1204,7 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
+              className="button-secondary button-small"
               disabled={moveOffer.status === "moving"}
               onClick={declineMoveOffer}
             >
