@@ -1429,12 +1429,15 @@ html:has(.app-layout) {
 }
 
 .project-form-fields > input {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
 }
 
+/* The notes box is as tall as its text, with room for a couple of lines when
+   it is empty. */
 .project-form-fields > textarea {
-  min-height: 9rem;
-  resize: vertical;
+  field-sizing: content;
+  min-height: 4rem;
+  resize: none;
 }
 
 /* An opened project's tasks, below its notes. Each task's buttons and drag
