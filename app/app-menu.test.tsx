@@ -36,4 +36,19 @@ describe("AppMenu", () => {
     expect(notPrevented).toBe(true);
     expect(onBeforeLeave).not.toHaveBeenCalled();
   });
+
+  it("names each menu link by its screen, whatever its icon", () => {
+    render(
+      <MemoryRouter>
+        <AppMenu
+          current="/dashboard"
+          account={account}
+          onBeforeLeave={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    for (const name of ["Projects", "People"]) {
+      expect(screen.getByRole("link", { name })).toBeTruthy();
+    }
+  });
 });

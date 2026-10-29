@@ -4,7 +4,16 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DeleteProjectDialog } from "../projects/delete-project-dialog";
 import { ProjectForm } from "../projects/project-form";
 import { newProjectFields } from "../projects/projects";
-import { ArrowIcon, BinIcon, CloseIcon, PlusIcon } from "./icons";
+import { ScreenPanel } from "../screen-panel";
+import {
+  ArrowIcon,
+  BinIcon,
+  BinScreenIcon,
+  CloseIcon,
+  PeopleIcon,
+  PlusIcon,
+  ProjectsIcon,
+} from "./icons";
 
 // jsdom has no modal dialogs, so they are stood in for.
 beforeAll(() => {
@@ -92,5 +101,34 @@ describe("the shared icons", () => {
     expect(findIcon(screen.getByRole("button", { name: "Delete" }))).toBe(
       "bin",
     );
+  });
+
+  it("draw the screen icons uncircled, with their own names", () => {
+    const { container } = render(
+      <>
+        <ProjectsIcon />
+        <PeopleIcon />
+        <BinScreenIcon />
+      </>,
+    );
+    const icons = [...container.querySelectorAll("svg")];
+    expect(icons.map((icon) => icon.getAttribute("data-icon"))).toEqual([
+      "projects",
+      "people",
+      "bin-screen",
+    ]);
+    for (const icon of icons) {
+      expect(icon.getAttribute("class")).toBe("screen-icon");
+      expect(icon.querySelector("circle")).toBeNull();
+    }
+  });
+
+  it("keep a screen's title name when an icon sits beside it", () => {
+    render(
+      <ScreenPanel title="People" icon={<PeopleIcon />}>
+        content
+      </ScreenPanel>,
+    );
+    expect(screen.getByRole("heading", { name: "People" })).toBeTruthy();
   });
 });
