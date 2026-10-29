@@ -3,6 +3,7 @@
 // below it. The title row holds the screen's actions, such as Add project.
 export function ScreenPanel({
   title,
+  icon,
   actions,
   className,
   ref,
@@ -11,6 +12,8 @@ export function ScreenPanel({
   children,
 }: {
   title: string;
+  // The screen's icon, shown to the left of the title.
+  icon?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
   ref?: React.Ref<HTMLElement>;
@@ -25,7 +28,10 @@ export function ScreenPanel({
       tabIndex={tabIndex}
     >
       <div className="screen-title" inert={isTitleInert}>
-        <h2>{title}</h2>
+        <h2>
+          {icon}
+          {title}
+        </h2>
         {actions}
       </div>
       {children}

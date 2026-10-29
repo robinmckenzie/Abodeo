@@ -4,6 +4,7 @@
 import { useEffect, useId, useState } from "react";
 
 import { PlusIcon } from "../ui/icons";
+import { DueDateIcon } from "./due-date-icon";
 
 import {
   addOneHour,
@@ -62,6 +63,14 @@ export function findNextLocalHour(now: Date) {
 function readDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+// The day an appointment starts, in the browser's time zone, or "" when its
+// start cannot be read.
+function findAppointmentDate(appointment: Appointment) {
+  if (appointment.allDay) return appointment.start;
+  const start = new Date(appointment.start);
+  return Number.isNaN(start.getTime()) ? "" : formatLocalDate(start);
 }
 
 // When an appointment is, in the browser's locale and time zone: a date and
@@ -200,13 +209,20 @@ function SignedInAppointments({
           <ul className="appointment-list">
             {state.appointments.map((appointment) => (
               <li key={appointment.id} className="appointment-entry">
-                <span className="appointment-title">{appointment.title}</span>
-                <span className="appointment-time">
-                  {describeAppointmentTime(appointment)}
-                </span>
-                {appointment.notes && (
-                  <span className="appointment-notes">{appointment.notes}</span>
+                {findAppointmentDate(appointment) && (
+                  <DueDateIcon dueDate={findAppointmentDate(appointment)} />
                 )}
+                <div className="appointment-text">
+                  <span className="appointment-title">{appointment.title}</span>
+                  <span className="appointment-time">
+                    {describeAppointmentTime(appointment)}
+                  </span>
+                  {appointment.notes && (
+                    <span className="appointment-notes">
+                      {appointment.notes}
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -304,6 +320,7 @@ function AppointmentForm({
       <input
         id={`${id}-title`}
         type="text"
+        className="field"
         maxLength={maxTitleLength}
         value={fields.title}
         onChange={(event) => change({ title: event.target.value })}
@@ -312,6 +329,7 @@ function AppointmentForm({
       <label className="appointment-all-day">
         <input
           type="checkbox"
+          className="checkbox"
           checked={fields.allDay}
           onChange={(event) => changeAllDay(event.target.checked)}
         />
@@ -320,6 +338,7 @@ function AppointmentForm({
       <label htmlFor={`${id}-start`}>{fields.allDay ? "Day" : "Starts"}</label>
       <input
         id={`${id}-start`}
+        className="field"
         type={fields.allDay ? "date" : "datetime-local"}
         value={fields.start}
         onChange={(event) => changeStart(event.target.value)}
@@ -329,6 +348,7 @@ function AppointmentForm({
           <label htmlFor={`${id}-end`}>Ends</label>
           <input
             id={`${id}-end`}
+            className="field"
             type="datetime-local"
             value={fields.end}
             onChange={(event) => {
@@ -341,6 +361,7 @@ function AppointmentForm({
       <label htmlFor={`${id}-notes`}>Notes</label>
       <textarea
         id={`${id}-notes`}
+        className="field"
         rows={3}
         maxLength={maxNotesLength}
         value={fields.notes}

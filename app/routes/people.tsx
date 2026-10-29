@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Route } from "./+types/people";
 import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
-import { ArrowIcon, BinIcon, DragHandleIcon, SwapIcon } from "../ui/icons";
+import {
+  ArrowIcon,
+  BinIcon,
+  DragHandleIcon,
+  PeopleIcon,
+  SwapIcon,
+} from "../ui/icons";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
 import { describePersonFailure } from "../projects/people-messages";
@@ -41,7 +47,7 @@ export default function People() {
     }
   }, [identity, view, source, stores]);
   const controller = identity === null ? undefined : controllers.get(identity);
-  return <ScreenPanel title="People" className="people-page">
+  return <ScreenPanel title="People" icon={<PeopleIcon />} className="people-page">
       <p className="people-hint">Projects can be assigned to the people listed here. {account.view.kind === "signed-in" ? "They are kept in your account." : "They are kept in this browser."}</p>
       {view.status === "loading" && <p role="status">Loading...</p>}
       {view.status === "unavailable" && <p role="alert">Your people cannot be loaded right now. Please try again later.</p>}
@@ -68,6 +74,9 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
   useEffect(() => {
     const close = (event: PointerEvent) => {
       const editor = panel.current?.querySelector(".people-item.is-expanded");
+      // Closing here would move the rows before the click lands on another
+      // person's button, which switches to that person itself.
+      if ((event.target as Element).closest(".people-expand")) return;
       if (!editor?.contains(event.target as Node)) setExpanded(null);
     };
     document.addEventListener("pointerdown", close);
@@ -114,7 +123,6 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
     <h3>Add person</h3>
     <form className="people-quick-add" noValidate onSubmit={event => { event.preventDefault(); void add(); }}>
       <input aria-label="Name or job title" placeholder="Name or job title..." value={controller.quickAdd} disabled={isDisabled || adding} autoComplete="off" onChange={event => { controller.setQuickAdd(event.target.value); setMessage(null); }} />
-      <button type="submit" className="button-secondary" disabled={isDisabled || adding}><span aria-hidden="true">＋ </span>Add</button>
     </form>
     {message && <p className="people-error" role="alert">{message}</p>}<hr />
     {people.length === 0 ? <p className="people-empty">No people added yet.</p> : <ul className="people-list" aria-label="People"
@@ -146,15 +154,16 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
             {removal.notice && <p>{removal.notice}</p>}<p>{describeRemoval(removal)}</p><div><button type="button" className="button-delete button-small" disabled={locked} onClick={() => void finishRemoval(removal)}><BinIcon />Remove</button><button type="button" className="button-secondary button-small" disabled={locked} onClick={() => setRemoval(null)}>Cancel</button></div>
           </div>}
           {open && <div id={`person-${person.id}`} className="people-editor"><fieldset disabled={locked}>
-            <div className="people-name-fields">
-              <label>Name<input value={values.name} autoComplete="off" onChange={event => controller.edit(person, { ...values, name: event.target.value })} /></label>
+            <div className="people-details">
+              <label>Name<input className="field" value={values.name} autoComplete="off" onChange={event => controller.edit(person, { ...values, name: event.target.value })} /></label>
               <button type="button" className="icon-button people-swap" aria-label="Swap name and job title" onClick={() => controller.edit(person, { ...values, name: values.jobTitle, jobTitle: values.name })}><SwapIcon /></button>
-              <label>Job Title<input value={values.jobTitle} autoComplete="off" onChange={event => controller.edit(person, { ...values, jobTitle: event.target.value })} /></label>
+              <label>Job Title<input className="field" value={values.jobTitle} autoComplete="off" onChange={event => controller.edit(person, { ...values, jobTitle: event.target.value })} /></label>
+              <label>Email<input className="field" type="email" value={values.email} onChange={event => controller.edit(person, { ...values, email: event.target.value })} /></label>
+              <label>Phone number<input className="field" type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label>
             </div>
-            <div className="people-contact-fields"><label>Phone number<input type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label><label>Email<input type="email" value={values.email} onChange={event => controller.edit(person, { ...values, email: event.target.value })} /></label></div>
           </fieldset></div>}
-          {draft && <div className={`people-save-status people-save-${draft.status}`} role={draft.status === "invalid" || draft.status === "failed" ? "alert" : "status"}>
-            {draft.status === "pending" ? "Not saved yet..." : draft.status === "saving" ? "Saving..." : draft.status === "saved" ? "Saved." : draft.problem}
+          {(draft?.status === "invalid" || draft?.status === "failed") && <div className={`people-save-status people-save-${draft.status}`} role="alert">
+            {draft.problem}
             {draft.status === "failed" && <button type="button" className="button-secondary button-small" disabled={locked} onClick={() => void controller.save(person.id)}>Retry</button>}
           </div>}
         </li>;

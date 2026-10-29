@@ -36,4 +36,47 @@ describe("AppMenu", () => {
     expect(notPrevented).toBe(true);
     expect(onBeforeLeave).not.toHaveBeenCalled();
   });
+
+  it("names each menu link by its screen, whatever its icon", () => {
+    render(
+      <MemoryRouter>
+        <AppMenu
+          current="/dashboard"
+          account={account}
+          onBeforeLeave={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    for (const name of ["Projects", "People"]) {
+      expect(screen.getByRole("link", { name })).toBeTruthy();
+    }
+  });
+
+  it("puts the number of projects in the Bin after its name, unless it is empty", () => {
+    const signedIn: Account = {
+      ...account,
+      view: {
+        kind: "signed-in",
+        id: "ada",
+        name: "Ada",
+        email: "a@b.c",
+        preferredName: null,
+        profile: "ready",
+      },
+    };
+    const show = (binCount: number) => (
+      <MemoryRouter>
+        <AppMenu
+          current="/dashboard"
+          account={signedIn}
+          binCount={binCount}
+          onBeforeLeave={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(show(3));
+    expect(screen.getByRole("link", { name: "Bin (3)" })).toBeTruthy();
+    rerender(show(0));
+    expect(screen.getByRole("link", { name: "Bin" })).toBeTruthy();
+  });
 });

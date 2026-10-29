@@ -5,7 +5,12 @@ import type { Route } from "./+types/dashboard";
 import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { ScreenPanel } from "../screen-panel";
-import { useScreenAccount, useScreenLeave } from "../screen-context";
+import { ProjectsIcon } from "../ui/icons";
+import {
+  useRefreshBinCount,
+  useScreenAccount,
+  useScreenLeave,
+} from "../screen-context";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
   binAccountProject,
@@ -336,6 +341,7 @@ export default function Dashboard() {
   });
 
   const account = useScreenAccount();
+  const refreshBinCount = useRefreshBinCount();
   useScreenLeave({
     onBeforeLeave: prepareToLeave,
     onLeaving: () => {
@@ -467,6 +473,7 @@ export default function Dashboard() {
         );
       }
       source.removeProject(view.generation, id);
+      refreshBinCount();
     }
     setDeletion(null);
     document.querySelector<HTMLElement>(".add-project")?.focus();
@@ -604,9 +611,7 @@ export default function Dashboard() {
       key,
       id,
       values: pickFormValues(project),
-      message: opened.account
-        ? { text: "Loading the latest copy…", isError: false }
-        : null,
+      message: null,
       barHeight,
       slot,
       isLoading: opened.account !== undefined,
@@ -1159,6 +1164,7 @@ export default function Dashboard() {
       <AssigneeTuningPanel />
       <ScreenPanel
         title="Projects"
+        icon={<ProjectsIcon />}
         className={isDropTarget ? "projects-screen is-drop-target" : "projects-screen"}
         ref={mainRef}
         tabIndex={-1}
@@ -1179,7 +1185,7 @@ export default function Dashboard() {
               )}
             <button
               type="button"
-              className="button-main add-project"
+              className="button-secondary add-project"
               disabled={isAccountUnavailable}
               onClick={openNewProject}
             >

@@ -17,14 +17,14 @@ import {
   describeBinTimeLeft,
   isPastBinPeriod,
 } from "../projects/delete-project";
-import { useScreenAccount } from "../screen-context";
+import { useRefreshBinCount, useScreenAccount } from "../screen-context";
 import { ScreenPanel } from "../screen-panel";
 import { DeleteProjectDialog } from "../projects/delete-project-dialog";
 import {
   FloatingMessages,
   useFloatingMessages,
 } from "../ui/floating-messages";
-import { BinIcon } from "../ui/icons";
+import { BinIcon, BinScreenIcon } from "../ui/icons";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Bin - Abodeo" },
@@ -50,6 +50,7 @@ export default function Bin() {
   // Nothing on this screen is left unsaved, so it registers nothing to do
   // before leaving.
   const account = useScreenAccount();
+  const refreshBinCount = useRefreshBinCount();
   const accountId = account.view.kind === "signed-in" ? account.view.id : null;
   const [loaded, setLoaded] = useState<{
     accountId: string;
@@ -76,7 +77,10 @@ export default function Bin() {
   // the projects past the cooling-off period. Changing reloadCount reads it
   // again.
   const [reloadCount, setReloadCount] = useState(0);
-  const reload = () => setReloadCount((count) => count + 1);
+  const reload = () => {
+    setReloadCount((count) => count + 1);
+    refreshBinCount();
+  };
   useEffect(() => {
     if (!accountId) return;
     let isCurrent = true;
@@ -146,7 +150,15 @@ export default function Bin() {
 
   return (
     <>
-      <ScreenPanel title="Bin" className="bin-page">
+      <ScreenPanel
+        title="Bin"
+        icon={
+          <BinScreenIcon
+            count={state.status === "ready" ? state.projects.length : 0}
+          />
+        }
+        className="bin-page"
+      >
         {account.view.kind === "checking" && <p role="status">Loading…</p>}
         {(account.view.kind === "signed-out" ||
           account.view.kind === "not-configured") && (
@@ -196,7 +208,7 @@ export default function Bin() {
                       </div>
                       <button
                         type="button"
-                        className="button-main"
+                        className="button-secondary"
                         disabled={busyId !== null}
                         onClick={() => void restore(binned)}
                       >

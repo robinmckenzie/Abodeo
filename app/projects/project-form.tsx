@@ -144,6 +144,19 @@ export function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // On appearing, scrolls the assignees so that the assigned person is at the
+  // top, or as near as the end of the list allows. After the focus above,
+  // which would otherwise only bring them into view. The offsets ignore the
+  // arrival animation's movement.
+  useEffect(() => {
+    const list = assigneeOptionsRef.current;
+    const option = list
+      ?.querySelector<HTMLElement>(`input[name="assignee"]:checked`)
+      ?.closest<HTMLElement>(".assignee-option");
+    if (!list || !option) return;
+    list.scrollTop = option.offsetTop - list.offsetTop;
+  }, []);
+
   // A field cannot take focus while the form is read-only, so the starting
   // point is focused once it can be changed, unless focus has moved since.
   const wasReadOnlyRef = useRef(isReadOnly);
@@ -304,7 +317,7 @@ export function ProjectForm({
           <label htmlFor={`${id}-title`}>Title</label>
           <input
             id={`${id}-title`}
-            className="arrives-in-turn"
+            className="field arrives-in-turn"
             style={arriveAt(1)}
             name="title"
             value={values.title}
@@ -325,7 +338,7 @@ export function ProjectForm({
           </label>
           <textarea
             id={`${id}-notes`}
-            className="arrives-in-turn"
+            className="field arrives-in-turn"
             style={arriveAt(3)}
             name="notes"
             rows={8}
@@ -414,7 +427,7 @@ function NewProjectTasks({
         Tasks
       </h3>
       <textarea
-        className="task-entry"
+        className="field task-entry"
         name="tasks"
         rows={3}
         value={text}
@@ -483,7 +496,7 @@ function AddPersonBox({
       <input
         id={id}
         name="new-person"
-        className="task-entry"
+        className="field task-entry"
         value={name}
         placeholder="Add a person"
         aria-label="Add a person"

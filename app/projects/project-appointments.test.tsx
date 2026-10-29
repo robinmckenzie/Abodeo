@@ -167,6 +167,16 @@ describe("the appointments section", () => {
     expect(list.headers.get("X-Abodeo-Account")).toBe("ada");
   });
 
+  it("shows each appointment's day as a date icon", async () => {
+    await show(fakeEndpoints());
+
+    const icon = document.querySelector(".appointment-entry .due-date-icon");
+    expect(icon?.querySelector(".due-date-icon-day")?.textContent).toBe("2");
+    expect(icon?.querySelector(".due-date-icon-month")?.textContent).toBe(
+      "November",
+    );
+  });
+
   it("says when there are none", async () => {
     const fakes = fakeEndpoints();
     fakes.endpoints.list = { status: "ok", appointments: [] };

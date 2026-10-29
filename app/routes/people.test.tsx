@@ -132,7 +132,9 @@ describe("the People screen", () => {
     expect((addBox() as HTMLInputElement).value).toBe("Unrecognised text");
     expect(screen.getByRole("alert").textContent).toMatch(/Not saved/);
     write.mockRestore();
-    await press("Add");
+    await act(async () => {
+      fireEvent.submit(addBox().closest("form")!);
+    });
     expect(names()).toEqual(["Interior designer", "Bob the plumber", "Unrecognised text"]);
   });
 

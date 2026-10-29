@@ -4,7 +4,16 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DeleteProjectDialog } from "../projects/delete-project-dialog";
 import { ProjectForm } from "../projects/project-form";
 import { newProjectFields } from "../projects/projects";
-import { ArrowIcon, BinIcon, CloseIcon, PlusIcon } from "./icons";
+import { ScreenPanel } from "../screen-panel";
+import {
+  ArrowIcon,
+  BinIcon,
+  BinScreenIcon,
+  CloseIcon,
+  PeopleIcon,
+  PlusIcon,
+  ProjectsIcon,
+} from "./icons";
 
 // jsdom has no modal dialogs, so they are stood in for.
 beforeAll(() => {
@@ -92,5 +101,56 @@ describe("the shared icons", () => {
     expect(findIcon(screen.getByRole("button", { name: "Delete" }))).toBe(
       "bin",
     );
+  });
+
+  it("draw the screen icons uncircled, with their own names", () => {
+    const { container } = render(
+      <>
+        <ProjectsIcon />
+        <PeopleIcon />
+        <BinScreenIcon />
+      </>,
+    );
+    const icons = [...container.querySelectorAll("svg")];
+    expect(icons.map((icon) => icon.getAttribute("data-icon"))).toEqual([
+      "projects",
+      "people",
+      "bin-screen",
+    ]);
+    for (const icon of icons) {
+      expect(icon.getAttribute("class")).toBe("screen-icon");
+      expect(icon.querySelector("circle")).toBeNull();
+    }
+  });
+
+  it("put a line in the bin for each project in it, up to three", () => {
+    const { container } = render(<BinScreenIcon count={5} />);
+    expect(container.querySelectorAll("path")).toHaveLength(4);
+    cleanup();
+    expect(
+      render(<BinScreenIcon count={1} />).container.querySelectorAll("path"),
+    ).toHaveLength(2);
+    cleanup();
+    expect(
+      render(<BinScreenIcon />).container.querySelectorAll("path"),
+    ).toHaveLength(1);
+  });
+
+  it("fill the bin from the bottom", () => {
+    const { container } = render(<BinScreenIcon count={2} />);
+    const lines = [...container.querySelectorAll("path")].slice(1);
+    expect(lines.map((line) => line.getAttribute("d"))).toEqual([
+      "M8.8 12.6h2.4",
+      "M8.8 10.7h2.4",
+    ]);
+  });
+
+  it("keep a screen's title name when an icon sits beside it", () => {
+    render(
+      <ScreenPanel title="People" icon={<PeopleIcon />}>
+        content
+      </ScreenPanel>,
+    );
+    expect(screen.getByRole("heading", { name: "People" })).toBeTruthy();
   });
 });

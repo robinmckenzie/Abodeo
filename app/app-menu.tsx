@@ -6,13 +6,14 @@ import { Link, useNavigate } from "react-router";
 
 import { AccountControl } from "./account/account-control";
 import type { Account } from "./account/use-account";
+import { BinScreenIcon, PeopleIcon, ProjectsIcon } from "./ui/icons";
 
 const screens = [
-  { path: "/dashboard", name: "Projects" },
-  { path: "/people", name: "People" },
+  { path: "/dashboard", name: "Projects", Icon: ProjectsIcon },
+  { path: "/people", name: "People", Icon: PeopleIcon },
   // Deleted projects (AD #62 Delete Projects), only for an account, as signed
   // out there is no Bin.
-  { path: "/bin", name: "Bin" },
+  { path: "/bin", name: "Bin", Icon: BinScreenIcon },
 ] as const;
 
 export type MenuScreen = (typeof screens)[number]["path"];
@@ -43,11 +44,14 @@ export function useScreenLinkClick(onBeforeLeave: () => Promise<boolean>) {
 export function AppMenu({
   current,
   account,
+  binCount = 0,
   onBeforeLeave,
   onLeaveFailed,
 }: {
   current: MenuScreen;
   account: Account;
+  // The number of projects in the Bin, shown after its name when not zero.
+  binCount?: number;
   // Gets the screen ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
   onLeaveFailed?: () => void;
@@ -62,14 +66,21 @@ export function AppMenu({
       <AccountControl account={account} onBeforeLeave={onBeforeLeave} onLeaveFailed={onLeaveFailed} />
       <nav className="app-menu" aria-label="Main">
         <ul className="app-menu-list">
-          {shownScreens.map(({ path, name }) => (
+          {shownScreens.map(({ path, name, Icon }) => (
             <li key={path}>
               <Link
                 to={path}
                 aria-current={path === current ? "page" : undefined}
                 onClick={getClickHandler(path, current)}
               >
-                {name}
+                {path === "/bin" ? (
+                  <BinScreenIcon count={binCount} />
+                ) : (
+                  <Icon />
+                )}
+                {path === "/bin" && binCount > 0
+                  ? `${name} (${binCount})`
+                  : name}
               </Link>
             </li>
           ))}
