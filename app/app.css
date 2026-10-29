@@ -38,6 +38,7 @@
      for the tasks, which alone grows; the middle column keeps this width. */
   --form-max-width: 90rem;
   --middle-column-width: 20rem;
+  --third-column-min-width: 16rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -1111,7 +1112,7 @@ html:has(.app-layout) {
 @media (min-width: 63rem) {
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
+    --fields-columns: minmax(var(--middle-column-width), 1fr) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1141,7 +1142,7 @@ html:has(.app-layout) {
 @media (min-width: 75rem) {
   .project-bar.is-expanded .project-form {
     --fields-display: grid;
-    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
+    --fields-columns: minmax(var(--middle-column-width), 1fr) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
