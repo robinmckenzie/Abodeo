@@ -4,6 +4,7 @@
 import { useEffect, useId, useState } from "react";
 
 import { PlusIcon } from "../ui/icons";
+import { DueDateIcon } from "./due-date-icon";
 
 import {
   addOneHour,
@@ -62,6 +63,14 @@ export function findNextLocalHour(now: Date) {
 function readDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+// The day an appointment starts, in the browser's time zone, or "" when its
+// start cannot be read.
+function findAppointmentDate(appointment: Appointment) {
+  if (appointment.allDay) return appointment.start;
+  const start = new Date(appointment.start);
+  return Number.isNaN(start.getTime()) ? "" : formatLocalDate(start);
 }
 
 // When an appointment is, in the browser's locale and time zone: a date and
@@ -200,13 +209,20 @@ function SignedInAppointments({
           <ul className="appointment-list">
             {state.appointments.map((appointment) => (
               <li key={appointment.id} className="appointment-entry">
-                <span className="appointment-title">{appointment.title}</span>
-                <span className="appointment-time">
-                  {describeAppointmentTime(appointment)}
-                </span>
-                {appointment.notes && (
-                  <span className="appointment-notes">{appointment.notes}</span>
+                {findAppointmentDate(appointment) && (
+                  <DueDateIcon dueDate={findAppointmentDate(appointment)} />
                 )}
+                <div className="appointment-text">
+                  <span className="appointment-title">{appointment.title}</span>
+                  <span className="appointment-time">
+                    {describeAppointmentTime(appointment)}
+                  </span>
+                  {appointment.notes && (
+                    <span className="appointment-notes">
+                      {appointment.notes}
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
