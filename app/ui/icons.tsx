@@ -107,11 +107,17 @@ export function PeopleIcon() {
   );
 }
 
-// A bin with its lid ajar, to tell it from the bin of a delete button.
-export function BinScreenIcon() {
+// A bin with its lid ajar, to tell it from the bin of a delete button. One
+// short line inside for each project in it, up to three: the first level with
+// the top of the bin's body, then 1.9 units apart, which is also the space
+// left below the last, and clear of the sides.
+export function BinScreenIcon({ count = 0 }: { count?: number }) {
   return (
     <ScreenIcon name="bin-screen">
       <path d="M5.5 7.4l8.4-1.7M8.6 6.9l-.1-1.3l2.6-.5M6.8 8.8l.4 5.7h5.6l.4-5.7" />
+      {Array.from({ length: Math.min(count, 3) }, (_, index) => (
+        <path key={index} d={`M8.8 ${8.8 + index * 1.9}h2.4`} />
+      ))}
     </ScreenIcon>
   );
 }

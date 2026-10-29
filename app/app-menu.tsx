@@ -73,7 +73,11 @@ export function AppMenu({
                 aria-current={path === current ? "page" : undefined}
                 onClick={getClickHandler(path, current)}
               >
-                <Icon />
+                {path === "/bin" ? (
+                  <BinScreenIcon count={binCount} />
+                ) : (
+                  <Icon />
+                )}
                 {path === "/bin" && binCount > 0
                   ? `${name} (${binCount})`
                   : name}

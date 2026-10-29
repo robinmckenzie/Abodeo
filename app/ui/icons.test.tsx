@@ -123,6 +123,19 @@ describe("the shared icons", () => {
     }
   });
 
+  it("put a line in the bin for each project in it, up to three", () => {
+    const { container } = render(<BinScreenIcon count={5} />);
+    expect(container.querySelectorAll("path")).toHaveLength(4);
+    cleanup();
+    expect(
+      render(<BinScreenIcon count={1} />).container.querySelectorAll("path"),
+    ).toHaveLength(2);
+    cleanup();
+    expect(
+      render(<BinScreenIcon />).container.querySelectorAll("path"),
+    ).toHaveLength(1);
+  });
+
   it("keep a screen's title name when an icon sits beside it", () => {
     render(
       <ScreenPanel title="People" icon={<PeopleIcon />}>

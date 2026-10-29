@@ -150,7 +150,15 @@ export default function Bin() {
 
   return (
     <>
-      <ScreenPanel title="Bin" icon={<BinScreenIcon />} className="bin-page">
+      <ScreenPanel
+        title="Bin"
+        icon={
+          <BinScreenIcon
+            count={state.status === "ready" ? state.projects.length : 0}
+          />
+        }
+        className="bin-page"
+      >
         {account.view.kind === "checking" && <p role="status">Loading…</p>}
         {(account.view.kind === "signed-out" ||
           account.view.kind === "not-configured") && (
