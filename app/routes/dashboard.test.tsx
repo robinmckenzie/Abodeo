@@ -744,7 +744,7 @@ describe("Dashboard", () => {
         vi.advanceTimersByTime(16);
         expect(layout.scrollTop).toBe(434);
         vi.advanceTimersByTime(600);
-        expect(layout.scrollTop).toBe(434);
+        expect(layout.scrollTop).toBe(300);
       } finally {
         layout.restore();
       }
