@@ -123,7 +123,6 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
     <h3>Add person</h3>
     <form className="people-quick-add" noValidate onSubmit={event => { event.preventDefault(); void add(); }}>
       <input aria-label="Name or job title" placeholder="Name or job title..." value={controller.quickAdd} disabled={isDisabled || adding} autoComplete="off" onChange={event => { controller.setQuickAdd(event.target.value); setMessage(null); }} />
-      <button type="submit" className="button-secondary" disabled={isDisabled || adding}><span aria-hidden="true">＋ </span>Add</button>
     </form>
     {message && <p className="people-error" role="alert">{message}</p>}<hr />
     {people.length === 0 ? <p className="people-empty">No people added yet.</p> : <ul className="people-list" aria-label="People"
