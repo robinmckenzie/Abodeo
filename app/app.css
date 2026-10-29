@@ -38,7 +38,7 @@
      for the tasks, which alone grows; the middle column keeps this width. */
   --form-max-width: 90rem;
   --middle-column-width: 20rem;
-  --third-column-min-width: 16rem;
+  --third-column-min-width: 24rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
