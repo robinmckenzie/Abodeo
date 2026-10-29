@@ -244,11 +244,27 @@ export function ExpandedProjectBar({
         );
       }
       if (t < 1) frame = requestAnimationFrame(follow);
-      else stop();
+      else watch();
+    };
+    // Once open, a few seconds more: contents that arrive late, such as the
+    // appointments, make the bar taller, and its foot is kept in sight too,
+    // by scrolling down only.
+    let observer: ResizeObserver | undefined;
+    let timer = 0;
+    const watch = () => {
+      if (typeof ResizeObserver === "undefined") return stop();
+      observer = new ResizeObserver(() => {
+        const target = Math.min(findEnd(), findTopEnd());
+        if (target > page.scrollTop) page.scrollTop = target;
+      });
+      observer.observe(bar);
+      timer = window.setTimeout(stop, 4000);
     };
     const byHand = ["wheel", "touchmove", "mousedown"];
     const stop = () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
+      clearTimeout(timer);
       byHand.forEach((type) => window.removeEventListener(type, stop));
       window.removeEventListener("keydown", stopOnScrollKey);
     };
