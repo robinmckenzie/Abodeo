@@ -32,6 +32,11 @@
   --icon-inset: calc((var(--icon-button-size) - var(--icon-size) * 0.9) / 2);
   --side-column: 13.5rem;
   --list-width: 43rem;
+  /* The form with a third column (AD #88): an open in-place bar's width, and
+     the floating window's. The media queries below that use them cannot read
+     variables, so their widths are written there and point back here. */
+  --form-wide-width: 59.5rem;
+  --window-wide-width: 60rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -864,6 +869,7 @@ html:has(.app-layout) {
   margin: 0;
   padding: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.625rem;
 }
 
@@ -1097,6 +1103,46 @@ html:has(.app-layout) {
 
 .project-window::backdrop {
   background: rgb(26 26 26 / 0.22);
+}
+
+/* A third column for the tasks and appointments (AD #88) when the window is
+   wide enough, switched by the window alone so that a form open while the
+   window is resized keeps its text and focus. The floating window needs about
+   63rem; an open bar in place also has the 13.5rem menu column beside it, so
+   about 75rem. The first two rules are the variables the form reads, the same
+   in both. */
+@media (min-width: 63rem) {
+  .project-window {
+    /* --window-wide-width */
+    width: min(60rem, calc(100vw - 3rem));
+  }
+
+  .project-window .project-form {
+    --fields-display: grid;
+    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-rows: auto 1fr;
+    --wrapper-display: flex;
+    --images-align: start;
+  }
+}
+
+@media (min-width: 75rem) {
+  /* --form-wide-width, centred over the narrower list. The form inside is
+     fixed at the width it ends with, so that it is laid out once and the
+     bar's growing only uncovers it. */
+  .project-bar.is-expanded {
+    justify-self: center;
+    width: var(--form-wide-width);
+  }
+
+  .project-bar.is-expanded .project-form {
+    width: calc(var(--form-wide-width) - 3rem - 2px);
+    --fields-display: grid;
+    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-rows: auto 1fr;
+    --wrapper-display: flex;
+    --images-align: start;
+  }
 }
 
 .project-form-header {
@@ -1464,10 +1510,48 @@ html:has(.app-layout) {
   font-weight: 400;
 }
 
+/* Narrow, the fields are one column, in the order title, notes, tasks,
+   images, appointments: the two wrappers add no box, and the images and
+   appointments are moved after the tasks by order. Where the window is wide
+   (see the media queries below), the wrappers are the middle and third
+   columns, set by these variables. */
 .project-form-fields {
-  display: flex;
+  display: var(--fields-display, flex);
+  flex-direction: column;
+  grid-template-columns: var(--fields-columns, none);
+  grid-template-rows: var(--fields-rows, none);
+  column-gap: 1.75rem;
+  min-width: 0;
+}
+
+.project-form-main,
+.project-form-third {
+  display: var(--wrapper-display, contents);
   flex-direction: column;
   min-width: 0;
+}
+
+.project-form-fields .project-images {
+  order: 1;
+  grid-column: 1;
+  grid-row: 2;
+  align-self: var(--images-align, stretch);
+}
+
+.project-form-fields .project-appointments {
+  order: 2;
+}
+
+.project-form-main {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* The third column spans both rows, so that however long its tasks are, the
+   extra height goes to the second row and the images stay under the notes. */
+.project-form-third {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 /* The look of a text box, date box or notes box, defined once. Each form sets
@@ -1505,19 +1589,19 @@ html:has(.app-layout) {
   outline: none;
 }
 
-.project-form-fields > input,
-.project-form-fields > textarea {
+.project-form-main > input,
+.project-form-main > textarea {
   margin-bottom: 1rem;
 }
 
-.project-form-fields > input {
+.project-form-main > input {
   font-size: 1.0625rem;
   font-weight: 700;
 }
 
 /* The notes box is as tall as its text, with room for a couple of lines when
    it is empty. */
-.project-form-fields > textarea {
+.project-form-main > textarea {
   field-sizing: content;
   min-height: 4rem;
   resize: none;
