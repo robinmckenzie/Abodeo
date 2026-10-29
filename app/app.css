@@ -37,6 +37,10 @@
      variables, so their widths are written there and point back here. */
   --form-wide-width: 59.5rem;
   --window-wide-width: 60rem;
+  /* How far they grow with the window, and the third column's share of the
+     fields, never less than 18rem. */
+  --form-max-width: 72rem;
+  --third-column-width: max(18rem, 42%);
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -1113,13 +1117,13 @@ html:has(.app-layout) {
    in both. */
 @media (min-width: 63rem) {
   .project-window {
-    /* --window-wide-width */
-    width: min(60rem, calc(100vw - 3rem));
+    /* Grows with the window from --window-wide-width (60rem) to --form-max-width. */
+    width: min(var(--form-max-width), calc(100vw - 3rem));
   }
 
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-columns: minmax(0, 1fr) var(--third-column-width);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1132,13 +1136,18 @@ html:has(.app-layout) {
      bar's growing only uncovers it. */
   .project-bar.is-expanded {
     justify-self: center;
-    width: var(--form-wide-width);
+    --bar-wide-width: clamp(
+      var(--form-wide-width),
+      calc(100vw - 15rem),
+      var(--form-max-width)
+    );
+    width: var(--bar-wide-width);
   }
 
   .project-bar.is-expanded .project-form {
-    width: calc(var(--form-wide-width) - 3rem - 2px);
+    width: calc(var(--bar-wide-width) - 3rem - 2px);
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-columns: minmax(0, 1fr) var(--third-column-width);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
