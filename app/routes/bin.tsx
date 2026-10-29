@@ -24,7 +24,7 @@ import {
   FloatingMessages,
   useFloatingMessages,
 } from "../ui/floating-messages";
-import { BinIcon } from "../ui/icons";
+import { BinIcon, BinScreenIcon } from "../ui/icons";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Bin - Abodeo" },
@@ -146,7 +146,7 @@ export default function Bin() {
 
   return (
     <>
-      <ScreenPanel title="Bin" className="bin-page">
+      <ScreenPanel title="Bin" icon={<BinScreenIcon />} className="bin-page">
         {account.view.kind === "checking" && <p role="status">Loading…</p>}
         {(account.view.kind === "signed-out" ||
           account.view.kind === "not-configured") && (

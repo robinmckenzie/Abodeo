@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Route } from "./+types/people";
 import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
-import { ArrowIcon, BinIcon, DragHandleIcon, SwapIcon } from "../ui/icons";
+import {
+  ArrowIcon,
+  BinIcon,
+  DragHandleIcon,
+  PeopleIcon,
+  SwapIcon,
+} from "../ui/icons";
 import { describePerson, findSubtitle, type Person } from "../projects/people";
 import { PeopleDrafts } from "../projects/people-drafts";
 import { describePersonFailure } from "../projects/people-messages";
@@ -41,7 +47,7 @@ export default function People() {
     }
   }, [identity, view, source, stores]);
   const controller = identity === null ? undefined : controllers.get(identity);
-  return <ScreenPanel title="People" className="people-page">
+  return <ScreenPanel title="People" icon={<PeopleIcon />} className="people-page">
       <p className="people-hint">Projects can be assigned to the people listed here. {account.view.kind === "signed-in" ? "They are kept in your account." : "They are kept in this browser."}</p>
       {view.status === "loading" && <p role="status">Loading...</p>}
       {view.status === "unavailable" && <p role="alert">Your people cannot be loaded right now. Please try again later.</p>}

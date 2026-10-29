@@ -1,5 +1,5 @@
 // Every icon is drawn once, here, in a 20-unit square with the same thin
-// circle around it (AD #99 Layout and Style Tidy). The size, line weight and
+// circle around it (AD #99 Layout and Style Tidy), apart from the screens'. The size, line weight and
 // colour come from the shared values in app.css, so that icons of one kind
 // look alike wherever they are used. The bin means remove, and the X means
 // close.
@@ -66,6 +66,53 @@ export function SwapIcon() {
     <CircledIcon name="swap">
       <path d="M6.2 7.6h7.6M11.25 5.05l2.55 2.55-2.55 2.55M13.8 12.4H6.2M8.75 9.85L6.2 12.4l2.55 2.55" />
     </CircledIcon>
+  );
+}
+
+// The icons of the three screens, in the menu and beside each screen's title.
+// Not circled: they name a place, not an action. The line weight is set in
+// app.css.
+function ScreenIcon({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <svg
+      viewBox="4 4 12 12"
+      aria-hidden="true"
+      className="screen-icon"
+      data-icon={name}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function ProjectsIcon() {
+  return (
+    <ScreenIcon name="projects">
+      <path d="M5.5 7.5v6.5h9V8.8H10.2L9 7.5H5.5z" />
+    </ScreenIcon>
+  );
+}
+
+export function PeopleIcon() {
+  return (
+    <ScreenIcon name="people">
+      <path d="M8.2 6.6a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4M5 14c0-1.9 1.4-3 3.2-3s3.2 1.1 3.2 3M12.6 7.2a1.4 1.4 0 1 0 0 2.8a1.4 1.4 0 1 0 0-2.8M12.8 11.2c1.4 0 2.4 1 2.4 2.8" />
+    </ScreenIcon>
+  );
+}
+
+// A bin with its lid ajar, to tell it from the bin of a delete button.
+export function BinScreenIcon() {
+  return (
+    <ScreenIcon name="bin-screen">
+      <path d="M5.5 7.4l8.4-1.7M8.6 6.9l-.1-1.3l2.6-.5M6.8 8.8l.4 5.7h5.6l.4-5.7" />
+    </ScreenIcon>
   );
 }
 

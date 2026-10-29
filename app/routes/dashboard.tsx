@@ -5,6 +5,7 @@ import type { Route } from "./+types/dashboard";
 import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { ScreenPanel } from "../screen-panel";
+import { ProjectsIcon } from "../ui/icons";
 import { useScreenAccount, useScreenLeave } from "../screen-context";
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
@@ -1157,6 +1158,7 @@ export default function Dashboard() {
       <AssigneeTuningPanel />
       <ScreenPanel
         title="Projects"
+        icon={<ProjectsIcon />}
         className={isDropTarget ? "projects-screen is-drop-target" : "projects-screen"}
         ref={mainRef}
         tabIndex={-1}

@@ -23,6 +23,12 @@
   --icon-size: 1.375rem;
   --delete-icon-size: 1.5rem;
   --icon-stroke: 1;
+  /* The three screens' icons are drawn in a 12-unit square, so their line is
+     in those units: 2px in the menu (2.5px for the screen shown) and 2.5px in
+     a heading, which is drawn at 1.75rem. */
+  --screen-icon-stroke: 1;
+  --screen-icon-stroke-strong: 1.25;
+  --screen-icon-stroke-heading: 1.07;
   --icon-inset: calc((var(--icon-button-size) - var(--icon-size) * 0.9) / 2);
   --side-column: 13.5rem;
   --list-width: 43rem;
@@ -789,8 +795,22 @@ html:has(.app-layout) {
 /* The screen's title, level with Add project and at the left edge of the
    project boxes. */
 .screen-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   align-self: center;
   margin: 0 auto 0 0;
+}
+
+/* The screen's icon, a larger version of the menu's. */
+.screen-title h2 .screen-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--ink);
+}
+
+.screen-title h2 .screen-icon path {
+  stroke-width: var(--screen-icon-stroke-heading);
 }
 
 /* While the account's projects are unavailable, Add project is disabled, and
@@ -2260,7 +2280,9 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .app-menu-list a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.4rem 0.75rem;
   border-radius: 8px;
   color: inherit;
@@ -2273,6 +2295,37 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 .app-menu-list a[aria-current="page"] {
   font-weight: 600;
+}
+
+/* The screens' icons (icons.tsx): lighter in the menu, darker on hover, and
+   dark with a heavier line for the screen shown, as its name is bold. */
+.screen-icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.screen-icon path {
+  stroke-width: var(--screen-icon-stroke);
+}
+
+.app-menu-list .screen-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--muted);
+}
+
+.app-menu-list a:hover .screen-icon,
+.app-menu-list a[aria-current="page"] .screen-icon {
+  color: var(--ink);
+}
+
+.app-menu-list a[aria-current="page"] .screen-icon path {
+  stroke-width: var(--screen-icon-stroke-strong);
 }
 
 /* The people in Assigned To scroll when there are many, and the box to add
