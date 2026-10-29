@@ -2,10 +2,11 @@
 // Tidy): the left-hand column with the logo, the account area and the menu,
 // and the signed-in account, looked up once. The screen itself is the outlet,
 // and tells the layout how it is left through useScreenLeave.
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { useAccount } from "../account/use-account";
+import { loadAccountBin } from "../projects/account-projects";
 import { AppMenu, useScreenLinkClick, type MenuScreen } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
 import type { ScreenContext, ScreenLeave } from "../screen-context";
@@ -27,7 +28,32 @@ export default function AppLayout() {
   const getClickHandler = useScreenLinkClick(
     async () => (await leaveRef.current.onBeforeLeave?.()) ?? true,
   );
-  const context: ScreenContext = { account, leaveRef };
+
+  // How many projects are in the Bin, for the menu. Unknown until read, and
+  // when it cannot be read.
+  const accountId = account.view.kind === "signed-in" ? account.view.id : null;
+  const [binCount, setBinCount] = useState<{
+    accountId: string;
+    count: number;
+  } | null>(null);
+  const [binReloadCount, setBinReloadCount] = useState(0);
+  useEffect(() => {
+    if (!accountId) return;
+    let isCurrent = true;
+    void loadAccountBin(accountId).then((result) => {
+      if (isCurrent && result.ok) {
+        setBinCount({ accountId, count: result.projects.length });
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [accountId, binReloadCount]);
+  const context: ScreenContext = {
+    account,
+    leaveRef,
+    refreshBinCount: () => setBinReloadCount((count) => count + 1),
+  };
 
   return (
     <div
@@ -48,6 +74,9 @@ export default function AppLayout() {
         <AppMenu
           current={current}
           account={account}
+          binCount={
+            binCount && binCount.accountId === accountId ? binCount.count : 0
+          }
           onBeforeLeave={async () =>
             (await leaveRef.current.onBeforeLeave?.()) ?? true
           }

@@ -1097,7 +1097,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       expect(accountProject(server, "a1")).toBeUndefined();
       expect(screen.queryByRole("button", { name: /Old/ })).toBeNull();
       expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
-      expect(screen.getByRole("link", { name: "Bin" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Bin (1)" })).toBeTruthy();
     });
 
     it("saves a change still waiting before deleting, and does not bring the project back", async () => {

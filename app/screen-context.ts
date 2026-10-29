@@ -19,10 +19,17 @@ export type ScreenLeave = {
 export type ScreenContext = {
   account: Account;
   leaveRef: RefObject<ScreenLeave>;
+  // Reads the number of projects in the Bin again, for the menu, after a
+  // screen has put one in or taken one out.
+  refreshBinCount: () => void;
 };
 
 export function useScreenAccount(): Account {
   return useOutletContext<ScreenContext>().account;
+}
+
+export function useRefreshBinCount(): () => void {
+  return useOutletContext<ScreenContext>().refreshBinCount;
 }
 
 // Registers the screen's handlers with the layout, the latest on every

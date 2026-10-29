@@ -44,11 +44,14 @@ export function useScreenLinkClick(onBeforeLeave: () => Promise<boolean>) {
 export function AppMenu({
   current,
   account,
+  binCount = 0,
   onBeforeLeave,
   onLeaveFailed,
 }: {
   current: MenuScreen;
   account: Account;
+  // The number of projects in the Bin, shown after its name when not zero.
+  binCount?: number;
   // Gets the screen ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
   onLeaveFailed?: () => void;
@@ -71,7 +74,9 @@ export function AppMenu({
                 onClick={getClickHandler(path, current)}
               >
                 <Icon />
-                {name}
+                {path === "/bin" && binCount > 0
+                  ? `${name} (${binCount})`
+                  : name}
               </Link>
             </li>
           ))}
