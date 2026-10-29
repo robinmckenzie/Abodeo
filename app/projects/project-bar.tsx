@@ -179,7 +179,15 @@ export function ExpandedProjectBar({
     const bar = barRef.current;
     if (!page || !bar) return;
     const start = page.scrollTop;
-    const height = bar.offsetHeight;
+    const startHeight = bar.offsetHeight;
+    // The bar's full height now, which can be more than at the start if its
+    // contents (such as the images) arrive while it opens. The bar's own
+    // height is the animated one, so its contents' height is read instead.
+    const findHeight = () =>
+      Math.max(
+        startHeight,
+        bar.scrollHeight + bar.offsetHeight - bar.clientHeight,
+      );
     // Found again as the bar grows, as the page's end moves with it, and
     // the bar itself moves up if a project above it squashes closed. Down
     // only as far as needed to show the bar, but up if its top would
@@ -201,7 +209,7 @@ export function ExpandedProjectBar({
       calculateBarScrollEnd({
         start,
         barTop: findBarTop(),
-        height,
+        height: findHeight(),
         viewportHeight: page.clientHeight,
         pageEnd: page.scrollHeight - page.clientHeight,
         scrollsToPageEnd,
