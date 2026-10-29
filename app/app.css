@@ -32,11 +32,12 @@
   --icon-inset: calc((var(--icon-button-size) - var(--icon-size) * 0.9) / 2);
   --side-column: 13.5rem;
   --list-width: 43rem;
-  /* The form with a third column (AD #88): an open in-place bar's width, and
-     the floating window's. The media queries below that use them cannot read
-     variables, so their widths are written there and point back here. */
-  --form-wide-width: 59.5rem;
-  --window-wide-width: 60rem;
+  /* The form (AD #88): the floating window and an open in-place bar keep
+     growing with the window up to this width. From a width written in the
+     media queries below (they cannot read variables), it has a third column
+     for the tasks, which alone grows; the middle column keeps this width. */
+  --form-max-width: 90rem;
+  --middle-column-width: 20rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -505,7 +506,7 @@ body:has(.app-layout) {
    title so that the account panel opens over it. That panel then has the
    window's height to fit in, and scrolls within it: it starts 16rem down,
    under the logo and the account button, and 1rem is left below it. */
-@media (min-width: 40.01rem) {
+@media (min-width: 50.01rem) {
   .app-layout > header {
     position: sticky;
     top: 0;
@@ -665,11 +666,7 @@ body:has(.app-layout) {
 
 /* On a phone the left-hand column would leave too little room for the
    list, so the logo goes above it. */
-@media (max-width: 40rem) {
-  :root {
-    --screen-top: 1rem;
-  }
-
+@media (max-width: 50rem) {
   .app-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1091,7 +1088,7 @@ html:has(.app-layout) {
 
 .project-window {
   scrollbar-gutter: stable;
-  width: min(44rem, calc(100vw - 3rem));
+  width: min(var(--form-max-width), calc(100vw - 3rem));
   max-height: calc(100dvh - 3rem);
   padding: 1.25rem 1.75rem 1.5rem;
   border: 0;
@@ -1112,33 +1109,39 @@ html:has(.app-layout) {
    about 75rem. The first two rules are the variables the form reads, the same
    in both. */
 @media (min-width: 63rem) {
-  .project-window {
-    /* --window-wide-width */
-    width: min(60rem, calc(100vw - 3rem));
-  }
-
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
   }
 }
 
-@media (min-width: 75rem) {
-  /* --form-wide-width, centred over the narrower list. The form inside is
-     fixed at the width it ends with, so that it is laid out once and the
-     bar's growing only uncovers it. */
+/* An open bar grows with the window once it is wider than the list (the
+   menu column and the panel's sides take 15rem), centred over the list. The
+   form inside is fixed at the width the bar ends with, so that it is laid out
+   once and the bar's growing only uncovers it. */
+@media (min-width: 58rem) {
   .project-bar.is-expanded {
     justify-self: center;
-    width: var(--form-wide-width);
+    --bar-wide-width: clamp(
+      var(--list-width),
+      calc(100vw - 15rem),
+      var(--form-max-width)
+    );
+    width: var(--bar-wide-width);
   }
 
   .project-bar.is-expanded .project-form {
-    width: calc(var(--form-wide-width) - 3rem - 2px);
+    width: calc(var(--bar-wide-width) - 3rem - 2px);
+  }
+}
+
+@media (min-width: 75rem) {
+  .project-bar.is-expanded .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) 18rem;
+    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;

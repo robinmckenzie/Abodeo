@@ -10,6 +10,7 @@ import { loadAccountBin } from "../projects/account-projects";
 import { AppMenu, useScreenLinkClick, type MenuScreen } from "../app-menu";
 import logo from "../images/abodeo-home-logo.jpeg";
 import type { ScreenContext, ScreenLeave } from "../screen-context";
+import { useKeepScrollOnResize } from "./use-keep-scroll-on-resize";
 
 // Whether each screen's title stays in view while its content scrolls. One
 // switch, so that it can be tried and taken away: the style is under the
@@ -17,6 +18,7 @@ import type { ScreenContext, ScreenLeave } from "../screen-context";
 const isScreenTitleSticky = true;
 
 export default function AppLayout() {
+  useKeepScrollOnResize();
   const pathname = useLocation().pathname;
   const current = pathname as MenuScreen;
   const leaveRef = useRef<ScreenLeave>({});
