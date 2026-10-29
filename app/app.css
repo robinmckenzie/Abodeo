@@ -38,6 +38,7 @@
      for the tasks, which alone grows; the middle column keeps this width. */
   --form-max-width: 90rem;
   --middle-column-width: 20rem;
+  --third-column-min-width: 24rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -1111,7 +1112,7 @@ html:has(.app-layout) {
 @media (min-width: 63rem) {
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
+    --fields-columns: minmax(var(--middle-column-width), auto) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1141,7 +1142,7 @@ html:has(.app-layout) {
 @media (min-width: 75rem) {
   .project-bar.is-expanded .project-form {
     --fields-display: grid;
-    --fields-columns: var(--middle-column-width) minmax(0, 1fr);
+    --fields-columns: minmax(var(--middle-column-width), auto) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1728,6 +1729,28 @@ html:has(.app-layout) {
 .task.is-done .task-title {
   color: #8a8478;
   text-decoration: line-through;
+}
+
+/* Sized by the task's saved title, as the button is, so that the third column
+   neither shrinks when a task is edited nor moves while it is typed in. */
+.task-title-box {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title-box::after {
+  content: attr(data-title);
+  grid-area: 1 / 1;
+  visibility: hidden;
+  padding: 0.3125rem 0.375rem;
+  border: 1px solid transparent;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.task-title-box > .task-title-input {
+  grid-area: 1 / 1;
 }
 
 .task-title-input {

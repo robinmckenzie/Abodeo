@@ -446,33 +446,35 @@ export function TaskList({
                   }}
                 />
                 {isEditing ? (
-                  <textarea
-                    ref={titleInputRef}
-                    className="task-title-input"
-                    rows={1}
-                    value={editing.draft}
-                    aria-label={`Title of task ${task.title}`}
-                    autoComplete="off"
-                    autoFocus
-                    onFocus={(event) => {
-                      const at = caretRef.current ?? event.target.value.length;
-                      caretRef.current = null;
-                      event.target.setSelectionRange(at, at);
-                    }}
-                    onChange={(event) => changeDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.nativeEvent.isComposing) return;
-                      if (event.key !== "Enter" && event.key !== "Escape") {
-                        return;
-                      }
-                      // Kept from the form, so that Escape does not close
-                      // the project and Enter does not submit it.
-                      event.preventDefault();
-                      focusAfterRenderRef.current = titleSelector(task.id);
-                      finishEdit(event.key === "Enter");
-                    }}
-                    onBlur={() => finishEdit(true)}
-                  />
+                  <span className="task-title-box" data-title={task.title}>
+                    <textarea
+                      ref={titleInputRef}
+                      className="task-title-input"
+                      rows={1}
+                      value={editing.draft}
+                      aria-label={`Title of task ${task.title}`}
+                      autoComplete="off"
+                      autoFocus
+                      onFocus={(event) => {
+                        const at = caretRef.current ?? event.target.value.length;
+                        caretRef.current = null;
+                        event.target.setSelectionRange(at, at);
+                      }}
+                      onChange={(event) => changeDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.nativeEvent.isComposing) return;
+                        if (event.key !== "Enter" && event.key !== "Escape") {
+                          return;
+                        }
+                        // Kept from the form, so that Escape does not close
+                        // the project and Enter does not submit it.
+                        event.preventDefault();
+                        focusAfterRenderRef.current = titleSelector(task.id);
+                        finishEdit(event.key === "Enter");
+                      }}
+                      onBlur={() => finishEdit(true)}
+                    />
+                  </span>
                 ) : (
                   <button
                     type="button"
