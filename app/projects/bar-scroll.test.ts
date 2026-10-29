@@ -25,7 +25,7 @@ describe("calculateBarTopLimit", () => {
 });
 
 describe("calculateBarScrollEnd", () => {
-  it("leaves the page alone when the bar already fits", () => {
+  it("keeps the page at its top when the bar is near it and fits", () => {
     expect(
       calculateBarScrollEnd({
         ...view,
@@ -36,7 +36,7 @@ describe("calculateBarScrollEnd", () => {
     ).toBe(0);
   });
 
-  it("scrolls just far enough to show the foot of a short bar", () => {
+  it("centres a short bar in the window", () => {
     expect(
       calculateBarScrollEnd({
         ...view,
@@ -44,10 +44,10 @@ describe("calculateBarScrollEnd", () => {
         height: 300,
         stickyOffset: 0,
       }),
-    ).toBe(216);
+    ).toBe(450);
   });
 
-  it("shows the foot of a short bar the same with a sticky title", () => {
+  it("centres a short bar below a sticky title", () => {
     expect(
       calculateBarScrollEnd({
         ...view,
@@ -55,7 +55,7 @@ describe("calculateBarScrollEnd", () => {
         height: 300,
         stickyOffset: 100,
       }),
-    ).toBe(216);
+    ).toBe(400);
   });
 
   it("stops a tall bar with its top at the window's top", () => {

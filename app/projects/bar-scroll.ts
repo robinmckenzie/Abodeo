@@ -15,11 +15,10 @@ export function calculateBarTopLimit({
   return barTop - stickyOffset - margin;
 }
 
-// Where the page scrolls to: no further up than where it started, down just
-// far enough to show the bar's foot, or the page's end for a new project, and
-// never so far down that the bar's top goes out of sight. The foot is shown
-// whatever sticks above it, as the bar has the whole window below its top to
-// grow into.
+// Where the page scrolls to: the bar centred in the window below any sticky
+// title, or the page's end for a new project, but never so far down that the
+// bar's top goes out of sight. A bar too tall to centre therefore has its top
+// kept in sight, and its foot goes off the bottom.
 export function calculateBarScrollEnd({
   start,
   barTop,
@@ -39,10 +38,10 @@ export function calculateBarScrollEnd({
   stickyOffset: number;
   margin: number;
 }) {
-  const footTarget = barTop + height + margin - viewportHeight;
-  const end = scrollsToPageEnd ? pageEnd : footTarget;
-  return Math.min(
-    Math.max(start, end),
-    calculateBarTopLimit({ barTop, stickyOffset, margin }),
-  );
+  const centreTarget =
+    barTop - stickyOffset - (viewportHeight - stickyOffset - height) / 2;
+  const end = scrollsToPageEnd
+    ? Math.max(start, pageEnd)
+    : Math.max(0, centreTarget);
+  return Math.min(end, calculateBarTopLimit({ barTop, stickyOffset, margin }));
 }
