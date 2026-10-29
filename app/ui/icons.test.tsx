@@ -136,6 +136,15 @@ describe("the shared icons", () => {
     ).toHaveLength(1);
   });
 
+  it("fill the bin from the bottom", () => {
+    const { container } = render(<BinScreenIcon count={2} />);
+    const lines = [...container.querySelectorAll("path")].slice(1);
+    expect(lines.map((line) => line.getAttribute("d"))).toEqual([
+      "M8.8 12.6h2.4",
+      "M8.8 10.7h2.4",
+    ]);
+  });
+
   it("keep a screen's title name when an icon sits beside it", () => {
     render(
       <ScreenPanel title="People" icon={<PeopleIcon />}>
