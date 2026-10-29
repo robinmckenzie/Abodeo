@@ -38,10 +38,10 @@
   --form-wide-width: 59.5rem;
   --window-wide-width: 60rem;
   /* How far they grow with the window. The middle and third columns grow by
-     the same amount, the middle always this much wider than half of the
-     room, and the third this much narrower. */
+     the same amount, the third (the tasks) always this much wider than half of
+     the room, and the middle this much narrower. */
   --form-max-width: 90rem;
-  --column-offset: 3rem;
+  --column-offset: 0rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -1124,8 +1124,8 @@ html:has(.app-layout) {
 
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(0, calc(50% - 0.875rem + var(--column-offset)))
-      minmax(0, calc(50% - 0.875rem - var(--column-offset)));
+    --fields-columns: minmax(0, calc(50% - 0.875rem - var(--column-offset)))
+      minmax(0, calc(50% - 0.875rem + var(--column-offset)));
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1149,8 +1149,8 @@ html:has(.app-layout) {
   .project-bar.is-expanded .project-form {
     width: calc(var(--bar-wide-width) - 3rem - 2px);
     --fields-display: grid;
-    --fields-columns: minmax(0, calc(50% - 0.875rem + var(--column-offset)))
-      minmax(0, calc(50% - 0.875rem - var(--column-offset)));
+    --fields-columns: minmax(0, calc(50% - 0.875rem - var(--column-offset)))
+      minmax(0, calc(50% - 0.875rem + var(--column-offset)));
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
