@@ -32,6 +32,7 @@
 - Do not plan, build, test or review for rare cases, odd or recovered states, or returning users. Cover what a normal path meets. Note a rare case in the pull request, without asking for a decision or opening a ticket. Reviews report only problems that a normal path meets.
 - Only Robin, the friend and perhaps one prospective employer have the link. Assume nobody else will ever see the app, and treat nothing they do as noise: each visit or action matters to Robin, so do not filter or limit what Robin is told about it. Do not plan, build, test or review for attack, abuse, forgery, load or misuse; two tabs or devices at once; full storage; old browsers, JavaScript off or poor networks; accessibility; privacy notices; backups, rollbacks or monitoring; or browser storage left by older versions. Do care about database migrations, losing data when a save fails, time zones (the friend is in Switzerland), and the cost and quotas of services.
 - This does not relax secret handling, the security rules, or the Saved data rules.
+- A plan and its Codex review each check the plan against this section. Hardening beyond a normal path is a defect to remove, not a finding to add.
 
 ## Ticket writing
 
