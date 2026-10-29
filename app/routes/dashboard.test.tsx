@@ -669,7 +669,7 @@ describe("Dashboard", () => {
   // on a page of pageHeight. A 16-pixel margin is kept from the window's
   // edges.
   it.each([
-    ["an opened project to show its foot", false, 800, 600, 2000, 516],
+    ["an opened project to centre it", false, 800, 600, 2000, 650],
     ["an opened project only when it does not fit", false, 100, 600, 2000, 0],
     ["a tall opened project only to its top", false, 800, 1200, 2500, 784],
     ["a new project to the page's end", true, 800, 600, 1500, 600],
@@ -699,10 +699,10 @@ describe("Dashboard", () => {
     layout.scrollTop = 700;
     try {
       fireEvent.click(bars()[0]);
-      expect(layout.scrollTop).toBe(716);
+      expect(layout.scrollTop).toBe(850);
       layout.barTop = 450;
       await act(() => new Promise(requestAnimationFrame));
-      expect(layout.scrollTop).toBe(434);
+      expect(layout.scrollTop).toBe(300);
     } finally {
       layout.restore();
     }
@@ -793,7 +793,7 @@ describe("Dashboard", () => {
       }
     });
 
-    it("arrives at the foot as the bar finishes expanding", async () => {
+    it("arrives at the centre as the bar finishes expanding", async () => {
       await renderDashboard();
       await addProject("Kitchen");
       pressKey("e");
@@ -805,7 +805,7 @@ describe("Dashboard", () => {
       try {
         fireEvent.click(bars()[0]);
         vi.advanceTimersByTime(600);
-        expect(layout.scrollTop).toBe(516);
+        expect(layout.scrollTop).toBe(650);
       } finally {
         layout.restore();
       }
