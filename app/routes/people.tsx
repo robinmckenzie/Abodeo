@@ -68,6 +68,9 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
   useEffect(() => {
     const close = (event: PointerEvent) => {
       const editor = panel.current?.querySelector(".people-item.is-expanded");
+      // Closing here would move the rows before the click lands on another
+      // person's button, which switches to that person itself.
+      if ((event.target as Element).closest(".people-expand")) return;
       if (!editor?.contains(event.target as Node)) setExpanded(null);
     };
     document.addEventListener("pointerdown", close);
