@@ -96,10 +96,11 @@ describe("readVisitAlertSettings hourly limit", () => {
 });
 
 describe("formatVisitAlert", () => {
-  it("names the welcome link when there is no label", () => {
+  it("names an unknown visitor when there is no label", () => {
     const { subject, text } = formatVisitAlert(alert);
-    expect(subject).toBe("Abodeo visit: welcome link");
-    expect(text).toContain("no label (the welcome link)");
+    expect(subject).toBe("Abodeo visit: Unknown visitor");
+    expect(text).toContain("unknown visitor (no label)");
+    expect(text).toContain("Welcome screen requested: yes");
     expect(text).toContain("Place: Leeds, GB");
     expect(text).toContain("2026-10-26T12:00:00.000Z");
   });
@@ -133,7 +134,7 @@ describe("sendVisitAlert", () => {
     expect(JSON.parse(init.body as string)).toMatchObject({
       from: "onboarding@resend.dev",
       to: ["robin@example.com"],
-      subject: "Abodeo visit: welcome link",
+      subject: "Abodeo visit: Unknown visitor",
     });
   });
 

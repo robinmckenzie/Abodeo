@@ -47,15 +47,15 @@ export type VisitDependencies = {
   alerts: VisitAlertSettings | undefined;
 };
 
-// A visit is worth an email when it is not a bot's and it either has a label
-// that is not ignored or asks for the welcome screen with no label, which is
-// the link Robin gave out.
+// A visit is worth an email when it is not a bot's and its label, if it has
+// one, is not ignored. A visit with no label qualifies, with or without
+// ?welcome (AD #106 Email Alerts For Unlabelled Visits).
 export function isAlertCandidate(
   visit: Visit,
   ignoredLabels: string[],
 ): boolean {
   if (visit.isBot) return false;
-  if (visit.label === "") return visit.welcome;
+  if (visit.label === "") return true;
   return !ignoredLabels.includes(visit.label.toLowerCase());
 }
 
