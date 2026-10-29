@@ -64,7 +64,7 @@ export function ArrowIcon({
 export function SwapIcon() {
   return (
     <CircledIcon name="swap">
-      <path d="M4.9 7.6h10.2M12.55 5.05l2.55 2.55-2.55 2.55M15.1 12.4H4.9M7.45 9.85L4.9 12.4l2.55 2.55" />
+      <path d="M6.2 7.6h7.6M11.25 5.05l2.55 2.55-2.55 2.55M13.8 12.4H6.2M8.75 9.85L6.2 12.4l2.55 2.55" />
     </CircledIcon>
   );
 }
