@@ -1600,6 +1600,13 @@ html:has(.app-layout) {
   bottom: -1px;
 }
 
+/* Level with the title's first line (the row's padding, the title's border and
+   padding, and half a line, less half the box), however many lines it wraps to. */
+.task .checkbox {
+  align-self: flex-start;
+  margin-top: calc(3px + 0.3125rem + 0.75rem - 0.53125rem);
+}
+
 .task-drag {
   display: grid;
   place-items: center;
