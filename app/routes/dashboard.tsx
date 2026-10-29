@@ -1185,7 +1185,7 @@ export default function Dashboard() {
               )}
             <button
               type="button"
-              className="button-main add-project"
+              className="button-secondary add-project"
               disabled={isAccountUnavailable}
               onClick={openNewProject}
             >

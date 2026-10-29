@@ -208,7 +208,7 @@ export default function Bin() {
                       </div>
                       <button
                         type="button"
-                        className="button-main"
+                        className="button-secondary"
                         disabled={busyId !== null}
                         onClick={() => void restore(binned)}
                       >
