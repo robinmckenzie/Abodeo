@@ -11,6 +11,7 @@
 - If an issue has no stage label, or more than one, stop and ask Robin.
 - Apply the `Agreed` label only when Robin has said that that ticket is agreed. Do not begin planning or implementation before it is applied.
 - Investigation is allowed at any stage, and is read-only except for recording findings on the ticket.
+- Save a ticket's plan to `.review/<number>-plan.md`, kept out of Git through `.git/info/exclude`.
 - If investigation or planning leads to an agreed change in requirements, update the ticket and record the decision in a comment before implementing it.
 - Agents act in GitHub under Robin's account, so these rules, and not GitHub, set what an agent may do there:
     - Without asking, in the project being worked on: create, read and comment on tickets, and edit a STUB or DRAFT.
