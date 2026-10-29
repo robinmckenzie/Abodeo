@@ -39,7 +39,7 @@
   --window-wide-width: 60rem;
   /* How far they grow with the window, and the third column's share of the
      fields, never less than 18rem. */
-  --form-max-width: 72rem;
+  --form-max-width: 90rem;
   --third-column-width: max(18rem, 42%);
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
