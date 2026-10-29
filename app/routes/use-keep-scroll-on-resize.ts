@@ -8,11 +8,22 @@ export function useKeepScrollOnResize() {
   useEffect(() => {
     const page = document.scrollingElement;
     if (!page) return;
-    // The panel's distance from the top of the page, which is the menu's
-    // height when the menu is above it and nothing when it is beside it.
+    // The distance from the top of the page to where the screen's content
+    // starts: the menu's height when the menu is above the panel, and the
+    // space the screen leaves above its title, which differs between the two
+    // layouts.
     const findPanelTop = () => {
       const panel = document.querySelector(".screen-panel");
-      return panel ? panel.getBoundingClientRect().top + page.scrollTop : null;
+      if (!panel) return null;
+      const root = getComputedStyle(document.documentElement);
+      const screenTop =
+        Number.parseFloat(root.getPropertyValue("--screen-top")) *
+        Number.parseFloat(root.fontSize);
+      return (
+        panel.getBoundingClientRect().top +
+        page.scrollTop +
+        (Number.isFinite(screenTop) ? screenTop : 0)
+      );
     };
     let panelTop = findPanelTop();
     const keep = () => {
