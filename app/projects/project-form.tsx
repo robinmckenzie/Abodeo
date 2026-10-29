@@ -144,6 +144,22 @@ export function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // On appearing, scrolls the assignees so that the assigned person is in the
+  // middle, or as near as the ends of the list allow. After the focus above,
+  // which would otherwise only bring them into view. The offsets ignore the
+  // arrival animation's movement.
+  useEffect(() => {
+    const list = assigneeOptionsRef.current;
+    const option = list
+      ?.querySelector<HTMLElement>(`input[name="assignee"]:checked`)
+      ?.closest<HTMLElement>(".assignee-option");
+    if (!list || !option) return;
+    list.scrollTop =
+      option.offsetTop -
+      list.offsetTop -
+      (list.clientHeight - option.offsetHeight) / 2;
+  }, []);
+
   // A field cannot take focus while the form is read-only, so the starting
   // point is focused once it can be changed, unless focus has moved since.
   const wasReadOnlyRef = useRef(isReadOnly);
