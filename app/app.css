@@ -506,7 +506,7 @@ body:has(.app-layout) {
    title so that the account panel opens over it. That panel then has the
    window's height to fit in, and scrolls within it: it starts 16rem down,
    under the logo and the account button, and 1rem is left below it. */
-@media (min-width: 40.01rem) {
+@media (min-width: 50.01rem) {
   .app-layout > header {
     position: sticky;
     top: 0;
@@ -666,7 +666,7 @@ body:has(.app-layout) {
 
 /* On a phone the left-hand column would leave too little room for the
    list, so the logo goes above it. */
-@media (max-width: 40rem) {
+@media (max-width: 50rem) {
   :root {
     --screen-top: 1rem;
   }
