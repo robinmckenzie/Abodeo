@@ -1112,7 +1112,7 @@ html:has(.app-layout) {
 @media (min-width: 63rem) {
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(var(--middle-column-width), 1fr) minmax(var(--third-column-min-width), max-content);
+    --fields-columns: minmax(var(--middle-column-width), auto) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1142,7 +1142,7 @@ html:has(.app-layout) {
 @media (min-width: 75rem) {
   .project-bar.is-expanded .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(var(--middle-column-width), 1fr) minmax(var(--third-column-min-width), max-content);
+    --fields-columns: minmax(var(--middle-column-width), auto) minmax(var(--third-column-min-width), max-content);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
