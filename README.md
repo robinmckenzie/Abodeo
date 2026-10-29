@@ -315,7 +315,7 @@ has the IP address or the user agent.
   reload or a move between pages is not another visit. Visits are not recorded on previews, with
   JavaScript off (as for most link-preview crawlers), or while the account store is down.
 - An email goes to Robin through Resend for a visit that is not from a bot and either has a label
-  that is not ignored, or has `?welcome` and no label, which is the link given to someone new. A
+  that is not ignored, or has no label at all, with or without `?welcome`. A
   label gets an email for every visit unless `VISIT_ALERT_COOLDOWN_MINUTES` sets a cooldown for each label, and the app sends at most 20 emails an hour in all (`VISIT_ALERT_HOURLY_LIMIT` changes it).
   A failed email loses the email, not the visit.
 - Nothing is sent without the settings below. In production set them in Vercel. In `.env.local`

@@ -71,10 +71,10 @@ export function readVisitAlertSettings(
 }
 
 export function formatVisitAlert(alert: VisitAlert) {
-  const who = alert.label || "no label (the welcome link)";
+  const who = alert.label || "unknown visitor (no label)";
   const place = [alert.city, alert.country].filter(Boolean).join(", ");
   return {
-    subject: `Abodeo visit: ${alert.label || "welcome link"}`,
+    subject: `Abodeo visit: ${alert.label || "Unknown visitor"}`,
     text: [
       "Someone opened Abodeo.",
       `Label: ${who}`,

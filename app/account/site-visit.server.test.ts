@@ -61,8 +61,8 @@ describe("isAlertCandidate", () => {
     expect(isAlertCandidate(human, [])).toBe(true);
   });
 
-  it("rejects a visit with no label and no ?welcome", () => {
-    expect(isAlertCandidate({ ...human, welcome: false }, [])).toBe(false);
+  it("accepts a visit with no label and no ?welcome", () => {
+    expect(isAlertCandidate({ ...human, welcome: false }, [])).toBe(true);
   });
 
   it("accepts a label, with or without ?welcome", () => {
@@ -264,6 +264,23 @@ describe("handleSiteVisitRequest", () => {
       settings,
       expect.objectContaining({ label: "Andrew", visitedAt: expect.any(Date) }),
     );
+  });
+
+  it("offers an unlabelled visit without ?welcome for email", async () => {
+    const store = createFakeStore(true);
+    const sendAlert = vi.fn(async () => {});
+    await handleSiteVisitRequest(postVisit(), {
+      store,
+      alerts: settings,
+      sendAlert,
+    });
+
+    expect(store.recordVisit).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "", welcome: false }),
+      true,
+      expect.anything(),
+    );
+    expect(sendAlert).toHaveBeenCalledTimes(1);
   });
 
   it("does not send an email when the store says not to", async () => {
