@@ -157,8 +157,8 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
               <label>Phone number<input className="field" type="tel" value={values.phone} onChange={event => controller.edit(person, { ...values, phone: event.target.value })} /></label>
             </div>
           </fieldset></div>}
-          {draft && <div className={`people-save-status people-save-${draft.status}`} role={draft.status === "invalid" || draft.status === "failed" ? "alert" : "status"}>
-            {draft.status === "pending" ? "Not saved yet..." : draft.status === "saving" ? "Saving..." : draft.status === "saved" ? "Saved." : draft.problem}
+          {(draft?.status === "invalid" || draft?.status === "failed") && <div className={`people-save-status people-save-${draft.status}`} role="alert">
+            {draft.problem}
             {draft.status === "failed" && <button type="button" className="button-secondary button-small" disabled={locked} onClick={() => void controller.save(person.id)}>Retry</button>}
           </div>}
         </li>;
