@@ -37,10 +37,10 @@
      variables, so their widths are written there and point back here. */
   --form-wide-width: 59.5rem;
   --window-wide-width: 60rem;
-  /* How far they grow with the window, and the third column's share of the
-     fields, never less than 18rem. */
+  /* How far they grow with the window. The middle column stops growing at
+     its maximum, and the third column, with the most text, takes the rest. */
   --form-max-width: 90rem;
-  --third-column-width: max(18rem, 42%);
+  --middle-column-max-width: 28rem;
   /* A screen's title row: the space above it, its height, and the gap below
      it. They add up to what the sticky title covers, which scrolling leaves
      clear. The last part of the gap is the fade under a sticky title. */
@@ -1123,7 +1123,8 @@ html:has(.app-layout) {
 
   .project-window .project-form {
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) var(--third-column-width);
+    --fields-columns: minmax(20rem, var(--middle-column-max-width))
+      minmax(18rem, 1fr);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
@@ -1147,7 +1148,8 @@ html:has(.app-layout) {
   .project-bar.is-expanded .project-form {
     width: calc(var(--bar-wide-width) - 3rem - 2px);
     --fields-display: grid;
-    --fields-columns: minmax(0, 1fr) var(--third-column-width);
+    --fields-columns: minmax(20rem, var(--middle-column-max-width))
+      minmax(18rem, 1fr);
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
     --images-align: start;
