@@ -604,9 +604,7 @@ export default function Dashboard() {
       key,
       id,
       values: pickFormValues(project),
-      message: opened.account
-        ? { text: "Loading the latest copy…", isError: false }
-        : null,
+      message: null,
       barHeight,
       slot,
       isLoading: opened.account !== undefined,
