@@ -88,9 +88,10 @@ export function ProjectForm({
   hasCloseButton?: boolean;
   // An opened project's tasks, shown below its notes.
   tasks?: React.ReactNode;
-  // An opened project's images, shown below its tasks.
+  // An opened project's images, shown below its notes.
   images?: React.ReactNode;
-  // An opened project's appointments, shown below its images.
+  // An opened project's appointments, shown below its tasks. Where the window
+  // is wide, the tasks and appointments are a third column.
   appointments?: React.ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -314,46 +315,50 @@ export function ProjectForm({
           role="group"
           aria-labelledby={`${id}-heading`}
         >
-          <label htmlFor={`${id}-title`}>Title</label>
-          <input
-            id={`${id}-title`}
-            className="field arrives-in-turn"
-            style={arriveAt(1)}
-            name="title"
-            value={values.title}
-            autoComplete="off"
-            onChange={(event) => onChange({ title: event.target.value })}
-          />
-          {!isNew && !hasTitle(values.title) && (
-            <p className="project-form-hint">
-              A project needs a title, so its last title is kept.
-            </p>
-          )}
-          <label
-            htmlFor={`${id}-notes`}
-            className="arrives-in-turn"
-            style={arriveAt(2)}
-          >
-            Notes
-          </label>
-          <textarea
-            id={`${id}-notes`}
-            className="field arrives-in-turn"
-            style={arriveAt(3)}
-            name="notes"
-            rows={8}
-            value={values.notes}
-            onChange={(event) => onChange({ notes: event.target.value })}
-          />
-          {isNew && (
-            <NewProjectTasks
-              tasks={values.tasks}
-              onChange={(tasks) => onChange({ tasks })}
+          <div className="project-form-main">
+            <label htmlFor={`${id}-title`}>Title</label>
+            <input
+              id={`${id}-title`}
+              className="field arrives-in-turn"
+              style={arriveAt(1)}
+              name="title"
+              value={values.title}
+              autoComplete="off"
+              onChange={(event) => onChange({ title: event.target.value })}
             />
-          )}
-          {tasks}
+            {!isNew && !hasTitle(values.title) && (
+              <p className="project-form-hint">
+                A project needs a title, so its last title is kept.
+              </p>
+            )}
+            <label
+              htmlFor={`${id}-notes`}
+              className="arrives-in-turn"
+              style={arriveAt(2)}
+            >
+              Notes
+            </label>
+            <textarea
+              id={`${id}-notes`}
+              className="field arrives-in-turn"
+              style={arriveAt(3)}
+              name="notes"
+              rows={8}
+              value={values.notes}
+              onChange={(event) => onChange({ notes: event.target.value })}
+            />
+          </div>
+          <div className="project-form-third">
+            {isNew && (
+              <NewProjectTasks
+                tasks={values.tasks}
+                onChange={(tasks) => onChange({ tasks })}
+              />
+            )}
+            {tasks}
+            {appointments}
+          </div>
           {images}
-          {appointments}
         </div>
       </div>
       <div

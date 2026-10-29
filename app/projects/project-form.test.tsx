@@ -48,7 +48,7 @@ function renderForm(
 describe("ProjectForm", () => {
   afterEach(cleanup);
 
-  it("shows an opened project's appointments below its images", () => {
+  it("puts an opened project's appointments before its images, as the Tab key reaches them", () => {
     render(
       <ProjectForm
         values={{ ...newProjectFields, assignee: "boris" }}
@@ -69,8 +69,19 @@ describe("ProjectForm", () => {
     const images = screen.getByText("Images here");
     const appointments = screen.getByText("Appointments here");
     expect(
-      images.compareDocumentPosition(appointments) &
+      appointments.compareDocumentPosition(images) &
         Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("puts the Add project tasks box after the notes", () => {
+    renderForm();
+    const notes = screen.getByRole("textbox", { name: "Notes" });
+    const tasks = screen.getByRole("textbox", {
+      name: "Add tasks, one per line",
+    });
+    expect(
+      notes.compareDocumentPosition(tasks) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 

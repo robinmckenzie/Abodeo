@@ -260,10 +260,16 @@ export function ExpandedProjectBar({
     const bar = barRef.current;
     if (!bar || !canAnimate(bar)) return;
     const height = bar.offsetHeight;
+    // Where the open bar is wider than the list, it grows sideways too.
+    const width = bar.offsetWidth;
     const expanding = bar.animate(
       [
-        { height: `${barHeight}px`, overflow: "clip" },
-        { height: `${height}px`, overflow: "clip" },
+        {
+          height: `${barHeight}px`,
+          width: `${findListWidth(bar, width)}px`,
+          overflow: "clip",
+        },
+        { height: `${height}px`, width: `${width}px`, overflow: "clip" },
       ],
       expandTiming,
     );
@@ -285,8 +291,16 @@ export function ExpandedProjectBar({
     bar
       .animate(
         [
-          { height: `${bar.offsetHeight}px`, overflow: "clip" },
-          { height: `${barHeight}px`, overflow: "clip" },
+          {
+            height: `${bar.offsetHeight}px`,
+            width: `${bar.offsetWidth}px`,
+            overflow: "clip",
+          },
+          {
+            height: `${barHeight}px`,
+            width: `${findListWidth(bar, bar.offsetWidth)}px`,
+            overflow: "clip",
+          },
         ],
         { ...squashTiming, fill: "forwards" },
       )
@@ -331,6 +345,13 @@ export function ExpandedProjectBar({
       )}
     </li>
   );
+}
+
+// The width of the list the bar is in, which a collapsed bar fills. Without a
+// list, or where the list is the wider, the bar's own width is kept.
+export function findListWidth(bar: HTMLElement, barWidth: number) {
+  const list = bar.parentElement;
+  return list ? Math.min(list.clientWidth, barWidth) : barWidth;
 }
 
 export function canAnimate(element: HTMLElement) {
