@@ -667,10 +667,6 @@ body:has(.app-layout) {
 /* On a phone the left-hand column would leave too little room for the
    list, so the logo goes above it. */
 @media (max-width: 50rem) {
-  :root {
-    --screen-top: 1rem;
-  }
-
   .app-layout {
     grid-template-columns: minmax(0, 1fr);
   }
