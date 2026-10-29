@@ -869,6 +869,7 @@ html:has(.app-layout) {
   margin: 0;
   padding: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.625rem;
 }
 
@@ -1121,6 +1122,7 @@ html:has(.app-layout) {
     --fields-columns: minmax(0, 1fr) 18rem;
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
+    --images-align: start;
   }
 }
 
@@ -1139,6 +1141,7 @@ html:has(.app-layout) {
     --fields-columns: minmax(0, 1fr) 18rem;
     --fields-rows: auto 1fr;
     --wrapper-display: flex;
+    --images-align: start;
   }
 }
 
@@ -1532,7 +1535,7 @@ html:has(.app-layout) {
   order: 1;
   grid-column: 1;
   grid-row: 2;
-  align-self: start;
+  align-self: var(--images-align, stretch);
 }
 
 .project-form-fields .project-appointments {
