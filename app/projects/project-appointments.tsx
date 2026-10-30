@@ -90,6 +90,23 @@ function findAppointmentDate(appointment: Appointment) {
   return Number.isNaN(start.getTime()) ? "" : formatLocalDate(start);
 }
 
+// What the edit form starts with: the appointment's own fields, with a timed
+// appointment's instants as local wall times. An all-day appointment has no
+// end in the form.
+export function readAppointmentFields(
+  appointment: Appointment,
+): AppointmentFields {
+  const { title, notes, allDay, start, end } = appointment;
+  if (allDay) return { title, notes, allDay, start, end: "" };
+  return {
+    title,
+    notes,
+    allDay,
+    start: formatLocalWallTime(new Date(start)),
+    end: formatLocalWallTime(new Date(end)),
+  };
+}
+
 // When an appointment is, in the browser's locale and time zone: a date and
 // "all day", or a date and start time to end time.
 export function describeAppointmentTime(appointment: Appointment) {

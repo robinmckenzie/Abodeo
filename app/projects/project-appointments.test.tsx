@@ -16,6 +16,7 @@ import {
   formatLocalWallTime,
   findNextLocalHour,
   ProjectAppointments,
+  readAppointmentFields,
   signInToAddAppointmentsMessage,
   tokenEndedMessage,
 } from "./project-appointments";
@@ -168,6 +169,67 @@ describe("formatLocalWallTime", () => {
     expect(formatLocalWallTime(new Date(2026, 10, 2, 14, 35))).toBe(
       "2026-11-02T14:35",
     );
+  });
+});
+
+describe("readAppointmentFields", () => {
+  it("copies the values, but end is set to blank", () => {
+    const allDay = readAppointmentFields({
+      ...visit,
+      allDay: true,
+      start: "2026-11-01",
+      end: "2026-11-02",
+    });
+
+    expect(allDay.title).toEqual(visit.title);
+    expect(allDay.notes).toEqual(visit.notes);
+    expect(allDay.allDay).toBe(true);
+    expect(allDay.start).toBe("2026-11-01");
+    expect(allDay.end).toEqual("");
+  });
+
+  it("gives a timed appointment's start and end as local wall times, without the ID", () => {
+    const original = process.env.TZ;
+    try {
+      process.env.TZ = "Europe/London";
+      expect(readAppointmentFields(visit)).toEqual({
+        title: "Site visit",
+        notes: "Bring keys",
+        allDay: false,
+        start: "2026-11-02T10:00",
+        end: "2026-11-02T11:00",
+      });
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  });
+
+  it("shows the same instant as the wall time of the browser's own time zone", () => {
+    const instant = {
+      ...visit,
+      start: "2026-11-02T14:00:00Z",
+      end: "2026-11-02T15:00:00Z",
+    };
+    const original = process.env.TZ;
+    try {
+      process.env.TZ = "Europe/London";
+      const london = readAppointmentFields(instant);
+      process.env.TZ = "Europe/Zurich";
+      const zurich = readAppointmentFields(instant);
+
+      expect([london.start, london.end]).toEqual([
+        "2026-11-02T14:00",
+        "2026-11-02T15:00",
+      ]);
+      expect([zurich.start, zurich.end]).toEqual([
+        "2026-11-02T15:00",
+        "2026-11-02T16:00",
+      ]);
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
   });
 });
 
