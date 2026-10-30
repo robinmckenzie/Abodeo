@@ -46,7 +46,7 @@
 - When handing over a drafted or revised ticket for review, separately summarise:
     - what it leaves out of scope, whether stated explicitly or left out by omission;
     - any assumptions made while drafting;
-    - any conflicts or tensions with `AGENTS.md`, existing behaviour, or previous tickets.
+    - earlier decisions or existing behaviour it changes, naming the ticket and what it decided, and any conflict with `AGENTS.md`.
 
 ## Development commands
 
