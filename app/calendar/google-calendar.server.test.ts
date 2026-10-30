@@ -178,6 +178,110 @@ describe("createGoogleCalendar", () => {
     expect(missing.message).not.toContain("secret");
   });
 
+  it("patches an event's title, notes and time, and gives it back", async () => {
+    const fetchFn = fakeFetch(
+      Response.json({
+        id: "e 1",
+        summary: "New",
+        start: { dateTime: "2026-11-02T10:00:00Z", timeZone: "Europe/London" },
+        end: { dateTime: "2026-11-02T11:00:00Z", timeZone: "Europe/London" },
+        extendedProperties: { private: { abodeoProject: "p1" } },
+      }),
+    );
+    const calendar = createGoogleCalendar(fetchFn as typeof fetch);
+
+    const patched = await calendar.patchEvent("token", "a@b", "e 1", {
+      summary: "New",
+      description: "Notes",
+      start: { dateTime: "2026-11-02T10:00:00", timeZone: "Europe/London" },
+      end: { dateTime: "2026-11-02T11:00:00", timeZone: "Europe/London" },
+    });
+
+    expect(patched.id).toBe("e 1");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe(
+      "https://www.googleapis.com/calendar/v3/calendars/a%40b/events/e%201",
+    );
+    expect(init.method).toBe("PATCH");
+    // The project property is not sent, so Google keeps it.
+    expect(JSON.parse(String(init.body))).toEqual({
+      summary: "New",
+      description: "Notes",
+      start: {
+        dateTime: "2026-11-02T10:00:00",
+        timeZone: "Europe/London",
+        date: null,
+      },
+      end: {
+        dateTime: "2026-11-02T11:00:00",
+        timeZone: "Europe/London",
+        date: null,
+      },
+    });
+  });
+
+  it("nulls a timed event's fields when patching it to all day", async () => {
+    const fetchFn = fakeFetch(
+      Response.json({
+        id: "e1",
+        start: { date: "2026-11-02" },
+        end: { date: "2026-11-03" },
+      }),
+    );
+    const calendar = createGoogleCalendar(fetchFn as typeof fetch);
+
+    await calendar.patchEvent("token", "id", "e1", {
+      summary: "Visit",
+      description: "",
+      start: { date: "2026-11-02" },
+      end: { date: "2026-11-03" },
+    });
+
+    const body = JSON.parse(String(fetchFn.mock.calls[0][1].body));
+    expect(body.start).toEqual({
+      date: "2026-11-02",
+      dateTime: null,
+      timeZone: null,
+    });
+    expect(body.end).toEqual({
+      date: "2026-11-03",
+      dateTime: null,
+      timeZone: null,
+    });
+  });
+
+  it("deletes an event", async () => {
+    const fetchFn = fakeFetch(new Response(null, { status: 204 }));
+    const calendar = createGoogleCalendar(fetchFn as typeof fetch);
+
+    await calendar.deleteEvent("token", "a@b", "e 1");
+
+    expect(fetchFn.mock.calls[0][0]).toBe(
+      "https://www.googleapis.com/calendar/v3/calendars/a%40b/events/e%201",
+    );
+    expect(fetchFn.mock.calls[0][1].method).toBe("DELETE");
+  });
+
+  it("rejects a patch or delete that Google refuses, by status code only", async () => {
+    const calendar = createGoogleCalendar(
+      fakeFetch(
+        Response.json({ error: { message: "private" } }, { status: 401 }),
+        new Response(null, { status: 404 }),
+      ) as typeof fetch,
+    );
+
+    const patched = await calendar
+      .patchEvent("token", "id", "e1", event)
+      .catch((error: unknown) => error);
+    const deleted = await calendar
+      .deleteEvent("token", "id", "e1")
+      .catch((error: unknown) => error);
+
+    expect((patched as GoogleCalendarError).code).toBe("google_401");
+    expect((patched as Error).message).not.toContain("private");
+    expect((deleted as GoogleCalendarError).code).toBe("google_404");
+  });
+
   it("deletes a calendar", async () => {
     const fetchFn = fakeFetch(new Response(null, { status: 204 }));
     const calendar = createGoogleCalendar(fetchFn as typeof fetch);

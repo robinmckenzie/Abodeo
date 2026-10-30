@@ -49,6 +49,12 @@ export type CalendarEvent = {
 // An event as Google holds it.
 export type CalendarEventRecord = CalendarEvent & { id: string };
 
+// What an edit changes. The project property is not among them.
+export type CalendarEventChanges = Pick<
+  CalendarEvent,
+  "summary" | "description" | "start" | "end"
+>;
+
 export type GoogleCalendar = {
   // Makes a calendar and gives its ID.
   insertCalendar(
@@ -70,6 +76,19 @@ export type GoogleCalendar = {
     calendarId: string,
     property: { name: string; value: string },
   ): Promise<CalendarEventRecord[]>;
+  // Changes an event's title, notes and time, and gives it back. Leaves its
+  // other properties, including the project link, as they are.
+  patchEvent(
+    accessToken: string,
+    calendarId: string,
+    eventId: string,
+    changes: CalendarEventChanges,
+  ): Promise<CalendarEventRecord>;
+  deleteEvent(
+    accessToken: string,
+    calendarId: string,
+    eventId: string,
+  ): Promise<void>;
   deleteCalendar(accessToken: string, calendarId: string): Promise<void>;
 };
 
@@ -120,6 +139,16 @@ function readEvent(value: unknown): CalendarEventRecord | undefined {
     end: to,
     extendedProperties: { private: properties },
   };
+}
+
+// A time for a patch. Google merges the nested start and end into the
+// event's, so the other form's fields are nulled to switch between a timed
+// and an all-day event without leaving the old ones behind.
+function toPatchTime(time: EventTime) {
+  if ("date" in time) {
+    return { date: time.date, dateTime: null, timeZone: null };
+  }
+  return { ...time, date: null };
 }
 
 export function createGoogleCalendar(
@@ -174,6 +203,8 @@ export function createGoogleCalendar(
   };
   const calendarPath = (calendarId: string) =>
     `/calendars/${encodeURIComponent(calendarId)}`;
+  const eventPath = (calendarId: string, eventId: string) =>
+    `${calendarPath(calendarId)}/events/${encodeURIComponent(eventId)}`;
 
   return {
     async insertCalendar(accessToken, { summary, timeZone }) {
@@ -236,6 +267,31 @@ export function createGoogleCalendar(
         pageToken = next;
       }
       throw new GoogleCalendarError("google_too_many_pages");
+    },
+    async patchEvent(accessToken, calendarId, eventId, changes) {
+      const response = await send(
+        accessToken,
+        eventPath(calendarId, eventId),
+        "PATCH",
+        {
+          summary: changes.summary,
+          description: changes.description,
+          start: toPatchTime(changes.start),
+          end: toPatchTime(changes.end),
+        },
+      );
+      if (!response.ok) throw await fail(response);
+      const patched = readEvent(await response.json().catch(() => undefined));
+      if (!patched) throw new GoogleCalendarError("google_no_event_id");
+      return patched;
+    },
+    async deleteEvent(accessToken, calendarId, eventId) {
+      const response = await send(
+        accessToken,
+        eventPath(calendarId, eventId),
+        "DELETE",
+      );
+      if (!response.ok) throw await fail(response);
     },
     async deleteCalendar(accessToken, calendarId) {
       const response = await send(

@@ -29,6 +29,8 @@ export function createMemoryGoogleCalendar() {
     insertCalendar?: string;
     insertEvent?: string;
     listEvents?: string;
+    patchEvent?: string;
+    deleteEvent?: string;
     deleteCalendar?: string;
   } = {};
   const fail = (method: keyof typeof failures) => {
@@ -62,6 +64,24 @@ export function createMemoryGoogleCalendar() {
       return found.events
         .filter((event) => event.extendedProperties?.private[name] === value)
         .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+    },
+    async patchEvent(accessToken, calendarId, eventId, changes) {
+      tokensUsed.push(accessToken);
+      fail("patchEvent");
+      const found = calendars.get(calendarId)?.events;
+      const index = found?.findIndex(({ id }) => id === eventId) ?? -1;
+      if (!found || index < 0) throw new GoogleCalendarError("google_404");
+      // Google keeps what a patch does not mention, such as the project link.
+      found[index] = { ...found[index], ...changes };
+      return found[index];
+    },
+    async deleteEvent(accessToken, calendarId, eventId) {
+      tokensUsed.push(accessToken);
+      fail("deleteEvent");
+      const found = calendars.get(calendarId)?.events;
+      const index = found?.findIndex(({ id }) => id === eventId) ?? -1;
+      if (!found || index < 0) throw new GoogleCalendarError("google_404");
+      found.splice(index, 1);
     },
     async deleteCalendar(accessToken, calendarId) {
       tokensUsed.push(accessToken);
