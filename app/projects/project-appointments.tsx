@@ -22,6 +22,11 @@ import {
   type ProjectAppointmentsOptions,
 } from "../calendar/use-project-appointments";
 
+//
+//
+// MARK: messages
+//
+//
 export const signInToAddAppointmentsMessage = "Sign in to add appointments.";
 export const appointmentsUnavailableMessage =
   "Appointments cannot be shown right now.";
@@ -45,18 +50,30 @@ export function describeReturnResult(
 export const tokenEndedMessage =
   "Your Google connection has ended. Reconnect and try again.";
 
-// A date or time as "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" in the browser's own
-// time zone.
+//
+//
+// MARK: helper functions
+//
+//
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+// A date as "YYYY-MM-DD" in the browser's own time zone.
 function formatLocalDate(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// A time as "YYYY-MM-DDTHH:mm" in the browser's own time zone
+// (wall clock time).
+export function formatLocalWallTime(date: Date) {
+  return `${formatLocalDate(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function findNextLocalHour(now: Date) {
   const next = new Date(now);
   next.setMinutes(0, 0, 0);
   next.setHours(next.getHours() + 1);
-  const pad = (value: number) => String(value).padStart(2, "0");
   return `${formatLocalDate(next)}T${pad(next.getHours())}:00`;
 }
 
@@ -95,6 +112,11 @@ export function describeAppointmentTime(appointment: Appointment) {
   }`;
 }
 
+//
+//
+// MARK: - ProjectAppointments
+//
+//
 export function ProjectAppointments({
   accountId,
   projectId,
@@ -129,6 +151,11 @@ export function ProjectAppointments({
   );
 }
 
+//
+//
+// MARK: - SignedInAppointments
+//
+//
 function SignedInAppointments({
   returnNote,
   onCountChange,
@@ -231,6 +258,11 @@ function SignedInAppointments({
   );
 }
 
+//
+//
+// MARK: - AppointmentForm
+//
+//
 function AppointmentForm({
   onAdd,
   onCancel,

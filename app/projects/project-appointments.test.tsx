@@ -13,6 +13,7 @@ import { resetAutomaticReconnects } from "../calendar/use-project-appointments";
 import {
   appointmentsUnavailableMessage,
   describeAppointmentTime,
+  formatLocalWallTime,
   findNextLocalHour,
   ProjectAppointments,
   signInToAddAppointmentsMessage,
@@ -38,7 +39,12 @@ const visit: Appointment = {
 
 type Call = { method: string; path: string; headers: Headers; body: unknown };
 
+//
+//
+// MARK: - fakeEndpoints
 // Answers as the appointment endpoints would.
+//
+//
 function fakeEndpoints() {
   const endpoints = {
     list: { status: "ok", appointments: [visit] } as unknown,
@@ -80,6 +86,11 @@ function fakeEndpoints() {
 
 type Fakes = ReturnType<typeof fakeEndpoints>;
 
+//
+//
+// MARK: helper functions
+//
+//
 async function show(
   fakes: Fakes,
   props: Partial<React.ComponentProps<typeof ProjectAppointments>> = {},
@@ -113,6 +124,11 @@ async function click(name: string) {
   await settle();
 }
 
+//
+//
+// MARK: - the tests
+//
+//
 describe("describeAppointmentTime", () => {
   it("says all day for a day, and gives a timed appointment's start and end", () => {
     const allDay = describeAppointmentTime({
@@ -144,6 +160,22 @@ describe("findNextLocalHour", () => {
   });
 });
 
+describe("formatLocalWallTime", () => {
+  it("is the date and time on the wall clock, in the browser's time zone", () => {
+    expect(formatLocalWallTime(new Date(2026, 10, 2, 9, 5))).toBe(
+      "2026-11-02T09:05",
+    );
+    expect(formatLocalWallTime(new Date(2026, 10, 2, 14, 35))).toBe(
+      "2026-11-02T14:35",
+    );
+  });
+});
+
+//
+//
+// MARK: the appointments section
+//
+//
 describe("the appointments section", () => {
   it("says to sign in while signed out, and asks Google for nothing", async () => {
     const fakes = fakeEndpoints();
@@ -258,6 +290,11 @@ describe("leaving for Google", () => {
   });
 });
 
+//
+//
+// MARK: opening w/o Google token
+//
+//
 describe("opening a project without a good Google token", () => {
   it("goes through Google by itself, once, for an account that connected before", async () => {
     const fakes = fakeEndpoints();
@@ -332,6 +369,11 @@ describe("opening a project without a good Google token", () => {
   });
 });
 
+//
+//
+// MARK: adding an appointment
+//
+//
 describe("adding an appointment", () => {
   it("opens the form when the token is good, with the end an hour after the start", async () => {
     const fakes = fakeEndpoints();
