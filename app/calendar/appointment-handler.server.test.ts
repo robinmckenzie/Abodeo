@@ -90,6 +90,40 @@ function add(test: TestSetUp, body: Record<string, unknown>, cookie?: string) {
   return handleAppointmentRequest(post(body, { cookie }), test.dependencies);
 }
 
+function patch(body: Record<string, unknown>, options: Options = {}) {
+  return new Request(`${origin}/api/calendar/appointments`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...headersFor(options) },
+    body: JSON.stringify(body),
+  });
+}
+
+function edit(test: TestSetUp, body: Record<string, unknown>, cookie?: string) {
+  return handleAppointmentRequest(patch(body, { cookie }), test.dependencies);
+}
+
+function remove(
+  test: TestSetUp,
+  projectId: string,
+  eventId: string,
+  cookie?: string,
+) {
+  return handleAppointmentRequest(
+    new Request(
+      `${origin}/api/calendar/appointments?projectId=${projectId}&eventId=${eventId}`,
+      { method: "DELETE", headers: headersFor({ cookie }) },
+    ),
+    test.dependencies,
+  );
+}
+
+// Adds the standard appointment and gives the ID Google made for it.
+async function addVisit(test: TestSetUp, cookie: string) {
+  const response = await add(test, timed, cookie);
+  return ((await response.json()) as { appointment: { id: string } })
+    .appointment.id;
+}
+
 const titles = (listed: Listed) =>
   listed.appointments.map((appointment) => appointment.title);
 
@@ -289,6 +323,229 @@ describe("adding appointments", () => {
     test.calendar.failures.insertCalendar = "google_500";
     expect((await add(test, timed, cookie)).status).toBe(503);
     expect(test.failures).toContainEqual(["create", "google_500"]);
+  });
+});
+
+describe("editing an appointment", () => {
+  it("changes its title, notes and time, and keeps its project link", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+
+    const response = await edit(
+      test,
+      {
+        ...timed,
+        eventId,
+        title: "Quote",
+        notes: "",
+        start: "2026-11-03T14:00",
+        end: "2026-11-03T15:30",
+      },
+      cookie,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      appointment: { id: eventId, title: "Quote" },
+    });
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events).toEqual([
+      expect.objectContaining({
+        summary: "Quote",
+        description: "",
+        start: { dateTime: "2026-11-03T14:00:00", timeZone: "Europe/London" },
+        end: { dateTime: "2026-11-03T15:30:00", timeZone: "Europe/London" },
+        extendedProperties: { private: { abodeoProject: "p-1" } },
+      }),
+    ]);
+  });
+
+  it("makes it all day, ending on the day after", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+
+    await edit(
+      test,
+      { ...timed, eventId, allDay: true, start: "2026-12-31", end: "" },
+      cookie,
+    );
+
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events[0]).toMatchObject({
+      start: { date: "2026-12-31" },
+      end: { date: "2027-01-01" },
+    });
+  });
+
+  it("refuses bad fields, a bad event id and a project that is not the account's, changing nothing", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+    const change = { ...timed, eventId, title: "Changed" };
+
+    expect((await edit(test, { ...change, title: " " }, cookie)).status).toBe(
+      400,
+    );
+    expect(
+      (await edit(test, { ...change, timeZone: "not a zone" }, cookie)).status,
+    ).toBe(400);
+    expect(
+      (await edit(test, { ...change, eventId: "../x" }, cookie)).status,
+    ).toBe(400);
+    expect(
+      (await edit(test, { ...change, projectId: "p-9" }, cookie)).status,
+    ).toBe(404);
+
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events[0].summary).toBe("Site visit");
+  });
+
+  it("changes nothing and says so when the token has expired or is missing", async () => {
+    const test = setUp();
+    const eventId = await addVisit(test, await tokenCookie());
+    const change = { ...timed, eventId, title: "Changed" };
+
+    const missing = await edit(test, change);
+    const expired = await edit(
+      test,
+      change,
+      await tokenCookie("user-1", -minute),
+    );
+
+    for (const response of [missing, expired]) {
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "token_expired" });
+    }
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events[0].summary).toBe("Site visit");
+  });
+
+  it("reports a token Google refuses, and any other Google failure as one failure", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+    const change = { ...timed, eventId };
+
+    test.calendar.failures.patchEvent = "google_401";
+    expect((await edit(test, change, cookie)).status).toBe(401);
+    test.calendar.failures.patchEvent = "google_500";
+    const failed = await edit(test, change, cookie);
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ error: "unavailable" });
+    expect(test.failures).toContainEqual(["edit", "google_500"]);
+    test.calendar.failures.patchEvent = undefined;
+    expect(
+      (await edit(test, { ...change, eventId: "gone" }, cookie)).status,
+    ).toBe(503);
+  });
+
+  it("refuses an edit from another site or without JSON", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+    const crossSite = patch({ ...timed, eventId }, { cookie });
+    crossSite.headers.set("Origin", "https://evil.example");
+    const text = new Request(`${origin}/api/calendar/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "text/plain", "X-Abodeo-Account": "user-1" },
+      body: "{}",
+    });
+
+    const statuses = [];
+    for (const request of [crossSite, text]) {
+      statuses.push(
+        (await handleAppointmentRequest(request, test.dependencies)).status,
+      );
+    }
+
+    expect(statuses).toEqual([403, 400]);
+  });
+});
+
+describe("deleting an appointment", () => {
+  it("removes it from Google, and only it", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+    await add(test, { ...timed, title: "Other" }, cookie);
+
+    const response = await remove(test, "p-1", eventId, cookie);
+
+    expect(response.status).toBe(200);
+    expect(titles((await list(test, "p-1", cookie)).body)).toEqual(["Other"]);
+  });
+
+  it("deletes nothing and says so when the token has expired or is missing", async () => {
+    const test = setUp();
+    const eventId = await addVisit(test, await tokenCookie());
+
+    const missing = await remove(test, "p-1", eventId);
+    const expired = await remove(
+      test,
+      "p-1",
+      eventId,
+      await tokenCookie("user-1", -minute),
+    );
+
+    for (const response of [missing, expired]) {
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "token_expired" });
+    }
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events).toHaveLength(1);
+  });
+
+  it("refuses a bad id, and a project that is not the account's", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+
+    expect((await remove(test, "p-1", "a%20b", cookie)).status).toBe(400);
+    expect((await remove(test, "p-9", eventId, cookie)).status).toBe(404);
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events).toHaveLength(1);
+  });
+
+  it("reports a token Google refuses, and any other Google failure as one failure", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+
+    test.calendar.failures.deleteEvent = "google_401";
+    expect((await remove(test, "p-1", eventId, cookie)).status).toBe(401);
+    test.calendar.failures.deleteEvent = "google_500";
+    expect((await remove(test, "p-1", eventId, cookie)).status).toBe(503);
+    expect(test.failures).toContainEqual(["delete", "google_500"]);
+    test.calendar.failures.deleteEvent = undefined;
+    expect((await remove(test, "p-1", "gone", cookie)).status).toBe(503);
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events).toHaveLength(1);
+  });
+
+  it("refuses a delete from another site, and one for a signed-out or other account", async () => {
+    const test = setUp();
+    const cookie = await tokenCookie();
+    const eventId = await addVisit(test, cookie);
+    const path = `${origin}/api/calendar/appointments?projectId=p-1&eventId=${eventId}`;
+    const crossSite = new Request(path, {
+      method: "DELETE",
+      headers: { ...headersFor({ cookie }), Origin: "https://evil.example" },
+    });
+    const otherAccount = new Request(path, {
+      method: "DELETE",
+      headers: headersFor({ cookie, account: "user-2" }),
+    });
+
+    expect(
+      (await handleAppointmentRequest(crossSite, test.dependencies)).status,
+    ).toBe(403);
+    expect(
+      (await handleAppointmentRequest(otherAccount, test.dependencies)).status,
+    ).toBe(409);
+    const [[, calendar]] = [...test.calendar.calendars];
+    expect(calendar.events).toHaveLength(1);
   });
 });
 

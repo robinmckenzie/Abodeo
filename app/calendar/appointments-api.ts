@@ -69,6 +69,18 @@ export type CreateAppointmentRequest = AppointmentFields & {
   timeZone: string | null;
 };
 
+// What the browser sends to change an appointment: the same fields as to
+// create one, and which event.
+export type EditAppointmentRequest = CreateAppointmentRequest & {
+  eventId: string;
+};
+
+// A Google event ID is letters and digits. Checked before it is used in a
+// request or in the address Google returns the browser to.
+export function isEventId(value: unknown): value is string {
+  return typeof value === "string" && /^[\w-]{1,1024}$/.test(value);
+}
+
 export type CreateAppointmentError =
   "token_expired" | "invalid" | "unavailable";
 

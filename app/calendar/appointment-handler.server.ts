@@ -6,7 +6,9 @@
 // - GET calendarConnectionPath says whether the token is good enough to open
 //   the appointment form;
 // - GET calendarAppointmentsPath?projectId= lists the project's appointments;
-// - POST calendarAppointmentsPath adds one.
+// - POST calendarAppointmentsPath adds one;
+// - PATCH calendarAppointmentsPath changes one, and
+//   DELETE calendarAppointmentsPath?projectId=&eventId= removes it.
 // Like the projects endpoints, each names the account the page works for.
 // Neither the token nor Google's response bodies are logged.
 import {
@@ -21,8 +23,10 @@ import {
   appointmentProjectProperty,
   calendarAppointmentsPath,
   calendarConnectionPath,
+  isEventId,
   validateAppointmentFields,
   type Appointment,
+  type AppointmentFields,
   type AppointmentsResponse,
   type ConnectionResponse,
 } from "./appointments-api";
@@ -81,6 +85,21 @@ function toAppointment(event: CalendarEventRecord): Appointment {
   };
 }
 
+// An appointment's start and end for Google. A timed one is a wall time
+// placed in the browser's time zone.
+function placeEventTimes(
+  fields: AppointmentFields,
+  timeZone: string | null,
+): Pick<CalendarEvent, "start" | "end"> {
+  const placeTime = (wallTime: string) => ({
+    dateTime: `${wallTime}:00`,
+    ...(timeZone ? { timeZone } : {}),
+  });
+  return fields.allDay
+    ? { start: { date: fields.start }, end: { date: fields.end } }
+    : { start: placeTime(fields.start), end: placeTime(fields.end) };
+}
+
 export async function handleAppointmentRequest(
   request: Request,
   dependencies: CalendarRequestDependencies,
@@ -97,17 +116,21 @@ export async function handleAppointmentRequest(
   } = dependencies;
   const url = new URL(request.url);
   const isConnection = url.pathname === calendarConnectionPath;
-  const isWrite = request.method === "POST" && !isConnection;
-  if (request.method !== "GET" && !isWrite) {
+  const isDelete = request.method === "DELETE" && !isConnection;
+  const isEdit = request.method === "PATCH" && !isConnection;
+  const isWrite = (request.method === "POST" && !isConnection) || isEdit;
+  if (request.method !== "GET" && !isWrite && !isDelete) {
     return respondWithError(405, "method_not_allowed");
   }
-  if (isWrite) {
+  if (isWrite || isDelete) {
     // A form on another site cannot send JSON or the account header, so this
-    // stops other sites adding appointments, as for the other endpoints.
+    // stops other sites changing appointments, as for the other endpoints.
     const origin = request.headers.get("Origin");
     if (origin !== null && origin !== url.origin) {
       return respondWithJson(403, { error: "forbidden" });
     }
+  }
+  if (isWrite) {
     if (!request.headers.get("Content-Type")?.startsWith("application/json")) {
       return respondWithError(400, "invalid_request");
     }
@@ -133,6 +156,36 @@ export async function handleAppointmentRequest(
       return respondWithJson(200, {
         ready: token !== undefined && !token.isNearExpiry,
       } satisfies ConnectionResponse);
+    }
+
+    if (isDelete) {
+      const projectId = url.searchParams.get("projectId");
+      const eventId = url.searchParams.get("eventId");
+      if (!isProjectId(projectId) || !isEventId(eventId)) {
+        return respondWithError(400, "invalid_request");
+      }
+      if (!(await withTimeout(hasProject(userId, projectId), timeout))) {
+        return respondWithJson(404, { error: "not_found" });
+      }
+      if (!token) return respondWithJson(401, { error: "token_expired" });
+      const calendarId = await withTimeout(
+        store.readCalendarId(userId),
+        timeout,
+      );
+      if (calendarId === undefined) {
+        reportFailure("delete", "no_calendar");
+        return respondWithJson(503, { error: "unavailable" });
+      }
+      try {
+        await calendar.deleteEvent(token.accessToken, calendarId, eventId);
+        return respondWithJson(200, { deleted: true });
+      } catch (error) {
+        if (isTokenRefused(error)) {
+          return respondWithJson(401, { error: "token_expired" });
+        }
+        reportFailure("delete", readFailureCode(error));
+        return respondWithJson(503, { error: "unavailable" });
+      }
     }
 
     if (!isWrite) {
@@ -182,10 +235,11 @@ export async function handleAppointmentRequest(
     } catch {
       return respondWithError(400, "invalid_request");
     }
-    const { projectId, title, notes, allDay, start, end } = body;
+    const { projectId, eventId, title, notes, allDay, start, end } = body;
     const timeZone = normaliseTimeZone(body.timeZone);
     if (
       !isProjectId(projectId) ||
+      (isEdit && !isEventId(eventId)) ||
       typeof title !== "string" ||
       typeof notes !== "string" ||
       typeof allDay !== "boolean" ||
@@ -210,18 +264,39 @@ export async function handleAppointmentRequest(
     }
     if (!token) return respondWithJson(401, { error: "token_expired" });
     const value = fields.value;
-    const placeTime = (wallTime: string) => ({
-      dateTime: `${wallTime}:00`,
-      ...(timeZone ? { timeZone } : {}),
-    });
+    const times = placeEventTimes(value, timeZone);
+    if (isEdit) {
+      const calendarId = await withTimeout(
+        store.readCalendarId(userId),
+        timeout,
+      );
+      if (calendarId === undefined) {
+        reportFailure("edit", "no_calendar");
+        return respondWithJson(503, { error: "unavailable" });
+      }
+      try {
+        const patched = await calendar.patchEvent(
+          token.accessToken,
+          calendarId,
+          eventId as string,
+          { summary: value.title, description: value.notes, ...times },
+        );
+        return respondWithJson(200, { appointment: toAppointment(patched) });
+      } catch (error) {
+        if (isTokenRefused(error)) {
+          return respondWithJson(401, { error: "token_expired" });
+        }
+        reportFailure("edit", readFailureCode(error));
+        return respondWithJson(503, { error: "unavailable" });
+      }
+    }
     const event: CalendarEvent = {
       summary: value.title,
       description: value.notes,
       extendedProperties: {
         private: { [appointmentProjectProperty]: projectId },
       },
-      start: value.allDay ? { date: value.start } : placeTime(value.start),
-      end: value.allDay ? { date: value.end } : placeTime(value.end),
+      ...times,
     };
     try {
       const created = await insertAbodeoEvent({
