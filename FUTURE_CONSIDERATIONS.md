@@ -81,6 +81,22 @@ requirements, commitments, or scheduled work.
   decision logic goes into a plain, tested function; if neither is practical,
   the pull request says so.
 
+## Code structure
+
+- Project validation and JSON encoding: `app/projects/projects.ts` validates
+  project data from JSON text, so database and API callers stringify objects
+  only to parse them again (also `project-store.server.ts`,
+  `people-store.server.ts`, `account-projects.ts`). Before adding more saved
+  fields, consider object-level readers and writers with thin JSON wrappers for
+  browser storage, keeping database versions and compatibility. Found by a
+  Codex review on 2026-10-30.
+- Account request transport: `account-people.ts` borrows generic transport from
+  `account-projects.ts`, while `images-client.ts` and
+  `use-project-appointments.ts` have their own request wrappers, so account
+  headers, credentials and timeouts have several owners. Consider one small
+  shared transport if another account endpoint is added. Found by the same
+  review.
+
 ## Ruled out
 
 - Importing order-confirmation emails through Gmail: ruled out by Robin on
