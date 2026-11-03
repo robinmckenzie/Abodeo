@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Appointment } from "../calendar/appointments-api";
@@ -14,8 +15,10 @@ import {
   appointmentsUnavailableMessage,
   describeAppointmentTime,
   findNextLocalHour,
+  googleUnreachableNote,
   ProjectAppointments,
   signInToAddAppointmentsMessage,
+  stayedOnPageNote,
   tokenEndedMessage,
 } from "./project-appointments";
 
@@ -83,6 +86,7 @@ type Fakes = ReturnType<typeof fakeEndpoints>;
 async function show(
   fakes: Fakes,
   props: Partial<React.ComponentProps<typeof ProjectAppointments>> = {},
+  { strict = false } = {},
 ) {
   const navigate = vi.fn();
   const onBeforeLeave = vi.fn(async () => true);
@@ -97,6 +101,7 @@ async function show(
       onSignInChange={onSignInChange}
       {...props}
     />,
+    { wrapper: strict ? StrictMode : undefined },
   );
   await settle();
   return { navigate, onBeforeLeave, onSignInChange };
@@ -318,7 +323,20 @@ describe("opening a project without a good Google token", () => {
     ).toBeTruthy();
   });
 
-  it("stays, and shows the Connect button, if the person chooses not to leave", async () => {
+  it("goes through Google once, never showing Connect, when development runs the effect twice", async () => {
+    const fakes = fakeEndpoints();
+    fakes.endpoints.list = { status: "needs-grant", connectedBefore: true };
+    const { navigate } = await show(fakes, {}, { strict: true });
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("https://accounts.google.com/grant");
+    expect(
+      screen.queryByRole("button", { name: "Connect Google Calendar" }),
+    ).toBeNull();
+    expect(screen.getByText("Connecting to Google Calendar…")).toBeTruthy();
+  });
+
+  it("stays, and shows the Connect button with the reason, if the person chooses not to leave", async () => {
     const fakes = fakeEndpoints();
     fakes.endpoints.list = { status: "needs-grant", connectedBefore: true };
     const onBeforeLeave = vi.fn(async () => false);
@@ -326,6 +344,26 @@ describe("opening a project without a good Google token", () => {
 
     expect(navigate).not.toHaveBeenCalled();
     expect(fakes.posts()).toHaveLength(0);
+    expect(screen.getByText(stayedOnPageNote)).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Connect Google Calendar" }),
+    ).toBeTruthy();
+  });
+
+  it("shows the Connect button with the reason if Google's address cannot be got", async () => {
+    const fakes = fakeEndpoints();
+    fakes.endpoints.list = { status: "needs-grant", connectedBefore: true };
+    const answer = fakes.fetchFn.getMockImplementation()!;
+    fakes.fetchFn.mockImplementation(async (path, init) => {
+      if (path === "/api/calendar/test-appointment") {
+        return new Response(null, { status: 500 });
+      }
+      return answer(path, init);
+    });
+    const { navigate } = await show(fakes);
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByText(googleUnreachableNote)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Connect Google Calendar" }),
     ).toBeTruthy();

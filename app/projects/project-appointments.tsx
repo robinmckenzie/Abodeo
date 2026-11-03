@@ -20,6 +20,7 @@ import {
   useProjectAppointments,
   type AddResult,
   type ProjectAppointmentsOptions,
+  type StayReason,
 } from "../calendar/use-project-appointments";
 
 export const signInToAddAppointmentsMessage = "Sign in to add appointments.";
@@ -40,6 +41,18 @@ export function describeReturnResult(
     default:
       return null;
   }
+}
+
+// Why Abodeo did not go through Google by itself on opening the project.
+export const stayedOnPageNote =
+  "Abodeo did not connect to Google Calendar because you stayed on this page. Connect when you are ready.";
+export const googleUnreachableNote =
+  "Google Calendar could not be reached. Try connecting again.";
+
+function describeStayReason(reason: StayReason | undefined) {
+  if (reason === "stayed") return stayedOnPageNote;
+  if (reason === "failed") return googleUnreachableNote;
+  return null;
 }
 
 export const tokenEndedMessage =
@@ -183,7 +196,8 @@ function SignedInAppointments({
       {state.status === "needs-grant" && (
         <>
           <p className="project-appointments-note" role="status">
-            {returnNote ??
+            {describeStayReason(state.reason) ??
+              returnNote ??
               "Connect Google Calendar to see and add this project's appointments."}
           </p>
           <button
