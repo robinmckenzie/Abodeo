@@ -4,6 +4,9 @@
 // address or browser details. Ported from TaskManager's TM #45. Each new
 // session, which only a sign-in makes, is added to the sign-in history.
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { google } from "better-auth/social-providers";
+
+import { calendarScope } from "../calendar/calendar-grant.server";
 
 import { accountReturnPath, authBasePath } from "./account-api";
 import type { AccountConfig } from "./account-config.server";
@@ -191,8 +194,47 @@ export type AccountDatabase = BetterAuthOptions["database"];
 // request's headers, including the label cookie.
 type SignInContext = { request?: Request; headers?: Headers };
 
+// What one sign-in's callback learns, for the account handler to turn into
+// the Calendar token cookie (AD #115 Open Projects Without Calendar
+// Connection Interruptions). It lives only for the one request.
+export type SignInCapture = {
+  calendarToken?: { accessToken: string; expiresAt: number };
+  userId?: string;
+};
+
+type GoogleTokens = {
+  accessToken?: string;
+  accessTokenExpiresAt?: Date;
+  scopes?: string[];
+  idToken?: string;
+};
+
+// Better Auth's own reading of Google's ID token, plus keeping the access
+// token in the capture when the person allowed Calendar.
+export function buildGoogleUserInfo(capture: SignInCapture) {
+  // Better Auth's Google provider without this override, for its default.
+  const defaultUserInfo = (tokens: GoogleTokens) =>
+    google({ clientId: "", clientSecret: "" }).getUserInfo(tokens);
+  return async (tokens: GoogleTokens) => {
+    if (
+      tokens.accessToken &&
+      tokens.accessTokenExpiresAt &&
+      tokens.scopes?.includes(calendarScope)
+    ) {
+      capture.calendarToken = {
+        accessToken: tokens.accessToken,
+        expiresAt: tokens.accessTokenExpiresAt.getTime(),
+      };
+    }
+    return defaultUserInfo(tokens);
+  };
+}
+
 // The hooks above, plus recording each sign-in once its session is saved.
-export function buildDatabaseHooks(history: HistoryStore | undefined) {
+export function buildDatabaseHooks(
+  history: HistoryStore | undefined,
+  capture?: SignInCapture,
+) {
   return {
     ...accountDatabaseHooks,
     session: {
@@ -203,6 +245,7 @@ export function buildDatabaseHooks(history: HistoryStore | undefined) {
           session: { userId: string },
           context?: SignInContext | null,
         ) => {
+          if (capture) capture.userId = session.userId;
           if (!history) return;
           const headers = context?.request?.headers ?? context?.headers;
           await recordSignInQuietly(
@@ -220,6 +263,7 @@ export function buildAccountAuthOptions(
   config: AccountConfig,
   database: AccountDatabase,
   history?: HistoryStore,
+  capture: SignInCapture = {},
 ) {
   return {
     appName: "Abodeo",
@@ -240,9 +284,14 @@ export function buildAccountAuthOptions(
         // Google always asks which account to use, rather than signing in
         // again with the last one.
         prompt: "select_account",
-        // Sign-in asks only for its own permissions, never adding the
-        // Calendar permission given earlier for the Calendar test.
+        // Sign-in also asks for Calendar in the same trip to Google, so a
+        // project can list appointments without a separate trip. No
+        // refresh token is asked for, so the token lasts about an hour.
+        scope: [calendarScope],
+        // Sign-in asks only for the permissions listed here, never
+        // inheriting a wider grant given earlier.
         includeGrantedScopes: false,
+        getUserInfo: buildGoogleUserInfo(capture),
       },
     },
     user: tableNames.user,
@@ -260,7 +309,7 @@ export function buildAccountAuthOptions(
       accountLinking: { enabled: false },
     },
     verification: tableNames.verification,
-    databaseHooks: buildDatabaseHooks(history),
+    databaseHooks: buildDatabaseHooks(history, capture),
     rateLimit: { enabled: true, customStorage: rateLimitStorage },
     onAPIError: { errorURL: accountReturnPath },
   } satisfies BetterAuthOptions;
@@ -270,8 +319,11 @@ export function createAccountAuth(
   config: AccountConfig,
   database: AccountDatabase,
   history?: HistoryStore,
+  capture?: SignInCapture,
 ) {
-  return betterAuth(buildAccountAuthOptions(config, database, history));
+  return betterAuth(
+    buildAccountAuthOptions(config, database, history, capture),
+  );
 }
 
 export type AccountAuth = ReturnType<typeof createAccountAuth>;

@@ -42,11 +42,16 @@ export type AppointmentsState =
   | { status: "loading" }
   | { status: "ready"; appointments: Appointment[] }
   // Google's token is missing or no good, and the person has to connect.
-  | { status: "needs-grant" }
+  // With why, when Abodeo tried to go through Google by itself and did not.
+  | { status: "needs-grant"; reason?: StayReason }
   // On the way to Google.
   | { status: "connecting" }
   // Google cannot be reached or the answer was not usable.
   | { status: "unavailable" };
+
+// Why the page did not leave for Google: the person chose to stay, or
+// Google's address could not be got.
+export type StayReason = "stayed" | "failed";
 
 export type AddResult =
   | { ok: true }
@@ -143,10 +148,14 @@ export function useProjectAppointments({
   }, []);
 
   // Saves the page, then goes through Google and comes back to this project.
-  // False if the person chose to stay, or Google could not be started.
+  // "left", or why it stayed. It does not leave once isCurrent says the
+  // project has been closed or the effect run that asked has been cancelled.
   const connect = useCallback(
-    async (openForm: boolean) => {
-      if (!(await optionsRef.current.onBeforeLeave())) return false;
+    async (
+      openForm: boolean,
+      isCurrent = () => isCurrentRef.current,
+    ): Promise<"left" | StayReason> => {
+      if (!(await optionsRef.current.onBeforeLeave())) return "stayed";
       try {
         const response = await send(calendarTestAppointmentPath, {
           method: "POST",
@@ -161,14 +170,14 @@ export function useProjectAppointments({
         const url = (body as { url?: unknown } | undefined)?.url;
         if (typeof url !== "string") {
           noteSignInChange(response.status);
-          return false;
+          return "failed";
         }
         // Not if the person has moved to another project meanwhile.
-        if (!isCurrentRef.current) return false;
+        if (!isCurrent()) return "stayed";
         optionsRef.current.navigate(url);
-        return true;
+        return "left";
       } catch {
-        return false;
+        return "failed";
       }
     },
     [projectId, send, noteSignInChange],
@@ -176,17 +185,24 @@ export function useProjectAppointments({
 
   useEffect(() => {
     isCurrentRef.current = true;
+    // This run's own flag. In development StrictMode runs the effect twice,
+    // and the second run sets isCurrentRef again, so the shared ref cannot
+    // tell the first run it was cancelled. Without this, both runs would
+    // decide about the one automatic reconnect, and the second would show
+    // Connect while the first leaves for Google.
+    let isCancelled = false;
+    const isCurrent = () => !isCancelled;
     const run = async () => {
       let next: AppointmentsState = { status: "unavailable" };
       try {
         const response = await send(
           `${calendarAppointmentsPath}?projectId=${encodeURIComponent(projectId)}`,
         );
-        if (!isCurrentRef.current) return;
+        if (isCancelled) return;
         const body = response.ok
           ? ((await readJson(response)) as AppointmentsResponse | undefined)
           : undefined;
-        if (!isCurrentRef.current) return;
+        if (isCancelled) return;
         noteSignInChange(response.status);
         if (body?.status === "ok" && Array.isArray(body.appointments)) {
           next = { status: "ready", appointments: body.appointments };
@@ -199,17 +215,19 @@ export function useProjectAppointments({
           if (mayRedirect) {
             automaticReconnects += 1;
             setState({ status: "connecting" });
-            if (await connect(false)) return;
-            if (!isCurrentRef.current) return;
+            const result = await connect(false, isCurrent);
+            if (result === "left" || isCancelled) return;
+            next = { status: "needs-grant", reason: result };
           }
         }
       } catch {
-        if (!isCurrentRef.current) return;
+        if (isCancelled) return;
       }
       setState(next);
     };
     void run();
     return () => {
+      isCancelled = true;
       isCurrentRef.current = false;
     };
   }, [projectId, reloads, send, connect, noteSignInChange]);
@@ -240,7 +258,9 @@ export function useProjectAppointments({
     }
     const before = state;
     setState({ status: "connecting" });
-    if (!(await connect(true)) && isCurrentRef.current) setState(before);
+    if ((await connect(true)) !== "left" && isCurrentRef.current) {
+      setState(before);
+    }
   };
 
   const closeForm = () => setIsFormOpen(false);
@@ -293,7 +313,9 @@ export function useProjectAppointments({
     setMessage(null);
     const before = state;
     setState({ status: "connecting" });
-    if (!(await connect(withForm)) && isCurrentRef.current) setState(before);
+    if ((await connect(withForm)) !== "left" && isCurrentRef.current) {
+      setState(before);
+    }
   };
 
   return { state, isFormOpen, message, openForm, closeForm, add, reconnect };

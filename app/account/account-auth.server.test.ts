@@ -1,15 +1,19 @@
 // @vitest-environment node
 import type { BetterAuthOptions } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
+import { google } from "better-auth/social-providers";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   buildAccountAuthOptions,
   buildDatabaseHooks,
+  buildGoogleUserInfo,
   createMemoryRateLimitStorage,
   disabledPaths,
   isEnabledAuthPath,
+  type SignInCapture,
 } from "./account-auth.server";
+import { calendarScope } from "../calendar/calendar-grant.server";
 import type { HistoryStore } from "./account-history.server";
 import {
   createTestAuth,
@@ -189,6 +193,94 @@ describe("createAccountAuth", () => {
     expect(rows.auth_user[0]).toEqual(
       expect.objectContaining({ name: "Ada Lovelace" }),
     );
+  });
+});
+
+// An unsigned ID token: reading the profile does not check the signature,
+// as Better Auth has already checked it by then.
+function encodeIdToken(claims: Record<string, unknown>) {
+  const part = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${part({ alg: "none" })}.${part(claims)}.`;
+}
+
+describe("buildGoogleUserInfo", () => {
+  const idToken = encodeIdToken({
+    sub: "google-sub-1",
+    name: "Ada Lovelace",
+    email: "ada@example.com",
+    email_verified: true,
+    picture: "https://example.com/photo.jpg",
+  });
+  const expiresAt = new Date("2026-11-03T10:00:00Z");
+
+  it("gives the profile exactly as Better Auth's own Google provider does", async () => {
+    const tokens = { idToken, accessToken: "token", scopes: ["openid"] };
+    const fallback = google({ clientId: "", clientSecret: "" });
+
+    const info = await buildGoogleUserInfo({})(tokens);
+
+    expect(info).toEqual(await fallback.getUserInfo(tokens));
+    expect(info?.user).toEqual({
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      image: "https://example.com/photo.jpg",
+      emailVerified: true,
+    });
+  });
+
+  it("keeps the access token when Calendar was allowed", async () => {
+    const capture: SignInCapture = {};
+
+    await buildGoogleUserInfo(capture)({
+      idToken,
+      accessToken: "calendar-token",
+      accessTokenExpiresAt: expiresAt,
+      scopes: ["openid", "email", "profile", calendarScope],
+    });
+
+    expect(capture).toEqual({
+      calendarToken: {
+        accessToken: "calendar-token",
+        expiresAt: expiresAt.getTime(),
+      },
+    });
+  });
+
+  it("keeps nothing when Calendar was declined", async () => {
+    const capture: SignInCapture = {};
+
+    await buildGoogleUserInfo(capture)({
+      idToken,
+      accessToken: "sign-in-token",
+      accessTokenExpiresAt: expiresAt,
+      scopes: ["openid", "email", "profile"],
+    });
+
+    expect(capture).toEqual({});
+  });
+});
+
+describe("buildDatabaseHooks", () => {
+  it("records the signed-in account for the Calendar token, with or without history", async () => {
+    const withHistory: SignInCapture = {};
+    const withoutHistory: SignInCapture = {};
+    const history: HistoryStore = {
+      recordSignIn: async () => {},
+      recordActivity: async () => {},
+    };
+
+    await buildDatabaseHooks(history, withHistory).session.create.after(
+      { userId: "ada" },
+      undefined,
+    );
+    await buildDatabaseHooks(undefined, withoutHistory).session.create.after(
+      { userId: "ada" },
+      undefined,
+    );
+
+    expect(withHistory).toEqual({ userId: "ada" });
+    expect(withoutHistory).toEqual({ userId: "ada" });
   });
 });
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventEmitter } from "node:events";
 
+import type { SignInCapture } from "./account-auth.server";
 import {
   createAccountRequestHandler,
   listenForPoolErrors,
@@ -19,7 +20,12 @@ import {
   signInTestAccount,
   testBaseUrl,
 } from "./test-account.server";
-import { createFakeCalendarDependencies } from "../calendar/test-calendar.server";
+import { calendarScope } from "../calendar/calendar-grant.server";
+import { readCalendarToken } from "../calendar/calendar-token.server";
+import {
+  createFakeCalendarDependencies,
+  testSecret,
+} from "../calendar/test-calendar.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { createPeopleStore } from "../projects/people-store.server";
 import { createFakeDatabase } from "../projects/test-database.server";
@@ -90,6 +96,7 @@ function createTestHandler() {
     people: createMemoryPeopleStore(),
     images: createMemoryImageStore().store,
     calendar: calendar.dependencies,
+    signIn: {},
     close,
   };
   const handle = createAccountRequestHandler(
@@ -171,6 +178,7 @@ describe("createAccountRequestHandler", () => {
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
+          signIn: {},
           close: async () => {},
         }),
         () => true,
@@ -203,6 +211,7 @@ describe("createAccountRequestHandler", () => {
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
+        signIn: {},
         close: async () => {},
       }),
       () => true,
@@ -267,7 +276,7 @@ describe("createAccountRequestHandler", () => {
     expect(new URL(url).searchParams.get("prompt")).toBe("select_account");
   });
 
-  it("does not add permissions given earlier, such as the Calendar one, to sign-in", async () => {
+  it("asks for Calendar at sign-in, with no refresh token and no earlier grants", async () => {
     const { handle } = createTestHandler();
 
     const response = await handle(
@@ -279,7 +288,10 @@ describe("createAccountRequestHandler", () => {
     );
 
     const { url } = (await response.json()) as { url: string };
-    expect(new URL(url).searchParams.has("include_granted_scopes")).toBe(false);
+    const parameters = new URL(url).searchParams;
+    expect(parameters.get("scope")?.split(" ")).toContain(calendarScope);
+    expect(parameters.has("access_type")).toBe(false);
+    expect(parameters.has("include_granted_scopes")).toBe(false);
   });
 
   it("starts the Calendar test for the signed-in account", async () => {
@@ -331,7 +343,7 @@ describe("createAccountRequestHandler", () => {
     expect(other.status).toBe(404);
   });
 
-  it("asks Google only for basic permissions and returns to the dashboard, whatever the page asks", async () => {
+  it("asks Google only for sign-in's own permissions and returns to the dashboard, whatever the page asks", async () => {
     const { handle, rows } = createTestHandler();
 
     const response = await handle(
@@ -352,11 +364,9 @@ describe("createAccountRequestHandler", () => {
     const { url } = (await response.json()) as { url: string };
     const google = new URL(url);
     expect(google.origin).toBe("https://accounts.google.com");
-    expect(google.searchParams.get("scope")?.split(" ").sort()).toEqual([
-      "email",
-      "openid",
-      "profile",
-    ]);
+    expect(google.searchParams.get("scope")?.split(" ").sort()).toEqual(
+      ["email", "openid", "profile", calendarScope].sort(),
+    );
     expect(google.searchParams.get("redirect_uri")).toBe(
       `${testBaseUrl}/api/auth/callback/google`,
     );
@@ -685,6 +695,7 @@ describe("createAccountRequestHandler", () => {
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
+        signIn: {},
         close: async () => {},
       }),
       () => true,
@@ -712,6 +723,7 @@ describe("createAccountRequestHandler", () => {
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
+          signIn: {},
           close: () => new Promise(() => {}),
         }),
         () => true,
@@ -781,5 +793,107 @@ describe("listenForPoolErrors", () => {
     listenForPoolErrors(pool as never, reportFailure);
     pool.emit("error", new Error("Unhandled error"));
     expect(reportFailure).toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe("Google's return to sign-in", () => {
+  const now = Date.now();
+  const allowed: SignInCapture = {
+    calendarToken: { accessToken: "calendar-token", expiresAt: now + 3600_000 },
+    userId: "ada",
+  };
+
+  // Better Auth's answer to Google's return, once the sign-in has learned
+  // what is in capture.
+  async function returnFromGoogle(answer: Response, capture: SignInCapture) {
+    const signIn: SignInCapture = {};
+    const handle = createAccountRequestHandler(
+      () => ({
+        handleAuthRequest: async () => {
+          Object.assign(signIn, capture);
+          return answer;
+        },
+        readSessionUserId: async () => undefined,
+        profiles: createMemoryProfileStore().store,
+        history: createMemoryHistory().history,
+        visits: createMemoryVisits().dependencies,
+        projects: createMemoryProjectStore().store,
+        people: createMemoryPeopleStore(),
+        images: createMemoryImageStore().store,
+        calendar: createFakeCalendarDependencies().dependencies,
+        signIn,
+        close: async () => {},
+      }),
+      () => true,
+      () => {},
+    );
+    return handle(request("/api/auth/callback/google?code=c&state=s"));
+  }
+
+  function redirect(location: string) {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: location, "Set-Cookie": "session=abc; Path=/" },
+    });
+  }
+
+  function readTokenCookie(response: Response) {
+    return response.headers
+      .getSetCookie()
+      .find((value) => value.startsWith("abodeo_calendar_token="));
+  }
+
+  it("keeps the Calendar token when Calendar was allowed", async () => {
+    const response = await returnFromGoogle(
+      redirect(`${testBaseUrl}/dashboard`),
+      allowed,
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(`${testBaseUrl}/dashboard`);
+    expect(response.headers.getSetCookie()).toContain("session=abc; Path=/");
+    const cookie = readTokenCookie(response);
+    expect(cookie).toContain("Path=/api/calendar");
+    const value = cookie?.split(";")[0] ?? null;
+    expect(await readCalendarToken(value, testSecret, "ada", now)).toEqual(
+      expect.objectContaining({ accessToken: "calendar-token" }),
+    );
+  });
+
+  it("keeps the token when the dashboard address is relative", async () => {
+    const response = await returnFromGoogle(redirect("/dashboard"), allowed);
+
+    expect(readTokenCookie(response)).toBeDefined();
+  });
+
+  it("keeps no token when Calendar was declined", async () => {
+    const response = await returnFromGoogle(
+      redirect(`${testBaseUrl}/dashboard`),
+      { userId: "ada" },
+    );
+
+    expect(readTokenCookie(response)).toBeUndefined();
+    expect(response.headers.getSetCookie()).toContain("session=abc; Path=/");
+  });
+
+  it("keeps no token when sign-in returns with an error", async () => {
+    const response = await returnFromGoogle(
+      redirect(`${testBaseUrl}/dashboard?error=access_denied`),
+      allowed,
+    );
+
+    expect(readTokenCookie(response)).toBeUndefined();
+  });
+
+  it("keeps no token when Better Auth answers with an error page", async () => {
+    const response = await returnFromGoogle(
+      new Response(null, { status: 500 }),
+      allowed,
+    );
+
+    expect(response.headers.get("Location")).toBe(
+      `${testBaseUrl}/dashboard?error=unavailable`,
+    );
+    expect(readTokenCookie(response)).toBeUndefined();
   });
 });
