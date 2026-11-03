@@ -338,7 +338,8 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
 
 - Sign-in asks for Calendar too (see [Project appointments](#project-appointments)). This
   separate grant is used when that token is missing or ending. The button posts to
-  `/api/calendar/test-appointment`, which answers with Google's address. Abodeo asks only for `openid` and `calendar.app.created`,
+  `/api/calendar/test-appointment`, which answers with Google's address. Abodeo asks only for
+  `openid` and `calendar.app.created`,
   which lets it make its own calendars and manage their events, and nothing else in the person's
   Google Calendar. Google classes it as non-sensitive. It suggests the signed-in Google account
   and asks for an online token, so Google issues no refresh token.

@@ -284,8 +284,8 @@ export function buildAccountAuthOptions(
         // Google always asks which account to use, rather than signing in
         // again with the last one.
         prompt: "select_account",
-        // Sign-in also asks for Calendar on the same screen, so a project
-        // can list appointments without a separate trip to Google. No
+        // Sign-in also asks for Calendar in the same trip to Google, so a
+        // project can list appointments without a separate trip. No
         // refresh token is asked for, so the token lasts about an hour.
         scope: [calendarScope],
         // Sign-in asks only for the permissions listed here, never
