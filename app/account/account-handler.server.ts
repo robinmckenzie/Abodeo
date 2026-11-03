@@ -9,7 +9,10 @@ import {
   handleAppointmentRequest,
   isAppointmentPath,
 } from "../calendar/appointment-handler.server";
-import { clearCalendarTokenCookie } from "../calendar/calendar-token.server";
+import {
+  clearCalendarTokenCookie,
+  createCalendarTokenCookie,
+} from "../calendar/calendar-token.server";
 import { createCalendarGoogle } from "../calendar/calendar-grant.server";
 import {
   handleCalendarRequest,
@@ -52,7 +55,11 @@ import {
   accountStatusPath,
   authBasePath,
 } from "./account-api";
-import { createAccountAuth, isEnabledAuthPath } from "./account-auth.server";
+import {
+  createAccountAuth,
+  isEnabledAuthPath,
+  type SignInCapture,
+} from "./account-auth.server";
 import { readAccountConfig, type AccountConfig } from "./account-config.server";
 import {
   createHistoryStore,
@@ -89,6 +96,8 @@ export type AccountRuntime = {
   people: PeopleStore;
   images: ImageStore;
   calendar: CalendarDependencies;
+  // What this request's sign-in callback learned from Google, if anything.
+  signIn: SignInCapture;
   // Closes the database connections, once the response is ready.
   close(): Promise<void>;
 };
@@ -115,7 +124,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   listenForPoolErrors(pool);
   const history = createHistoryStore(pool);
   const projects = createProjectStore(pool);
-  const auth = createAccountAuth(config, pool, history);
+  const signIn: SignInCapture = {};
+  const auth = createAccountAuth(config, pool, history, signIn);
   return {
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
@@ -140,6 +150,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
       hasProject: async (userId, projectId) =>
         (await projects.read(userId, projectId)).kind !== "not-found",
     },
+    signIn,
     close: () => pool.end(),
   };
 }
@@ -147,11 +158,43 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
 // How long a response waits for the database connections to close.
 export const accountCloseTimeout = 1000;
 
+// A sign-in that reached the dashboard with Calendar allowed also keeps
+// Google's token in the Calendar cookie, as the separate Calendar flow does.
+// Anything else, including a redirect that carries an error, is left as is.
+export async function addSignInCalendarToken(
+  response: Response,
+  request: Request,
+  signIn: SignInCapture,
+  calendar: Pick<CalendarDependencies, "secret" | "isSecure">,
+  now: number = Date.now(),
+) {
+  const location = response.headers.get("Location");
+  if (!location || response.status < 300 || response.status >= 400) {
+    return response;
+  }
+  const target = new URL(location, request.url);
+  const reachedDashboard =
+    target.pathname === accountReturnPath && !target.searchParams.has("error");
+  const { calendarToken, userId } = signIn;
+  if (!reachedDashboard || !calendarToken || !userId) return response;
+  const withToken = new Response(response.body, response);
+  withToken.headers.append(
+    "Set-Cookie",
+    await createCalendarTokenCookie({
+      ...calendar,
+      ...calendarToken,
+      userId,
+      now,
+    }),
+  );
+  return withToken;
+}
+
 function reportAuthFailure(code: string | undefined) {
   console.error(JSON.stringify({ type: "account_auth_failed", code }));
 }
 
-// Starting sign-in always asks Google for the basic permissions only and
+// Starting sign-in always asks Google for sign-in's own permissions only and
 // returns to the dashboard, whatever the browser asked for, so a page cannot
 // request more of Google or send the person elsewhere afterwards.
 async function fixSignInRequest(request: Request) {
@@ -295,6 +338,14 @@ export function createAccountRequestHandler(
       ) {
         reportFailure(`callback_${response.status}`);
         return fail();
+      }
+      if (pathname === `${authBasePath}/callback/google`) {
+        return await addSignInCalendarToken(
+          response,
+          request,
+          runtime.signIn,
+          runtime.calendar,
+        );
       }
       // Signing out also drops Google's Calendar token.
       if (pathname === `${authBasePath}/sign-out`) {

@@ -88,9 +88,10 @@ tuning panels, stay in the browser either way.
 - Accounts, sessions and profiles are kept in a Neon Postgres database. Production uses the
   database in `DATABASE_URL`. `npm run dev` uses a separate database, `abodeo-local`, through
   `AUTH_DATABASE_URL`, and never reads `DATABASE_URL`, so local accounts never reach production.
-- Starting sign-in always asks Google only for the account's identity, name and email, never
-  adding a Calendar permission given earlier, and always returns to `/dashboard`, whatever the
-  browser sends. Google always asks which account to use.
+- Starting sign-in always asks Google only for the account's identity, name and email, and the
+  Calendar permission (see [Project appointments](#project-appointments)), never adding a wider
+  permission given earlier, and always returns to `/dashboard`, whatever the browser sends.
+  Google always asks which account to use.
   Sign-out ends Abodeo's session, not the Google one, and loads the dashboard afresh. Before
   either leaves the page, anything open is saved, and the person is asked first if something
   cannot be saved.
@@ -335,8 +336,9 @@ has the IP address or the user agent.
 The account panel's "Create test appointment" proves that Abodeo can add appointments to Google
 Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
 
-- Signing in never asks for Calendar access. The button posts to `/api/calendar/test-appointment`,
-  which answers with Google's address. Abodeo asks only for `openid` and `calendar.app.created`,
+- Sign-in asks for Calendar too (see [Project appointments](#project-appointments)). This
+  separate grant is used when that token is missing or ending. The button posts to
+  `/api/calendar/test-appointment`, which answers with Google's address. Abodeo asks only for `openid` and `calendar.app.created`,
   which lets it make its own calendars and manage their events, and nothing else in the person's
   Google Calendar. Google classes it as non-sensitive. It suggests the signed-in Google account
   and asks for an online token, so Google issues no refresh token.
@@ -377,6 +379,13 @@ the account's Abodeo calendar in Google Calendar, and Abodeo keeps no copy. The 
   `/api/calendar/connection` (is the token good for more than five minutes?) and
   `/api/calendar/appointments` (list by `projectId`, and add), which name the account the page
   works for, as the projects endpoints do.
+- Sign-in asks Google for `calendar.app.created` on its own screens (AD #115 Open Projects Without
+  Calendar Connection Interruptions). Google shows Calendar as a separate, unticked choice the
+  first time; a returning person who allowed it sees no permission screen. If it is allowed,
+  Google's return to `/api/auth/callback/google` sets the same token cookie, so projects list
+  appointments straight away. Better Auth's `getUserInfo` is overridden only to catch the token
+  for that response; the account's token columns stay empty. No refresh token is asked for.
+  Declining still signs in, and a project then works as below.
 - Opening a project lists its appointments. With no good token it answers `needs-grant`: an
   account that has an Abodeo calendar (has connected before) goes through Google by itself and
   returns to the project, once per page load and not straight after a refusal or failure; any
