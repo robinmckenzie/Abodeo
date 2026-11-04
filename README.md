@@ -219,6 +219,17 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   tasks, and refuses with `conflict` while it is there, as after Undo. Run
   `db/account-tables.sql` v1.67.0 before deploying this: without the column, the signed-in
   dashboard's project list fails.
+- Signed in, a saved task's row has an Add photos button (shown with its other buttons), and once
+  the task has photos, their count and the newest's thumbnail (`use-task-image-summaries.ts`, one
+  request when the project opens). Choosing either, or dropping pictures on the row, opens the
+  task's photos in a dialog over the project (`task-photos-dialog.tsx`), with the same timeline,
+  captions and viewer as the project's images; the viewer steps only through that task's photos.
+  While the dialog is open, a drop anywhere adds to that task. A drop elsewhere on the page still
+  adds to the project.
+- A deleted task's photos are hidden with its row. When its Undo ends unused (its time runs out,
+  another task is deleted, or the project closes), `TaskList` calls `onUndoEnd` and the dashboard
+  removes them, if it has any. If the browser closes first, or removing fails, they stay hidden and
+  keep using allowance. The project's delete dialog counts task photos in its images.
 - The browser decodes each file, draws a thumbnail (at most 100 KB, usually 20 to 40 KB) and sends
   both in one binary request, with an id it made, so that sending it again after a lost answer
   gives the same image. The server decides the type from the file's content, and checks the

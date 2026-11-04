@@ -23,7 +23,10 @@ import Dashboard from "./dashboard";
 import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
-import { handleImagesRequest } from "../projects/image-handler.server";
+import {
+  handleImagesRequest,
+  isImagesPath,
+} from "../projects/image-handler.server";
 import { handlePeopleRequest } from "../projects/people-handler.server";
 import {
   createPeopleStore,
@@ -122,7 +125,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
     vi.fn(async (path: string, init: RequestInit = {}) => {
       server.calls.push(`${init.method ?? "GET"} ${path}`);
       if (server.hang) return new Promise(() => {});
-      if (/^\/api\/projects\/[^/]+\/images/.test(path)) {
+      if (isImagesPath(path.split("?")[0])) {
         const headers = new Headers(init.headers);
         if (server.session) headers.set("cookie", "ada");
         return handleImagesRequest(
@@ -1457,6 +1460,129 @@ describe("images on the dashboard (AD #48)", () => {
       document.body.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
+  });
+});
+
+describe("task photos on the dashboard (AD #67)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const paint = {
+    id: "t1",
+    title: "Paint",
+    isDone: false,
+    assignee: "unassigned" as const,
+  };
+
+  async function settle() {
+    for (let i = 0; i < 8; i++) await act(async () => {});
+  }
+
+  const png = (name = "porch.png") =>
+    new File([makePng()], name, { type: "image/png" });
+
+  // The images server knows which tasks each project has saved.
+  async function serverWithTask() {
+    const projects = createMemoryProjectStore();
+    const images = createMemoryImageStore({
+      hasTask: (userId, projectId, taskId) =>
+        projects.accounts
+          .get(userId)
+          ?.get(projectId)
+          ?.tasks.some(({ id }) => id === taskId) ?? false,
+    });
+    const server = fakeServer({ session: ada, projects, images });
+    await projects.store.create("ada", "a1", {
+      title: "Shed",
+      notes: "",
+      assignee: "unassigned",
+      dueDate: null,
+      tasks: [paint],
+    });
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    return server;
+  }
+
+  const dropOn = async (target: Element, files: File[]) => {
+    await act(async () => {
+      fireEvent.drop(target, { dataTransfer: { types: ["Files"], files } });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await settle();
+  };
+
+  const taskRow = () =>
+    document.querySelector<HTMLElement>('[data-photo-task-id="t1"]')!;
+  const photosOf = (server: Server) =>
+    server.images.accounts.get("ada")?.filter(({ taskId }) => taskId) ?? [];
+
+  async function addTaskPhotos(server: Server, count: number) {
+    await dropOn(
+      taskRow(),
+      Array.from({ length: count }, (_, index) => png(`p${index}.png`)),
+    );
+    expect(photosOf(server)).toHaveLength(count);
+    await click(screen.getByRole("button", { name: "Close photos" }));
+    await settle();
+  }
+
+  it("adds pictures dropped on a task to it, in its own dialog, apart from the project's images", async () => {
+    const server = await serverWithTask();
+    await dropOn(taskRow(), [png("a.png"), png("b.png")]);
+
+    const dialog = screen.getByRole("dialog", { name: "Paint" });
+    expect(within(dialog).getAllByRole("button", { name: /View full size/ }))
+      .toHaveLength(2);
+    expect(photosOf(server).map(({ taskId }) => taskId)).toEqual(["t1", "t1"]);
+    await click(within(dialog).getByRole("button", { name: "Close photos" }));
+    await settle();
+
+    expect(screen.queryByRole("dialog", { name: "Paint" })).toBeNull();
+    expect(document.querySelectorAll(".project-images .image-entry"))
+      .toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "2 photos of Paint" }),
+    ).toBeTruthy();
+  });
+
+  it("still adds a picture dropped elsewhere to the project", async () => {
+    const server = await serverWithTask();
+    await dropOn(document.body, [png()]);
+    expect(screen.queryByRole("dialog", { name: "Paint" })).toBeNull();
+    expect(server.images.accounts.get("ada")?.map(({ taskId }) => taskId))
+      .toEqual([null]);
+  });
+
+  it("counts task photos in the delete window", async () => {
+    const server = await serverWithTask();
+    await addTaskPhotos(server, 2);
+    await dropOn(document.body, [png()]);
+    await click(screen.getByRole("button", { name: "Delete project" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete “Shed”?" });
+    expect(within(dialog).getByText("3 images")).toBeTruthy();
+  });
+
+  it("keeps a deleted task's photos through Undo, and removes them once the project closes", async () => {
+    const server = await serverWithTask();
+    await addTaskPhotos(server, 1);
+
+    await click(screen.getByRole("button", { name: "Delete Paint" }));
+    await settle();
+    await click(screen.getByRole("button", { name: "Undo deleting Paint" }));
+    await settle();
+    expect(screen.getByRole("button", { name: "1 photo of Paint" }))
+      .toBeTruthy();
+
+    await click(screen.getByRole("button", { name: "Delete Paint" }));
+    await settle();
+    expect(photosOf(server)).toHaveLength(1);
+    await click(screen.getByRole("button", { name: "Close" }));
+    await settle();
+    expect(photosOf(server)).toHaveLength(0);
+    expect(server.calls).toContain("DELETE /api/projects/a1/tasks/t1/images");
   });
 });
 
