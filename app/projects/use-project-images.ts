@@ -7,7 +7,7 @@
 // is made for it.
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { sniffImageType } from "./image-sniff";
+import { identifyUnsupportedFormat, sniffImageType } from "./image-sniff";
 import {
   describeImageFailure,
   describeRefusals,
@@ -364,8 +364,8 @@ export function useProjectImages({
     for (const [position, file] of files.entries()) {
       if (!session.isCurrent) return;
       const entry = entries[position];
-      const refuse = (reason: ImageFailure) => {
-        refused.push({ name: file.name, reason });
+      const refuse = (reason: ImageFailure, format?: string) => {
+        refused.push({ name: file.name, reason, format });
         removeEntries([entry]);
       };
       // A folder, or a file that cannot be read, is not an image.
@@ -375,7 +375,10 @@ export function useProjectImages({
         .then((buffer) => new Uint8Array(buffer))
         .catch(() => null);
       if (!head || sniffImageType(head) === null) {
-        refuse("unsupported-format");
+        refuse(
+          "unsupported-format",
+          (head && identifyUnsupportedFormat(head)) ?? undefined,
+        );
         continue;
       }
       if (file.size > maxImageBytes) {

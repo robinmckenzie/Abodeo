@@ -175,7 +175,7 @@ describe("ProjectImages", () => {
     expect(document.querySelectorAll(".image-entry")).toHaveLength(2);
     expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
     expect(onMessage).toHaveBeenCalledWith(
-      "holiday.png: Sorry, only JPEG and PNG images can be added.",
+      "holiday.png: This looks like a GIF file. Only JPEG and PNG can be added.",
     );
     // The size is checked after the type, so a large non-image is a format
     // problem, and a large image is a size problem.
@@ -184,6 +184,64 @@ describe("ProjectImages", () => {
     expect(server.store.accounts.get("ada")).toHaveLength(2);
     // The messages float, so none is left in the Images section.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("names a recognised other format named .jpg, and otherwise gives the general message (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const webp = new File(
+      ["RIFF\u0024\u0000\u0000\u0000WEBPVP8 "],
+      "photo.jpg",
+      { type: "image/jpeg" },
+    );
+    const unknown = new File(["just some text"], "notes.jpg", {
+      type: "image/jpeg",
+    });
+    chooseFiles([webp, unknown]);
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(2));
+    expect(onMessage).toHaveBeenCalledWith(
+      "photo.jpg: This looks like a WebP file. Only JPEG and PNG can be added.",
+    );
+    expect(onMessage).toHaveBeenCalledWith(
+      "notes.jpg: Sorry, only JPEG and PNG images can be added.",
+    );
+    expect(server.store.accounts.get("ada") ?? []).toHaveLength(0);
+  });
+
+  it("adds a JPEG with data after its end, as phones write (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const photo = new File(
+      [Uint8Array.from([...makeJpeg(500), ...makeJpeg(300)])],
+      "phone.jpg",
+      { type: "image/jpeg" },
+    );
+    chooseFiles([photo]);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
+    );
+    expect(server.store.accounts.get("ada")).toHaveLength(1);
+    expect(onMessage).not.toHaveBeenCalled();
   });
 
   it("refuses an image over 4 MiB as too large", async () => {
