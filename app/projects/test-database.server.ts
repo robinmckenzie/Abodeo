@@ -16,7 +16,6 @@ type Row = {
 // recording each one with its values.
 export function createFakeDatabase() {
   const projects: Row[] = [];
-  const records = new Map<string, { hash: string; ids: string[] }>();
   // Each account's list of people (AD #61 Manage People).
   const people = new Map<string, { data: unknown; revision: number }>();
   // The newest image of each project, as the database would answer.
@@ -52,36 +51,16 @@ export function createFakeDatabase() {
     if (isFailing) throw Object.assign(new Error("down"), { code: "57P01" });
     const [userId] = values as string[];
     if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
-    if (sql.startsWith("select hash, ids from project_defaults_received")) {
-      const record = records.get(userId);
-      return { rows: record ? [{ ...record }] : [] };
-    }
-    if (sql.startsWith("insert into project_defaults_received")) {
-      if (!records.has(userId)) records.set(userId, { hash: "", ids: [] });
-      return { rows: [] };
-    }
-    if (sql.startsWith("update project_defaults_received")) {
-      records.set(userId, {
-        hash: values[1] as string,
-        ids: JSON.parse(values[2] as string),
-      });
-      return { rows: [] };
-    }
     if (sql.startsWith("insert into project ")) {
       const entries = JSON.parse(values[1] as string) as {
         id: string;
         data: unknown;
       }[];
-      const overwrite = sql.includes("do update");
       const rows = [];
       for (const { id, data } of entries) {
         const existing = find(userId, id);
         if (!existing) {
           projects.push({ user_id: userId, id, data, revision: 1 });
-          rows.push({ id });
-        } else if (overwrite && isReached(existing, sql)) {
-          existing.data = data;
-          existing.revision++;
           rows.push({ id });
         }
       }
@@ -301,7 +280,6 @@ export function createFakeDatabase() {
     database,
     projects,
     people,
-    records,
     latestImages,
     images,
     statements,

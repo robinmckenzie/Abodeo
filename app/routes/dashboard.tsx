@@ -26,7 +26,6 @@ import {
   type ProjectSaveFailure,
   type ProjectSaveResult,
 } from "../projects/autosave";
-import { DefaultProjectsPanel } from "../projects/default-projects-panel";
 import {
   DeleteProjectDialog,
   type DeleteMode,
@@ -1170,28 +1169,14 @@ export default function Dashboard() {
         tabIndex={-1}
         isTitleInert={isAddingInPlace}
         actions={
-          <>
-            {/* Replaced by false when the app is built for deployment, which
-                leaves the panel out. Hidden in development too, unless
-                VITE_SHOW_DEVELOPMENT_PANEL=true is set in .env.local. */}
-            {import.meta.env.DEV &&
-              import.meta.env.VITE_SHOW_DEVELOPMENT_PANEL === "true" && (
-                <DefaultProjectsPanel
-                  isSignedIn={view.kind === "account"}
-                  onBeforeChange={() => {
-                    if (view.kind === "browser") closeProject();
-                  }}
-                />
-              )}
-            <button
-              type="button"
-              className="button-secondary add-project"
-              disabled={isAccountUnavailable}
-              onClick={openNewProject}
-            >
-              Add project
-            </button>
-          </>
+          <button
+            type="button"
+            className="button-secondary add-project"
+            disabled={isAccountUnavailable}
+            onClick={openNewProject}
+          >
+            Add project
+          </button>
         }
       >
         {view.kind === "browser" && view.result && !view.result.ok && (

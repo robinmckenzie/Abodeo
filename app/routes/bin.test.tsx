@@ -65,7 +65,6 @@ function fakeServer({ isSignedIn = true } = {}) {
             readSessionUserId: async () => (isSignedIn ? "ada" : undefined),
             store: projects.store,
             reportFailure: () => {},
-            defaultIds: [],
           },
         );
       }

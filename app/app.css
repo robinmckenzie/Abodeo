@@ -740,57 +740,6 @@ html:has(.app-layout) {
   scrollbar-gutter: stable;
 }
 
-/* Development only. Fixed at the bottom right of the window, out of the
-   toolbar's way. */
-.default-projects-panel {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 10;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
-  border: 1px dashed #8a857a;
-  border-radius: 10px;
-  background: var(--paper);
-  font-size: 0.85rem;
-}
-
-.default-projects-label {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.default-projects-panel button {
-  padding: 0.3rem 0.75rem;
-  border: 1px solid var(--ink);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.default-projects-panel button:hover:not(:disabled) {
-  background: var(--hover);
-}
-
-.default-projects-panel p {
-  flex-basis: 100%;
-  max-width: 32rem;
-  margin: 0;
-  color: var(--ink-soft);
-}
-
-.default-projects-panel p:empty {
-  display: none;
-}
-
-.default-projects-note {
-  color: var(--muted);
-}
-
 .screen-title .add-project {
   flex-shrink: 0;
 }
@@ -816,10 +765,9 @@ html:has(.app-layout) {
   stroke-width: var(--screen-icon-stroke-heading);
 }
 
-/* While the account's projects are unavailable, Add project is disabled, and
-   it and the development panel, which has nothing to act on, are hidden. */
-.screen-title .add-project:disabled,
-.screen-title .default-projects-panel:has(~ .add-project:disabled) {
+/* While the account's projects are unavailable, Add project is disabled and
+   hidden. */
+.screen-title .add-project:disabled {
   display: none;
 }
 .app-layout :is(button, [role="button"]):focus-visible {
