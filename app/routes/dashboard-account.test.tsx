@@ -445,7 +445,7 @@ describe("the dashboard's account control", () => {
     expect(screen.getByText(/Signed in as/)).toBeTruthy();
   });
 
-  it("leaves the browser's projects and settings as they are when signing in or out", async () => {
+  it("leaves the browser's settings as they are when signing in or out", async () => {
     const server = fakeServer();
     await renderDashboard();
     await addProject("Paint the fence");
@@ -459,10 +459,16 @@ describe("the dashboard's account control", () => {
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
 
-    // Signed in, the account's projects were shown, so the hint for the
-    // welcome screen is the only addition.
+    // Signed in, the browser's project moved into the account (AD #68) and
+    // the account's projects were shown, so the hint for the welcome screen
+    // is the only addition.
     const after = { ...localStorage };
     delete after["abodeo-account-has-projects"];
+    for (const key of Object.keys(before)) {
+      if (key.startsWith("abodeo-project:") || key === "abodeo-people") {
+        delete before[key];
+      }
+    }
     expect(after).toEqual(before);
   });
 });
@@ -786,6 +792,11 @@ describe("a signed-in account's projects (AD #41)", () => {
     browserProject("b1", "Browser shed");
     refreshProjects();
     const server = fakeServer({ session: ada });
+    // The browser's project stays there while it cannot be moved in.
+    vi.spyOn(server.projects.store, "importProjects").mockRejectedValue(
+      new Error("unreachable"),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
     await server.projects.store.create("ada", "a1", {
       title: "Account shed",
       ...fields,
@@ -900,55 +911,140 @@ describe("a signed-in account's projects (AD #41)", () => {
     });
   });
 
-  it("offers to move the browser's own projects in, and moves them", async () => {
-    browserProject("b1", "Browser shed");
-    refreshProjects();
-    const server = fakeServer({ session: ada });
-    await renderDashboard();
-    await settle();
-    expect(
-      screen.getByText(
-        "This browser has 1 project saved while signed out. Move it into your account?",
-      ),
-    ).toBeTruthy();
+  describe("moving the browser's projects in (AD #68)", () => {
+    it("moves them in by itself, removes them from the browser, and says how many", async () => {
+      browserProject("b1", "Browser shed");
+      browserProject("b2", "Browser porch");
+      refreshProjects();
+      const server = fakeServer({ session: ada });
+      await renderDashboard();
+      await settle();
 
-    await click(screen.getByRole("button", { name: "Move" }));
-    await settle();
+      expect(accountProject(server, "b1")?.title).toBe("Browser shed");
+      expect(accountProject(server, "b2")?.title).toBe("Browser porch");
+      expect(browserProjectIds()).toEqual([]);
+      expect(screen.getByRole("button", { name: /Browser shed/ })).toBeTruthy();
+      expect(
+        screen.getByText(
+          "2 projects from this browser were moved into your account.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Not now" })).toBeNull();
 
-    expect(accountProject(server, "b1")?.title).toBe("Browser shed");
-    expect(browserProjectIds()).toEqual([]);
-    expect(screen.getByRole("button", { name: /Browser shed/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
-  });
+      await click(screen.getByRole("button", { name: "Dismiss" }));
+      expect(screen.queryByText(/moved into your account/)).toBeNull();
+    });
 
-  it("leaves the browser and account as they are on Not now, and offers again at the next sign-in", async () => {
-    browserProject("b1", "Browser shed");
-    refreshProjects();
-    const server = fakeServer({ session: ada });
-    await renderDashboard();
-    await settle();
+    it("says it is moving them while the move is on its way", async () => {
+      browserProject("b1", "Browser shed");
+      refreshProjects();
+      const server = fakeServer({ session: ada });
+      let finish = () => {};
+      const importProjects = server.projects.store.importProjects.bind(
+        server.projects.store,
+      );
+      vi.spyOn(server.projects.store, "importProjects").mockImplementation(
+        (...args) =>
+          new Promise((resolve) => {
+            finish = () => resolve(importProjects(...args));
+          }),
+      );
+      await renderDashboard();
+      await settle();
+      expect(
+        screen.getByText(
+          "Moving the project saved in this browser into your account…",
+        ),
+      ).toBeTruthy();
 
-    await click(screen.getByRole("button", { name: "Not now" }));
-    expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
-    expect(server.projects.accounts.get("ada")!.size).toBe(0);
-    cleanup();
-    await renderDashboard();
-    await settle();
-    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      finish();
+      await settle();
+      expect(
+        screen.getByText(
+          "1 project from this browser was moved into your account.",
+        ),
+      ).toBeTruthy();
+    });
 
-    // jsdom cannot leave the page, so the reload after signing out is stood
-    // in for by rendering again, and its complaint is silenced.
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    // Earlier tests can leave typed tasks behind, which the check before
-    // leaving asks about.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    await click(screen.getByRole("button", { name: /Signed in as/ }));
-    await click(screen.getByRole("button", { name: "Sign out" }));
-    await settle();
-    cleanup();
-    await renderDashboard();
-    await settle();
-    expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
+    it("keeps them in the browser when the move fails, and moves them on Try again", async () => {
+      browserProject("b1", "Browser shed");
+      refreshProjects();
+      const server = fakeServer({ session: ada });
+      vi.spyOn(server.projects.store, "importProjects").mockRejectedValueOnce(
+        new Error("unreachable"),
+      );
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await renderDashboard();
+      await settle();
+
+      expect(
+        screen.getByText(
+          /could not be moved into your account just now\. It is kept here/,
+        ),
+      ).toBeTruthy();
+      expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
+      expect(server.projects.accounts.get("ada")?.size ?? 0).toBe(0);
+
+      await click(screen.getByRole("button", { name: "Try again" }));
+      await settle();
+      expect(accountProject(server, "b1")?.title).toBe("Browser shed");
+      expect(browserProjectIds()).toEqual([]);
+      expect(
+        screen.getByText(
+          "1 project from this browser was moved into your account.",
+        ),
+      ).toBeTruthy();
+    });
+
+    it("moves them at the next sign-in after a failed move", async () => {
+      browserProject("b1", "Browser shed");
+      refreshProjects();
+      const server = fakeServer({ session: ada });
+      vi.spyOn(server.projects.store, "importProjects").mockRejectedValueOnce(
+        new Error("unreachable"),
+      );
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await renderDashboard();
+      await settle();
+      expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
+
+      // A new page load stands in for signing in again.
+      cleanup();
+      await renderDashboard();
+      await settle();
+      expect(accountProject(server, "b1")?.title).toBe("Browser shed");
+      expect(browserProjectIds()).toEqual([]);
+    });
+
+    it("keeps a project changed in the browser while it was moving", async () => {
+      browserProject("b1", "Browser shed");
+      refreshProjects();
+      const server = fakeServer({ session: ada });
+      const importProjects = server.projects.store.importProjects.bind(
+        server.projects.store,
+      );
+      vi.spyOn(server.projects.store, "importProjects").mockImplementation(
+        async (...args) => {
+          const answer = await importProjects(...args);
+          browserProject("b1", "Changed meanwhile");
+          return answer;
+        },
+      );
+      await renderDashboard();
+      await settle();
+
+      expect(accountProject(server, "b1")?.title).toBe("Browser shed");
+      expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
+    });
+
+    it("shows no notice when the browser has no projects of its own", async () => {
+      fakeServer({ session: ada });
+      await renderDashboard();
+      await settle();
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.queryByText(/into your account/)).toBeNull();
+    });
   });
 
   it("says the projects cannot be loaded, showing none of the browser's", async () => {
@@ -1539,16 +1635,20 @@ describe("a signed-in account's people (AD #61)", () => {
     ).toBe(true);
   });
 
-  it("saves the account's list once there is no move to offer, and not before", async () => {
+  it("saves the account's list once the move is done, and not while it fails", async () => {
     browserProject("unassigned");
     refreshProjects();
     const server = fakeServer({ session: ada });
+    vi.spyOn(server.projects.store, "importProjects").mockRejectedValueOnce(
+      new Error("unreachable"),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
     await renderDashboard();
     await settle();
-    // The offer is pending, so the account's list is left unsaved.
+    // The move failed, so the account's list is left unsaved.
     expect(sentPeople(server)).toEqual([]);
 
-    await click(screen.getByRole("button", { name: "Not now" }));
+    await click(screen.getByRole("button", { name: "Try again" }));
     await settle();
     expect(sentPeople(server)).toHaveLength(1);
     expect(await server.people.read("ada")).toMatchObject({
@@ -1572,13 +1672,27 @@ describe("a signed-in account's people (AD #61)", () => {
     await renderDashboard();
     await settle();
 
-    await click(screen.getByRole("button", { name: "Move" }));
-    await settle();
-
     expect(importProjects).toHaveBeenCalledWith("ada", expect.any(Array), [
       { id: "andy", name: "Andy" },
     ]);
     expect(localStorage.getItem("abodeo-people")).toBeNull();
+  });
+
+  it("keeps the browser's people when the move fails", async () => {
+    browserProject("andy");
+    refreshProjects();
+    refreshPeople();
+    const server = fakeServer({ session: ada });
+    vi.spyOn(server.projects.store, "importProjects").mockRejectedValueOnce(
+      new Error("unreachable"),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = localStorage.getItem("abodeo-people");
+    await renderDashboard();
+    await settle();
+
+    expect(before).not.toBeNull();
+    expect(localStorage.getItem("abodeo-people")).toBe(before);
   });
 
   it("loads the list again when a save names someone removed on another device", async () => {
