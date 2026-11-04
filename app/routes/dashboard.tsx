@@ -30,10 +30,7 @@ import {
   DeleteProjectDialog,
   type DeleteMode,
 } from "../projects/delete-project-dialog";
-import {
-  FloatingMessages,
-  useFloatingMessages,
-} from "../ui/floating-messages";
+import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
 import {
   areAllTypesUnsupported,
   noProjectOpenMessage,
@@ -1315,9 +1312,14 @@ export default function Dashboard() {
             ),
           ]}
         </ul>
-        {isShowingList && list.length === 0 && unreadableCount === 0 && (
-          <p className="dashboard-empty">No projects added yet.</p>
-        )}
+        {isShowingList &&
+          list.length === 0 &&
+          unreadableCount === 0 &&
+          // Not while moved projects are on their way into the list.
+          currentMove?.status !== "moving" &&
+          currentMove?.status !== "moved" && (
+            <p className="dashboard-empty">No projects added yet.</p>
+          )}
         {!isInPlace && open && (
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
