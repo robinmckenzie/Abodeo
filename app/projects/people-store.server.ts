@@ -7,6 +7,9 @@
 import type { Queryable } from "../account/account-profile.server";
 import {
   addPerson,
+  countAssignedProjects,
+  countAssignedTasks,
+  findUnassignChanges,
   movePerson,
   derivePeopleFromProjects,
   readPeople,
@@ -23,7 +26,7 @@ import type {
   PeopleOperation,
   PeopleResponse,
 } from "./people-api";
-import { parseProject } from "./projects";
+import { parseProject, serialiseProject, type Project } from "./projects";
 import {
   inTransaction,
   type TransactionalDatabase,
@@ -31,11 +34,16 @@ import {
 
 export type PeopleOutcome =
   | { kind: "done"; people: Person[]; revision: number }
-  | { kind: "preview"; count: number; unreadable: number }
+  | { kind: "preview"; count: number; taskCount: number; unreadable: number }
   | { kind: "invalid-name"; problem: PeopleInvalidName }
   | { kind: "duplicate" }
   | { kind: "not-found" }
-  | { kind: "count-changed"; count: number; unreadable: number }
+  | {
+      kind: "count-changed";
+      count: number;
+      taskCount: number;
+      unreadable: number;
+    }
   // The saved list cannot be read: damaged, or from a later version.
   | { kind: "unreadable" };
 
@@ -152,21 +160,34 @@ export function createPeopleStore(
     prepare?: (userId: string) => Promise<unknown>;
   } = {},
 ): PeopleStore {
-  // The readable and unreadable projects assigned to the person.
-  const findAssigned = async (query: Queryable, userId: string, id: string) => {
+  // The readable projects with the person assigned to them or to any of
+  // their tasks, with each row's revision, and how many such projects could
+  // not be read. With lock, the rows are held until the transaction ends.
+  const findAssigned = async (
+    query: Queryable,
+    userId: string,
+    id: string,
+    { lock = false }: { lock?: boolean } = {},
+  ) => {
     const { rows } = await query.query(
-      `select id, data from project
+      `select id, data, revision from project
        where user_id = $1 and deleted_at is null
-       and data->>'assignee' = $2 for update`,
+       and (data->>'assignee' = $2
+         or data->'tasks' @> jsonb_build_array(jsonb_build_object('assignee', $2::text)))${lock ? " for update" : ""}`,
       [userId, id],
     );
-    const readable: string[] = [];
+    const readable: { project: Project; revision: unknown }[] = [];
     for (const row of rows) {
-      if (readStoredProject(String(row.id), row.data)) {
-        readable.push(String(row.id));
-      }
+      const project = readStoredProject(String(row.id), row.data);
+      if (project) readable.push({ project, revision: row.revision });
     }
-    return { readable, unreadable: rows.length - readable.length };
+    const projects = readable.map(({ project }) => project);
+    return {
+      readable,
+      count: countAssignedProjects(projects, id),
+      taskCount: countAssignedTasks(projects, id),
+      unreadable: rows.length - readable.length,
+    };
   };
 
   const preview = async (
@@ -175,18 +196,14 @@ export function createPeopleStore(
   ): Promise<PeopleOutcome> => {
     const people = await readAccountPeople(database, userId);
     if (!people.some((person) => person.id === id)) {
-      return { kind: "preview", count: 0, unreadable: 0 };
+      return { kind: "preview", count: 0, taskCount: 0, unreadable: 0 };
     }
-    const { rows } = await database.query(
-      `select id, data from project
-       where user_id = $1 and deleted_at is null
-       and data->>'assignee' = $2`,
-      [userId, id],
+    const { count, taskCount, unreadable } = await findAssigned(
+      database,
+      userId,
+      id,
     );
-    const count = rows.filter((row) =>
-      readStoredProject(String(row.id), row.data),
-    ).length;
-    return { kind: "preview", count, unreadable: rows.length - count };
+    return { kind: "preview", count, taskCount, unreadable };
   };
 
   const removeFrom = async (
@@ -195,23 +212,39 @@ export function createPeopleStore(
     locked: Extract<LockedList, { kind: "found" }>,
     id: string,
     expectedCount: number | undefined,
+    expectedTaskCount: number | undefined,
   ): Promise<PeopleOutcome> => {
     // Already removed, as by an earlier try whose answer was lost.
     if (!locked.people.some((person) => person.id === id)) {
       return { kind: "done", people: locked.people, revision: locked.revision };
     }
-    const { readable, unreadable } = await findAssigned(client, userId, id);
-    if (expectedCount !== undefined && expectedCount !== readable.length) {
-      return { kind: "count-changed", count: readable.length, unreadable };
+    const { readable, count, taskCount, unreadable } = await findAssigned(
+      client,
+      userId,
+      id,
+      { lock: true },
+    );
+    if (
+      (expectedCount !== undefined && expectedCount !== count) ||
+      (expectedTaskCount !== undefined && expectedTaskCount !== taskCount)
+    ) {
+      return { kind: "count-changed", count, taskCount, unreadable };
     }
-    if (readable.length > 0) {
+    // Each row is locked, so its revision is still the one read.
+    for (const { project, revision } of readable) {
+      const changes = findUnassignChanges(project, (other) => other === id);
+      if (!changes) continue;
       await client.query(
-        `update project
-         set data = jsonb_set(data, '{assignee}', '"unassigned"'::jsonb),
-             revision = revision + 1
-         where user_id = $1
-         and id in (select jsonb_array_elements_text($2::jsonb))`,
-        [userId, JSON.stringify(readable)],
+        `update project set data = $3::jsonb, revision = revision + 1
+         where user_id = $1 and id = $2 and revision = $4
+         and deleted_at is null
+         returning id`,
+        [
+          userId,
+          project.id,
+          serialiseProject({ ...project, ...changes }),
+          revision,
+        ],
       );
     }
     const people = removePerson(locked.people, id);
@@ -264,6 +297,7 @@ export function createPeopleStore(
               locked,
               operation.id,
               operation.expectedCount,
+              operation.expectedTaskCount,
             );
           case "move": {
             const change = movePerson(

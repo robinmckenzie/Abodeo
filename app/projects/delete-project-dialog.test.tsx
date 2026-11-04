@@ -16,9 +16,9 @@ beforeAll(() => {
 afterEach(cleanup);
 
 const tasks = [
-  { id: "a", title: "Tiles", isDone: false },
-  { id: "b", title: "Grout", isDone: true },
-  { id: "c", title: "Seal", isDone: false },
+  { id: "a", title: "Tiles", isDone: false, assignee: "unassigned" },
+  { id: "b", title: "Grout", isDone: true, assignee: "unassigned" },
+  { id: "c", title: "Seal", isDone: false, assignee: "unassigned" },
 ];
 
 function renderDialog(

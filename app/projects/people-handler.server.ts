@@ -47,8 +47,20 @@ function reportPeopleFailure(code: string | undefined) {
 // checked by the store, which says what is wrong with it.
 function readOperation(body: unknown): PeopleOperation | undefined {
   if (typeof body !== "object" || body === null) return undefined;
-  const { op, id, name, jobTitle, phone, email, toIndex, expectedCount, dryRun } =
-    body as Record<string, unknown>;
+  const {
+    op,
+    id,
+    name,
+    jobTitle,
+    phone,
+    email,
+    toIndex,
+    expectedCount,
+    expectedTaskCount,
+    dryRun,
+  } = body as Record<string, unknown>;
+  const isCount = (value: unknown) =>
+    value === undefined || (Number.isInteger(value) && (value as number) >= 0);
   switch (op) {
     case "details":
       if (!isPersonId(id) || typeof name !== "string" || typeof jobTitle !== "string" || typeof phone !== "string" || typeof email !== "string") return undefined;
@@ -70,10 +82,7 @@ function readOperation(body: unknown): PeopleOperation | undefined {
         : undefined;
     case "remove": {
       if (!isPersonId(id)) return undefined;
-      if (
-        expectedCount !== undefined &&
-        !(Number.isInteger(expectedCount) && (expectedCount as number) >= 0)
-      ) {
+      if (!isCount(expectedCount) || !isCount(expectedTaskCount)) {
         return undefined;
       }
       if (dryRun !== undefined && typeof dryRun !== "boolean") {
@@ -84,6 +93,9 @@ function readOperation(body: unknown): PeopleOperation | undefined {
         id,
         ...(expectedCount !== undefined && {
           expectedCount: expectedCount as number,
+        }),
+        ...(expectedTaskCount !== undefined && {
+          expectedTaskCount: expectedTaskCount as number,
         }),
         ...(dryRun !== undefined && { dryRun }),
       };
@@ -165,6 +177,7 @@ export async function handlePeopleRequest(
       case "preview":
         return respondWithJson(200, {
           count: outcome.count,
+          taskCount: outcome.taskCount,
           unreadable: outcome.unreadable,
         });
       case "invalid-name":
@@ -178,6 +191,7 @@ export async function handlePeopleRequest(
       case "count-changed":
         return respondWithPeopleError(409, "count_changed", {
           count: outcome.count,
+          taskCount: outcome.taskCount,
           unreadable: outcome.unreadable,
         });
       case "unreadable":

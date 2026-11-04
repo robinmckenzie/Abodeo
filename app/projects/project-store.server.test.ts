@@ -22,6 +22,13 @@ const project = (id: string, title: string, overrides: Partial<Project> = {}) =>
 
 const savedForm = (value: Project) => JSON.parse(serialiseProject(value));
 
+const task = (id: string, assignee = "unassigned") => ({
+  id,
+  title: id,
+  isDone: false,
+  assignee,
+});
+
 function makeDefaults(projects: Project[]): DefaultProjects {
   return readDefaultProjects({
     projects: projects.map((value) => ({ id: value.id, ...savedForm(value) })),
@@ -412,6 +419,32 @@ describe("the project store", () => {
       ).toMatchObject({ kind: "saved", project: { assignee: "andy" } });
     });
 
+    it("refuses a save assigning a task to someone not in the list (AD #66)", async () => {
+      const fake = createFakeDatabase();
+      saveList(fake, [andy]);
+      const store = createProjectStore(fake.database, { defaults: null, now });
+      await store.create("ada", "p1", project("p1", "Shed"));
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { tasks: [] },
+          { tasks: [task("t1", "boris")] },
+        ),
+      ).toEqual({ kind: "unknown-assignee" });
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { tasks: [] },
+          { tasks: [task("t1", "andy")] },
+        ),
+      ).toMatchObject({
+        kind: "saved",
+        project: { assignee: "unassigned", tasks: [{ assignee: "andy" }] },
+      });
+    });
+
     it("drops a default project's person who is not in the list to Unassigned", async () => {
       const fake = createFakeDatabase();
       const defaults = makeDefaults([
@@ -566,6 +599,31 @@ describe("the project store", () => {
         ).toHaveLength(2);
       });
 
+      it("matches the people tasks are assigned to as it does the project's (AD #66)", async () => {
+        const fake = createFakeDatabase();
+        saveList(fake, [{ id: "b9", name: "boris" }]);
+        const store = createProjectStore(fake.database, {
+          defaults: null,
+          now,
+        });
+        await store.importProjects(
+          "ada",
+          [project("p1", "Shed", { tasks: [task("a", "x1"), task("b", "x2")] })],
+          browser,
+        );
+        expect(
+          (fake.projects[0].data as Project).tasks.map((t) => t.assignee),
+        ).toEqual(["unassigned", "b9"]);
+        // Sent again, it is found as already moved, not copied.
+        expect(
+          await store.importProjects(
+            "ada",
+            [project("p1", "Shed", { tasks: [task("a", "x1"), task("b", "x2")] })],
+            browser,
+          ),
+        ).toEqual({ p1: "already-moved" });
+      });
+
       it("finds what it made before when sent again after someone was renamed", async () => {
         const fake = createFakeDatabase();
         saveList(fake, [{ id: "b9", name: "Boris" }]);
@@ -704,6 +762,34 @@ describe("the project store", () => {
 
       expect(await store.read("ada", "p1")).toMatchObject({
         project: { assignee: "unassigned" },
+      });
+    });
+
+    it("restores tasks whose person was removed as Unassigned (AD #66)", async () => {
+      const { fake, store } = setUp();
+      const saveList = (people: { id: string; name: string }[]) =>
+        fake.people.set("ada", { data: { version: 1, people }, revision: 1 });
+      saveList([
+        { id: "andy", name: "Andy" },
+        { id: "boris", name: "Boris" },
+      ]);
+      await store.create(
+        "ada",
+        "p1",
+        project("p1", "Paint", {
+          assignee: "boris",
+          tasks: [task("a", "andy"), task("b", "boris")],
+        }),
+      );
+      await store.remove("ada", "p1");
+      saveList([{ id: "boris", name: "Boris" }]);
+      await store.restore("ada", "p1");
+
+      expect(await store.read("ada", "p1")).toMatchObject({
+        project: {
+          assignee: "boris",
+          tasks: [{ assignee: "unassigned" }, { assignee: "boris" }],
+        },
       });
     });
 

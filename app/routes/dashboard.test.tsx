@@ -34,6 +34,10 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close = function () {
     this.removeAttribute("open");
   };
+  // Nor popovers, which it always hides, such as a task's list of people.
+  const shown = document.createElement("style");
+  shown.textContent = "[popover] { display: grid !important; }";
+  document.head.append(shown);
 });
 
 // Sign-in is not set up, so projects are kept in the browser, as signed out.
@@ -988,8 +992,11 @@ describe("tasks", () => {
     screen
       .queryAllByRole("button", { name: /^Edit / })
       .map((button) => button.textContent);
-  const savedTasks = (): { title: string; isDone: boolean }[] =>
-    savedProjects()[0].tasks;
+  const savedTasks = (): {
+    title: string;
+    isDone: boolean;
+    assignee: string;
+  }[] => savedProjects()[0].tasks;
 
   async function openKitchen() {
     await renderDashboard();
@@ -1291,6 +1298,105 @@ describe("tasks", () => {
       "Seal",
       "Tiles",
     ]);
+  });
+
+  describe("assigned to people (AD #66 Assign Tasks To People)", () => {
+    const assigneeButton = (title: string) =>
+      screen.getByRole("button", {
+        name: new RegExp(`^${title} is assigned to`),
+      });
+
+    it("start Unassigned, and are assigned one at a time on their rows, leaving the project's", async () => {
+      savePeople("Andy", "Boris");
+      await openKitchen();
+      await enterTasks("Tiles\nGrout");
+      expect(assigneeButton("Tiles").textContent).toBe("Unassigned");
+      expect(assigneeButton("Grout").textContent).toBe("Unassigned");
+
+      fireEvent.click(assigneeButton("Tiles"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("menuitemradio", { name: "Boris" }));
+      });
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(assigneeButton("Tiles").textContent).toBe("Boris");
+      expect(assigneeButton("Grout").textContent).toBe("Unassigned");
+      expect(savedProjects()[0].assignee).toBe("unassigned");
+      expect(savedTasks().map((task) => task.assignee)).toEqual([
+        "boris",
+        "unassigned",
+      ]);
+
+      // Unassigned clears it, and it survives reopening.
+      fireEvent.click(assigneeButton("Tiles"));
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("menuitemradio", { name: "Unassigned" }),
+        );
+      });
+      expect(assigneeButton("Tiles").textContent).toBe("Unassigned");
+      fireEvent.click(assigneeButton("Grout"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("menuitemradio", { name: "Andy" }));
+      });
+      cleanup();
+      refreshProjects();
+      await renderDashboard();
+      fireEvent.click(bars()[0]);
+      expect(assigneeButton("Tiles").textContent).toBe("Unassigned");
+      expect(assigneeButton("Grout").textContent).toBe("Andy");
+    });
+
+    it("can be chosen with the keyboard alone, and Escape closes only the list", async () => {
+      savePeople("Andy", "Boris");
+      await openKitchen();
+      await enterTasks("Tiles");
+      assigneeButton("Tiles").focus();
+      fireEvent.keyDown(assigneeButton("Tiles"), { key: "ArrowDown" });
+      const menu = screen.getByRole("menu");
+      expect(document.activeElement).toBe(
+        screen.getByRole("menuitemradio", { name: "Unassigned" }),
+      );
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(
+        screen.getByRole("menuitemradio", { name: "Boris" }),
+      );
+      fireEvent.keyDown(menu, { key: "Escape" });
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(document.activeElement).toBe(assigneeButton("Tiles"));
+      // The project is still open.
+      expect(titleField()).toBeTruthy();
+      fireEvent.keyDown(assigneeButton("Tiles"), { key: "ArrowDown" });
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "End" });
+      await act(async () => {
+        (document.activeElement as HTMLElement).click();
+      });
+      expect(assigneeButton("Tiles").textContent).toBe("Boris");
+      expect(document.activeElement).toBe(assigneeButton("Tiles"));
+    });
+
+    it("keep their person when moved, renamed, ticked, deleted and put back", async () => {
+      savePeople("Andy");
+      await openKitchen();
+      await enterTasks("Tiles\nGrout");
+      fireEvent.click(assigneeButton("Grout"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("menuitemradio", { name: "Andy" }));
+      });
+      await click("Move Grout up");
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("checkbox", { name: "Mark Grout as done" }),
+        );
+      });
+      await click("Delete Grout");
+      await click("Undo deleting Grout");
+      expect(assigneeButton("Grout").textContent).toBe("Andy");
+      expect(savedTasks().map((task) => [task.title, task.assignee])).toEqual([
+        ["Grout", "andy"],
+        ["Tiles", "unassigned"],
+      ]);
+    });
   });
 });
 

@@ -128,8 +128,14 @@ describe("the browser's list of people", () => {
       await createAssigned("One", "andy");
       await createAssigned("Two", "andy");
       await createAssigned("Three", "boris");
-      expect(countStoredAssignedProjects("andy")).toBe(2);
-      expect(countStoredAssignedProjects("zed")).toBe(0);
+      expect(countStoredAssignedProjects("andy")).toEqual({
+        count: 2,
+        taskCount: 0,
+      });
+      expect(countStoredAssignedProjects("zed")).toEqual({
+        count: 0,
+        taskCount: 0,
+      });
     });
 
     it.each([
@@ -147,7 +153,10 @@ describe("the browser's list of people", () => {
       await createAssigned("Two", "boris");
       await createAssigned("Three", "andy");
       loadPeople();
-      const result = await removeStoredPerson("andy", 2);
+      const result = await removeStoredPerson("andy", {
+        count: 2,
+        taskCount: 0,
+      });
       expect(result).toEqual({
         ok: true,
         people: [{ id: "boris", name: "Boris" }],
@@ -180,10 +189,13 @@ describe("the browser's list of people", () => {
     it("changes nothing when the count is no longer the one confirmed", async () => {
       await createAssigned("One", "andy");
       loadPeople();
-      expect(await removeStoredPerson("andy", 0)).toEqual({
+      expect(
+        await removeStoredPerson("andy", { count: 0, taskCount: 0 }),
+      ).toEqual({
         ok: false,
         reason: "count-changed",
         count: 1,
+        taskCount: 0,
       });
       expect(assigneesOf()).toEqual(["andy"]);
       expect(readStoredPeople()).toMatchObject({ people: [{ id: "andy" }] });
@@ -196,17 +208,54 @@ describe("the browser's list of people", () => {
         "abodeo-project:future",
         JSON.stringify({ version: 99, assignee: "andy" }),
       );
-      expect(await removeStoredPerson("andy", 1)).toMatchObject({ ok: true });
+      expect(
+        await removeStoredPerson("andy", { count: 1, taskCount: 0 }),
+      ).toMatchObject({ ok: true });
       expect(localStorage.getItem("abodeo-project:future")).toBe(
         JSON.stringify({ version: 99, assignee: "andy" }),
       );
     });
 
+    it("counts and unassigns their tasks, keeping the others (AD #66)", async () => {
+      const id = await createAssigned("One", "boris");
+      loadPeople();
+      await addStoredPerson("andy", "Andy");
+      const task = (taskId: string, assignee: string) => ({
+        id: taskId,
+        title: taskId,
+        isDone: false,
+        assignee,
+      });
+      await saveProjectChanges(id, {
+        tasks: [task("a", "andy"), task("b", "boris"), task("c", "andy")],
+      });
+      expect(countStoredAssignedProjects("andy")).toEqual({
+        count: 0,
+        taskCount: 2,
+      });
+      expect(
+        await removeStoredPerson("andy", { count: 0, taskCount: 1 }),
+      ).toMatchObject({ ok: false, reason: "count-changed", taskCount: 2 });
+      expect(
+        await removeStoredPerson("andy", { count: 0, taskCount: 2 }),
+      ).toMatchObject({ ok: true });
+      const loaded = loadProjects();
+      if (!loaded.ok) throw new Error("not loaded");
+      expect(loaded.projects[0].assignee).toBe("boris");
+      expect(loaded.projects[0].tasks.map((t) => t.assignee)).toEqual([
+        "unassigned",
+        "boris",
+        "unassigned",
+      ]);
+    });
+
     it("finds the person already removed when sent again", async () => {
       await createAssigned("One", "andy");
       loadPeople();
-      await removeStoredPerson("andy", 1);
-      expect(await removeStoredPerson("andy", 1)).toEqual({
+      await removeStoredPerson("andy", { count: 1, taskCount: 0 });
+      expect(
+        await removeStoredPerson("andy", { count: 1, taskCount: 0 }),
+      ).toEqual({
         ok: true,
         people: [],
       });

@@ -1036,8 +1036,8 @@ describe("a signed-in account's projects (AD #41)", () => {
         title,
         ...fields,
         tasks: [
-          { id: "t1", title: "Tiles", isDone: false },
-          { id: "t2", title: "Grout", isDone: false },
+          { id: "t1", title: "Tiles", isDone: false, assignee: "unassigned" },
+          { id: "t2", title: "Grout", isDone: false, assignee: "unassigned" },
         ],
       });
       await renderDashboard();

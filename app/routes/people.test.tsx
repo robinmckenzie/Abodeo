@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import People, { describeRemoval } from "./people";
 import { serialisePeople } from "../projects/people";
 import { peopleKey, readStoredPeople } from "../projects/people-storage";
-import { createProject, loadProjects } from "../projects/project-storage";
+import {
+  createProject,
+  loadProjects,
+  saveProjectChanges,
+} from "../projects/project-storage";
 import { newProjectFields } from "../projects/projects";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
@@ -55,6 +59,7 @@ async function saveAssignedProject(title: string, assignee: string) {
     localStorage.getItem(key)!.replace('"unassigned"', `"${assignee}"`),
   );
   refreshProjects();
+  return created.project.id;
 }
 
 async function renderPeople() {
@@ -308,7 +313,7 @@ describe("the People screen", () => {
     await press("Delete Andy");
     const dialog = screen.getByRole("alertdialog", { name: "Remove Andy" });
     expect(dialog.textContent).toContain(
-      "Andy is not assigned to any project.",
+      "Andy is not assigned to any project or task.",
     );
     expect(names()).toEqual(["Andy", "Boris"]);
     await press("Remove");
@@ -335,6 +340,28 @@ describe("the People screen", () => {
       loaded.ok && loaded.projects.map((project) => project.assignee).sort(),
     ).toEqual(["boris", "unassigned", "unassigned"]);
     expect(floatingMessage()).toBe("Andy was removed.");
+  });
+
+  it("counts the tasks assigned to someone, and unassigns them only once confirmed (AD #66)", async () => {
+    savePeople("Andy", "Boris");
+    const id = await saveAssignedProject("Shed", "boris");
+    const task = (title: string, assignee: string) => ({ id: title, title, isDone: false, assignee });
+    await saveProjectChanges(id, { tasks: [task("Paint", "andy"), task("Oil", "andy"), task("Fit", "boris")] });
+    await renderPeople();
+    await press("Delete Andy");
+    expect(screen.getByRole("alertdialog", { name: "Remove Andy" }).textContent).toContain(
+      "Andy is assigned to 2 tasks. Removing Andy sets them to Unassigned.",
+    );
+    await press("Cancel");
+    const assigneesOf = () => {
+      const loaded = loadProjects();
+      return loaded.ok ? loaded.projects[0].tasks.map((t) => t.assignee) : [];
+    };
+    expect(assigneesOf()).toEqual(["andy", "andy", "boris"]);
+    await press("Delete Andy");
+    await press("Remove");
+    expect(names()).toEqual(["Boris"]);
+    expect(assigneesOf()).toEqual(["unassigned", "unassigned", "boris"]);
   });
 
   it("keeps everything when the removal is cancelled", async () => {
@@ -394,19 +421,28 @@ describe("describing a removal", () => {
   const person = { id: "andy", name: "Andy" };
 
   it("names the number of projects", () => {
-    expect(describeRemoval({ person, count: 1, unreadable: 0 })).toBe(
+    expect(describeRemoval({ person, count: 1, taskCount: 0, unreadable: 0 })).toBe(
       "Andy is assigned to 1 project. Removing Andy sets it to Unassigned.",
     );
-    expect(describeRemoval({ person, count: 0, unreadable: 0 })).toBe(
-      "Andy is not assigned to any project.",
+    expect(describeRemoval({ person, count: 0, taskCount: 0, unreadable: 0 })).toBe(
+      "Andy is not assigned to any project or task.",
+    );
+  });
+
+  it("names the number of tasks, with or without projects (AD #66)", () => {
+    expect(describeRemoval({ person, count: 0, taskCount: 1, unreadable: 0 })).toBe(
+      "Andy is assigned to 1 task. Removing Andy sets it to Unassigned.",
+    );
+    expect(describeRemoval({ person, count: 1, taskCount: 3, unreadable: 0 })).toBe(
+      "Andy is assigned to 1 project and 3 tasks. Removing Andy sets them to Unassigned.",
     );
   });
 
   it("says how many projects could not be read and were not changed", () => {
-    expect(describeRemoval({ person, count: 3, unreadable: 2 })).toBe(
+    expect(describeRemoval({ person, count: 3, taskCount: 0, unreadable: 2 })).toBe(
       "Andy is assigned to 3 projects. Removing Andy sets them to Unassigned. 2 projects could not be read and were not changed.",
     );
-    expect(describeRemoval({ person, count: 3, unreadable: 1 })).toMatch(
+    expect(describeRemoval({ person, count: 3, taskCount: 0, unreadable: 1 })).toMatch(
       /1 project could not be read/,
     );
   });
