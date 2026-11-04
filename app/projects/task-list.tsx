@@ -20,21 +20,13 @@ import {
   setTaskDone,
   type Task,
 } from "./tasks";
+import type { TaskDrafts } from "./task-drafts";
 
 export type TaskChange = (tasks: Task[]) => Task[];
 
 // How long Undo is offered after a task is deleted. Closing the project also
 // ends it.
 export const undoDuration = 8000;
-
-// Text typed into a project's box but not yet added, kept until the page
-// reloads, so that closing the project does not lose it.
-const unsubmittedText = new Map<string, string>();
-
-// Whether any project has such text, which leaving the page would lose.
-export function hasUnsubmittedTaskText() {
-  return [...unsubmittedText.values()].some((text) => text.trim() !== "");
-}
 
 // Identifies a task being dragged, so that only tasks can be dropped here,
 // and a task dropped into a text field does not type its title there.
@@ -55,6 +47,7 @@ const titleSteps: Partial<Record<string, -1 | 1>> = {
 export function TaskList({
   projectId,
   tasks,
+  drafts,
   onChange,
   finishEditRef,
   className,
@@ -62,6 +55,9 @@ export function TaskList({
 }: {
   projectId: string;
   tasks: Task[];
+  // Keeps text typed into the box but not yet added, so that closing the
+  // project does not lose it.
+  drafts: TaskDrafts;
   // Saves a change, giving the reason it failed, or null once saved.
   onChange: (change: TaskChange) => Promise<string | null>;
   // Set while a title is being edited, so that closing the project can save
@@ -78,7 +74,7 @@ export function TaskList({
   // Each task's place in the list as last shown, from which a reordered
   // task slides to its new place.
   const rowTopsRef = useRef(new Map<string, number>());
-  const [text, setText] = useState(() => unsubmittedText.get(projectId) ?? "");
+  const [text, setText] = useState(() => drafts.readText(projectId));
   const [failure, setFailure] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(
     null,
@@ -212,8 +208,7 @@ export function TaskList({
 
   const changeText = (value: string) => {
     setText(value);
-    if (value) unsubmittedText.set(projectId, value);
-    else unsubmittedText.delete(projectId);
+    drafts.keepText(projectId, value);
   };
 
   const isAddingRef = useRef(false);
@@ -226,7 +221,8 @@ export function TaskList({
     isAddingRef.current = false;
     if (reason) return;
     isShowingAddedRef.current = true;
-    changeText("");
+    setText("");
+    drafts.clearText(projectId);
   };
 
   // The list scrolls to show the tasks added at its end.
