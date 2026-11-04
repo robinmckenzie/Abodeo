@@ -11,8 +11,9 @@ import { calculateDragScroll } from "./drag-scroll";
 import type { TaskImageSummary } from "./images-api";
 import type { Person } from "./people";
 import type { AddPerson } from "./project-form";
+import { canAnimate } from "../ui/can-animate";
+import { fitHeightToText } from "../ui/fit-height-to-text";
 import { ArrowIcon, BinIcon, DragHandleIcon, PhotoIcon } from "../ui/icons";
-import { canAnimate } from "./project-bar";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
 import { TaskAssigneePicker } from "./task-assignee-picker";
 import {
@@ -740,12 +741,6 @@ function findClickedCharacter(event: React.MouseEvent<HTMLElement>) {
 function findShift(row: HTMLElement) {
   const transform = getComputedStyle(row).transform;
   return !transform || transform === "none" ? 0 : new DOMMatrix(transform).m42;
-}
-
-export function fitHeightToText(box: HTMLTextAreaElement) {
-  box.style.height = "auto";
-  const borders = box.offsetHeight - box.clientHeight;
-  box.style.height = `${box.scrollHeight + borders}px`;
 }
 
 function buttonSelector(focusKey: string) {
