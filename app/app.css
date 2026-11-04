@@ -2587,8 +2587,10 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* The window that asks "Are you sure?" before a project is deleted
-   (AD #62 Delete Projects). */
-.delete-dialog {
+   (AD #62 Delete Projects), and the one that asks before something else is
+   removed, such as an image (AD #55). */
+.delete-dialog,
+.confirm-dialog {
   width: min(30rem, calc(100vw - 3rem));
   padding: 1.25rem 1.75rem 1.5rem;
   border: 0;
@@ -2598,17 +2600,20 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
 }
 
-.delete-dialog::backdrop {
+.delete-dialog::backdrop,
+.confirm-dialog::backdrop {
   background: rgb(26 26 26 / 0.22);
 }
 
-.delete-dialog h2 {
+.delete-dialog h2,
+.confirm-dialog h2 {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
 }
 
 .delete-dialog p,
-.delete-dialog ul {
+.delete-dialog ul,
+.confirm-dialog p {
   margin: 0 0 0.75rem;
 }
 
@@ -2620,13 +2625,15 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   color: var(--red);
 }
 
-.delete-dialog-buttons {
+.delete-dialog-buttons,
+.confirm-dialog-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1rem;
 }
-.delete-dialog button:focus-visible {
+.delete-dialog button:focus-visible,
+.confirm-dialog button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
