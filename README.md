@@ -5,7 +5,8 @@ https://github.com/robinmckenzie/Abodeo/issues. Each ticket's stage is shown by
 one of the labels `STUB`, `DRAFT` or `Agreed`, and is referred to outside GitHub
 with the prefix `AD`, such as `AD #3`.
 
-`AGENTS.md` holds the working instructions for agents and people.
+`AGENTS.md` holds the working instructions for agents and people, and links to
+the detailed rules in `docs/agents/`.
 ChatGPT also follows the shared `CHATGPT.md` in
 [project-starters](https://github.com/robinmckenzie/project-starters), which is
 not copied here.
@@ -583,7 +584,7 @@ it starts.
 
 - Merging or pushing into `main` deploys that commit to production
   automatically. Approving the merge or push therefore approves the deployment,
-  as `AGENTS.md` says.
+  as `docs/agents/git-and-prs.md` says.
 - Any other deployment, such as using Redeploy in Vercel after a failed build,
   needs Robin's approval first.
 - A page opened before a deployment keeps running the old code until it is
