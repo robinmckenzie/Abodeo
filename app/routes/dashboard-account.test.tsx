@@ -37,6 +37,7 @@ import { createFakeDatabase } from "../projects/test-database.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { makeJpeg, makePng } from "../projects/test-images";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
+import { undoDuration } from "../projects/task-list";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
@@ -1479,8 +1480,11 @@ describe("task photos on the dashboard (AD #67)", () => {
   const png = (name = "porch.png") =>
     new File([makePng()], name, { type: "image/png" });
 
-  // The images server knows which tasks each project has saved.
-  async function serverWithTask() {
+  // The images server knows which tasks each project has saved. What is
+  // seeded is in place before the project opens.
+  async function serverWithTask(
+    seed: (server: Server) => Promise<void> = async () => {},
+  ) {
     const projects = createMemoryProjectStore();
     const images = createMemoryImageStore({
       hasTask: (userId, projectId, taskId) =>
@@ -1497,6 +1501,7 @@ describe("task photos on the dashboard (AD #67)", () => {
       dueDate: null,
       tasks: [paint],
     });
+    await seed(server);
     await renderDashboard();
     await settle();
     await click(screen.getByRole("button", { name: /Shed/ }));
@@ -1563,6 +1568,82 @@ describe("task photos on the dashboard (AD #67)", () => {
     await click(screen.getByRole("button", { name: "Delete project" }));
     const dialog = screen.getByRole("dialog", { name: "Delete “Shed”?" });
     expect(within(dialog).getByText("3 images")).toBeTruthy();
+  });
+
+  describe("the account's allowance, once task photos are removed", () => {
+    const mib = 1024 * 1024;
+    // 94 MiB elsewhere in the account and two 2 MiB photos of the task, out
+    // of 100 MiB: 3 MiB more fits only once the photos are removed.
+    const nearlyFull = async (server: Server) => {
+      await server.images.store.upload(
+        "ada",
+        "elsewhere",
+        "filler",
+        "image/png",
+        Buffer.alloc(94 * mib),
+        Buffer.alloc(1),
+      );
+      for (const id of ["tp1", "tp2"]) {
+        await server.images.store.upload(
+          "ada",
+          "a1",
+          id,
+          "image/png",
+          Buffer.alloc(2 * mib),
+          Buffer.alloc(1),
+          "t1",
+        );
+      }
+    };
+    const projectImagesOf = (server: Server) =>
+      server.images.accounts
+        .get("ada")
+        ?.filter(({ projectId, taskId }) => projectId === "a1" && !taskId) ??
+      [];
+
+    async function expectProjectImageAdded(server: Server) {
+      await dropOn(document.body, [
+        new File([makePng(3 * mib)], "big.png", { type: "image/png" }),
+      ]);
+      await vi.waitFor(() => expect(projectImagesOf(server)).toHaveLength(1));
+      expect(server.calls).toContain("POST /api/projects/a1/images");
+    }
+
+    it("lets the project's images use what removing photos one by one gave back", async () => {
+      const server = await serverWithTask(nearlyFull);
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      await click(screen.getByRole("button", { name: "2 photos of Paint" }));
+      await settle();
+      const dialog = screen.getByRole("dialog", { name: "Paint" });
+      for (const button of within(dialog).getAllByRole("button", {
+        name: "Remove photo",
+      })) {
+        await click(button);
+        await settle();
+      }
+      expect(photosOf(server)).toHaveLength(0);
+      await click(within(dialog).getByRole("button", { name: "Close photos" }));
+      await settle();
+
+      await expectProjectImageAdded(server);
+    });
+
+    it("lets the project's images use what a deleted task's photos gave back once Undo ends", async () => {
+      const server = await serverWithTask(nearlyFull);
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        await click(screen.getByRole("button", { name: "Delete Paint" }));
+        await settle();
+        await act(async () => vi.advanceTimersByTime(undoDuration));
+      } finally {
+        vi.useRealTimers();
+      }
+      await settle();
+      expect(server.calls).toContain("DELETE /api/projects/a1/tasks/t1/images");
+      expect(photosOf(server)).toHaveLength(0);
+
+      await expectProjectImageAdded(server);
+    });
   });
 
   it("keeps a deleted task's photos through Undo, and removes them once the project closes", async () => {

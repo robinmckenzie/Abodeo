@@ -58,6 +58,10 @@ import { removeTaskImages } from "../projects/images-client";
 import { TaskPhotosDialog } from "../projects/task-photos-dialog";
 import { useTaskImageSummaries } from "../projects/use-task-image-summaries";
 import {
+  noteStorageUsage,
+  type StorageUsage,
+} from "../projects/use-project-images";
+import {
   describeReturnResult,
   ProjectAppointments,
 } from "../projects/project-appointments";
@@ -392,6 +396,9 @@ export default function Dashboard() {
   // or, dropped on one of its tasks, to that task's photos (AD #67).
   const addFilesRef = useRef<AddFiles | null>(null);
   const addTaskFilesRef = useRef<AddFiles | null>(null);
+  // The account's storage use as last given by the server, shared by the
+  // project's images, its tasks' photos and their removal (AD #67).
+  const storageUsageRef = useRef<StorageUsage | null>(null);
   // The task whose photos are shown in their dialog, over the open project,
   // and files to add to them once it opens.
   const [taskPhotos, setTaskPhotos] = useState<{
@@ -434,8 +441,12 @@ export default function Dashboard() {
     taskId: string,
   ) => {
     void removeTaskImages(accountId, projectId, taskId).then((result) => {
-      if (result.ok) taskSummaries.forget(taskId);
-      else if (result.reason !== "conflict") noteAccountFailure(result.reason);
+      if (result.ok) {
+        noteStorageUsage(storageUsageRef, accountId, result.usedBytes);
+        taskSummaries.forget(taskId);
+      } else if (result.reason !== "conflict") {
+        noteAccountFailure(result.reason);
+      }
     });
   };
   const { boxes: messageBoxes, showMessage } = useFloatingMessages();
@@ -1140,6 +1151,7 @@ export default function Dashboard() {
           <ProjectImages
             accountId={view.kind === "account" ? view.accountId : null}
             projectId={open.id}
+            usageRef={storageUsageRef}
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
@@ -1400,6 +1412,7 @@ export default function Dashboard() {
             )
           }
           addFilesRef={addTaskFilesRef}
+          usageRef={storageUsageRef}
           onSummaryChange={(count, latestImageId) =>
             taskSummaries.report(taskPhotos.taskId, count, latestImageId)
           }

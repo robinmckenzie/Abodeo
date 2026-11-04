@@ -11,7 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleImagesRequest } from "./image-handler.server";
 import { maxCaptionLength } from "./images-api";
-import { ImageViewer, ProjectImages, type AddFiles } from "./project-images";
+import {
+  ImageTimeline,
+  ImageViewer,
+  ProjectImages,
+  taskPhotosWording,
+  type AddFiles,
+} from "./project-images";
 import { createMemoryImageStore } from "./test-image-store.server";
 import { makeJpeg, makePng } from "./test-images";
 
@@ -675,5 +681,83 @@ describe("ProjectImages", () => {
     expect(details?.lastElementChild?.getAttribute("datetime")).toBe(
       "2026-10-22T10:30:00Z",
     );
+  });
+});
+
+describe("files chosen on a task before its photos have loaded (AD #67)", () => {
+  it("waits for the list, so that a late list cannot replace the photo just added", async () => {
+    const server = fakeServer();
+    const answerRequest = vi.mocked(fetch);
+    // The first list is read at once, while the task has no photos, and its
+    // answer is held back.
+    let releaseList: () => void = () => {};
+    const listHeld = new Promise<void>((resolve) => (releaseList = resolve));
+    let isFirstList = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string, init: RequestInit = {}) => {
+        const answer = answerRequest(path, init);
+        if (isFirstList && path === "/api/projects/shed/tasks/t1/images") {
+          isFirstList = false;
+          await listHeld;
+        }
+        return answer;
+      }),
+    );
+    const summaries: [number, string | null][] = [];
+    render(
+      <ImageTimeline
+        accountId="ada"
+        projectId="shed"
+        taskId="t1"
+        wording={taskPhotosWording}
+        filesToAdd={[pngFile("new-photo.png")]}
+        onSummaryChange={(count, latest) => summaries.push([count, latest])}
+      />,
+    );
+    // Let the upload finish, if it were sent before the list arrived.
+    for (let i = 0; i < 20; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    expect(server.calls).not.toContain(
+      "POST /api/projects/shed/tasks/t1/images",
+    );
+
+    await act(async () => releaseList());
+    await waitFor(() =>
+      expect(server.store.accounts.get("ada")).toHaveLength(1),
+    );
+    const [stored] = server.store.accounts.get("ada")!;
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
+    );
+    // Nothing that arrives later takes it away.
+    for (let i = 0; i < 5; i++) await act(async () => {});
+    expect(document.querySelectorAll(".image-entry")).toHaveLength(1);
+    expect(summaries.at(-1)).toEqual([1, stored.image.id]);
+  });
+
+  it("adds nothing, and says so, when the photos cannot be loaded", async () => {
+    const server = fakeServer();
+    server.session = null;
+    const messages: string[] = [];
+    render(
+      <ImageTimeline
+        accountId="ada"
+        projectId="shed"
+        taskId="t1"
+        wording={taskPhotosWording}
+        filesToAdd={[pngFile("new-photo.png")]}
+        onMessage={(text) => messages.push(text)}
+      />,
+    );
+    await waitFor(() => expect(messages).toHaveLength(1));
+    expect(messages[0]).toMatch(/new-photo\.png/);
+    expect(server.calls).not.toContain(
+      "POST /api/projects/shed/tasks/t1/images",
+    );
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

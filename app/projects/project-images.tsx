@@ -28,7 +28,11 @@ import {
 } from "./images-api";
 import type { ImageFailure } from "./images-client";
 import { fitHeightToText } from "./task-list";
-import { useProjectImages, type PendingImage } from "./use-project-images";
+import {
+  useProjectImages,
+  type PendingImage,
+  type StorageUsageRef,
+} from "./use-project-images";
 
 // What the dashboard calls to add files dropped on the page.
 export type AddFiles = (files: File[]) => void;
@@ -76,6 +80,7 @@ export function formatAddedTime(createdAt: string) {
 export function ProjectImages({
   accountId,
   projectId,
+  usageRef,
   onFailure,
   onMessage,
   addFilesRef,
@@ -85,6 +90,8 @@ export function ProjectImages({
   // Null while signed out, when images are unavailable.
   accountId: string | null;
   projectId: string;
+  // The account's storage use, shared with its task photos (AD #67).
+  usageRef?: StorageUsageRef;
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, as a floating message.
   onMessage?: (text: string) => void;
@@ -111,6 +118,7 @@ export function ProjectImages({
       key={`${accountId}/${projectId}`}
       accountId={accountId}
       projectId={projectId}
+      usageRef={usageRef}
       onFailure={onFailure}
       onMessage={onMessage}
       addFilesRef={addFilesRef}
@@ -127,6 +135,7 @@ export function ImageTimeline({
   projectId,
   taskId = null,
   wording = projectImagesWording,
+  usageRef,
   onFailure,
   onMessage,
   addFilesRef,
@@ -141,6 +150,7 @@ export function ImageTimeline({
   // A task's photos instead of the project's own images.
   taskId?: string | null;
   wording?: TimelineWording;
+  usageRef?: StorageUsageRef;
   onFailure?: (reason: ImageFailure) => void;
   onMessage?: (text: string) => void;
   addFilesRef?: RefObject<AddFiles | null>;
@@ -158,6 +168,7 @@ export function ImageTimeline({
     accountId,
     projectId,
     taskId,
+    usageRef,
     onFailure,
     onMessage,
   });

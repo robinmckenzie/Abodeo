@@ -13,6 +13,7 @@ import {
   taskPhotosWording,
   type AddFiles,
 } from "./project-images";
+import type { StorageUsageRef } from "./use-project-images";
 
 export function TaskPhotosDialog({
   accountId,
@@ -22,6 +23,7 @@ export function TaskPhotosDialog({
   filesToAdd,
   onFilesTaken,
   addFilesRef,
+  usageRef,
   onSummaryChange,
   onFailure,
   onMessage,
@@ -36,6 +38,8 @@ export function TaskPhotosDialog({
   onFilesTaken: () => void;
   // For files dropped while it is open.
   addFilesRef: RefObject<AddFiles | null>;
+  // The account's storage use, shared with the project's images.
+  usageRef: StorageUsageRef;
   onSummaryChange: (count: number, latestImageId: string | null) => void;
   onFailure?: (reason: ImageFailure) => void;
   onMessage?: (text: string) => void;
@@ -90,6 +94,7 @@ export function TaskPhotosDialog({
           filesToAdd={filesToAdd}
           onFilesTaken={onFilesTaken}
           addFilesRef={addFilesRef}
+          usageRef={usageRef}
           onSummaryChange={onSummaryChange}
           onFailure={onFailure}
           onMessage={onMessage}

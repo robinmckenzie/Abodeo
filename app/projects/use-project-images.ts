@@ -62,8 +62,28 @@ export type PendingImage = {
   bytes: number;
 };
 
+// The account's storage use as the server last gave it, shared by the open
+// project's timelines and the dashboard, so that photos removed in one are
+// not still counted by another (AD #67). Only the server enforces the
+// allowance: this only spares sending what would certainly be refused.
+export type StorageUsage = { accountId: string; usedBytes: number };
+export type StorageUsageRef = { current: StorageUsage | null };
+
+export function noteStorageUsage(
+  usageRef: StorageUsageRef,
+  accountId: string,
+  usedBytes: number,
+) {
+  usageRef.current = { accountId, usedBytes };
+}
+
 type Session = {
   isCurrent: boolean;
+  // Settles once the first list has loaded, with null if it did, or why
+  // not. Files added before then wait for it, so that the list cannot arrive
+  // after them and replace the images they added.
+  loaded: Promise<ImageFailure | null>;
+  limitBytes: number;
   // The batches of files added run one after another, so that images and
   // their placeholders keep their order.
   batches: Promise<void>;
@@ -82,6 +102,9 @@ export type ImagesOptions = {
   // A task's photos instead of the project's own images (AD #67). The
   // caller mounts the hook keyed by account, project and task.
   taskId?: string | null;
+  // Shared with the account's other timelines. Without it, the hook keeps
+  // its own.
+  usageRef?: StorageUsageRef;
   // A failure that means the sign-in has changed, for the dashboard to check.
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, for the floating messages.
@@ -107,6 +130,7 @@ export function useProjectImages({
   accountId,
   projectId,
   taskId = null,
+  usageRef,
   onFailure,
   onMessage,
   fetchFn = fetch,
@@ -117,7 +141,9 @@ export function useProjectImages({
   const [reloads, setReloads] = useState(0);
   const sessionRef = useRef<Session | null>(null);
   const stateRef = useRef(state);
+  const ownUsageRef = useRef<StorageUsage | null>(null);
   const optionsRef = useRef({
+    usageRef,
     onFailure,
     onMessage,
     fetchFn,
@@ -127,6 +153,7 @@ export function useProjectImages({
   useEffect(() => {
     stateRef.current = state;
     optionsRef.current = {
+      usageRef,
       onFailure,
       onMessage,
       fetchFn,
@@ -134,6 +161,18 @@ export function useProjectImages({
       createId,
     };
   });
+
+  const noteUsage = (usedBytes: number) =>
+    noteStorageUsage(
+      optionsRef.current.usageRef ?? ownUsageRef,
+      accountId,
+      usedBytes,
+    );
+  // The storage use last given by the server, by whichever timeline.
+  const readUsage = () => {
+    const usage = (optionsRef.current.usageRef ?? ownUsageRef).current;
+    return usage?.accountId === accountId ? usage.usedBytes : 0;
+  };
 
   const update = useCallback(
     (
@@ -167,8 +206,11 @@ export function useProjectImages({
   };
 
   useEffect(() => {
+    let settleLoaded: (failure: ImageFailure | null) => void = () => {};
     const session: Session = {
       isCurrent: true,
+      loaded: new Promise((resolve) => (settleLoaded = resolve)),
+      limitBytes: 0,
       batches: Promise.resolve(),
       batchCount: 0,
       nextPendingKey: 0,
@@ -189,8 +231,16 @@ export function useProjectImages({
       if (!result.ok) {
         optionsRef.current.onFailure?.(result.reason);
         setState((current) => ({ ...current, status: "unavailable" }));
+        settleLoaded(result.reason);
         return;
       }
+      session.limitBytes = result.page.limitBytes;
+      noteStorageUsage(
+        optionsRef.current.usageRef ?? ownUsageRef,
+        accountId,
+        result.page.usedBytes,
+      );
+      settleLoaded(null);
       setState((current) => ({
         ...current,
         status: "ready",
@@ -202,6 +252,7 @@ export function useProjectImages({
     });
     return () => {
       session.isCurrent = false;
+      settleLoaded("account-changed");
       session.urls.forEach((url) => URL.revokeObjectURL(url));
       session.urls.clear();
       session.queued = [];
@@ -299,6 +350,7 @@ export function useProjectImages({
       say(describeImageFailure(result.reason));
       return;
     }
+    noteUsage(result.page.usedBytes);
     update(session, (current) => ({
       ...current,
       images: [
@@ -360,6 +412,16 @@ export function useProjectImages({
     files: File[],
     entries: PendingImage[],
   ) => {
+    // Files added before the images have loaded wait for them. If they
+    // could not be loaded, nothing is sent.
+    const loadFailure = await session.loaded;
+    if (!session.isCurrent) return;
+    if (loadFailure) {
+      describeRefusals(
+        files.map(({ name }) => ({ name, reason: loadFailure })),
+      ).forEach(say);
+      return;
+    }
     const refused: RefusedImage[] = [];
     const removeEntries = (removed: PendingImage[]) =>
       update(session, (current) => ({
@@ -368,7 +430,6 @@ export function useProjectImages({
           ({ key }) => !removed.some((entry) => entry.key === key),
         ),
       }));
-    let usedBytes = stateRef.current.usedBytes;
     for (const [position, file] of files.entries()) {
       if (!session.isCurrent) return;
       const entry = entries[position];
@@ -390,8 +451,8 @@ export function useProjectImages({
         refuse("too-large");
         continue;
       }
-      const limit = stateRef.current.limitBytes;
-      if (limit > 0 && usedBytes + file.size > limit) {
+      const limit = session.limitBytes;
+      if (limit > 0 && readUsage() + file.size > limit) {
         refuse("no-space");
         continue;
       }
@@ -428,7 +489,7 @@ export function useProjectImages({
         }
         continue;
       }
-      usedBytes = result.usedBytes;
+      noteUsage(result.usedBytes);
       const { image } = result;
       const url = keepUrl(session, `thumbnail:${image.id}`, thumbnail);
       update(session, (current) => ({
@@ -531,6 +592,7 @@ export function useProjectImages({
       say(describeImageFailure(result.reason));
       return false;
     }
+    if (result.ok) noteUsage(result.usedBytes);
     forgetUrls(session, imageId);
     update(session, (current) => {
       const { [imageId]: _removed, ...thumbnails } = current.thumbnails;
