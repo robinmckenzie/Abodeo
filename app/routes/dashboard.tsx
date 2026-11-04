@@ -566,6 +566,10 @@ export default function Dashboard() {
             }
             projectId={entry.id}
             tasks={entry.values.tasks}
+            people={readyPeople?.people ?? noPeople}
+            onAddPerson={
+              !isClosing && readyPeople ? people.addPerson : undefined
+            }
             drafts={taskDrafts}
             onChange={isClosing ? async () => null : editing.changeTasks}
             finishEditRef={isClosing ? undefined : editing.finishTaskEditRef}

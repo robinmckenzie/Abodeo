@@ -144,8 +144,8 @@ export function establishAccountPeople(
 export type AccountRemovalCount =
   ({ ok: true } & RemovalCount) | { ok: false; reason: AccountFailure };
 
-// How many projects removing the person would set to Unassigned, as the
-// server has them now.
+// How many projects and tasks removing the person would set to Unassigned,
+// as the server has them now.
 export async function countAccountAssignedProjects(
   accountId: string,
   id: string,
@@ -159,10 +159,19 @@ export async function countAccountAssignedProjects(
     answer !== "unreachable" && answer.status === 200
       ? (answer.body as Partial<RemovalCount> | null)
       : null;
-  if (typeof body?.count !== "number" || typeof body.unreadable !== "number") {
+  if (
+    typeof body?.count !== "number" ||
+    typeof body.taskCount !== "number" ||
+    typeof body.unreadable !== "number"
+  ) {
     return { ok: false, reason: readFailure(answer) };
   }
-  return { ok: true, count: body.count, unreadable: body.unreadable };
+  return {
+    ok: true,
+    count: body.count,
+    taskCount: body.taskCount,
+    unreadable: body.unreadable,
+  };
 }
 
 export type AccountRemoval =
@@ -171,17 +180,22 @@ export type AccountRemoval =
   | ({ ok: false; reason: "count-changed" } & RemovalCount)
   | { ok: false; reason: PeopleFailure };
 
-// Removes the person and sets their projects to Unassigned, if the count is
-// still the one confirmed.
+// Removes the person and sets their projects and tasks to Unassigned, if the
+// counts are still the ones confirmed.
 export async function removeAccountPerson(
   accountId: string,
   id: string,
-  expectedCount: number,
+  expected: Pick<RemovalCount, "count" | "taskCount">,
   fetchFn: Fetch = fetch,
 ): Promise<AccountRemoval> {
   const answer = await send(fetchFn, accountId, peoplePath, {
     method: "POST",
-    body: { op: "remove", id, expectedCount } satisfies PeopleOperation,
+    body: {
+      op: "remove",
+      id,
+      expectedCount: expected.count,
+      expectedTaskCount: expected.taskCount,
+    } satisfies PeopleOperation,
   });
   const response = readResponse(answer);
   if (response) return { ok: true, ...response };
@@ -192,6 +206,7 @@ export async function removeAccountPerson(
       ok: false,
       reason: "count-changed",
       count: typeof body.count === "number" ? body.count : 0,
+      taskCount: typeof body.taskCount === "number" ? body.taskCount : 0,
       unreadable: typeof body.unreadable === "number" ? body.unreadable : 0,
     };
   }

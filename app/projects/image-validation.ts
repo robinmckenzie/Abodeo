@@ -65,11 +65,11 @@ function isFrameMarker(marker: number) {
 }
 
 // Starts with the start of image, and its segments' lengths fit the file, with
-// a frame that has a size, a scan, and the end of image last. Trailing zero
-// bytes are allowed, as some cameras and editors leave them.
+// a frame that has a size, a scan, and then the end of image. Whatever follows
+// the end of image is allowed and kept, as many phones and cameras add a
+// second picture, an HDR gain map, a video or zero bytes there (AD #53).
 function isSoundJpeg(bytes: Uint8Array) {
-  let end = bytes.length;
-  while (end > 0 && bytes[end - 1] === 0) end--;
+  const end = bytes.length;
   let offset = 2;
   let hasFrame = false;
   let hasScan = false;
@@ -78,7 +78,7 @@ function isSoundJpeg(bytes: Uint8Array) {
     while (bytes[offset] === 0xff && offset < end) offset++;
     const marker = bytes[offset];
     offset++;
-    if (marker === endOfImage) return hasFrame && hasScan && offset === end;
+    if (marker === endOfImage) return hasFrame && hasScan;
     if (marker === startOfImage || marker === 0x00) return false;
     if (isStandaloneMarker(marker)) continue;
     if (offset + 2 > end) return false;

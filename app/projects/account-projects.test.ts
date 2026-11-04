@@ -20,9 +20,9 @@ afterEach(() => {
 });
 
 const tasks: Task[] = [
-  { id: "a", title: "Tiles", isDone: false },
-  { id: "b", title: "Grout", isDone: false },
-  { id: "c", title: "Seal", isDone: false },
+  { id: "a", title: "Tiles", isDone: false, assignee: "unassigned" },
+  { id: "b", title: "Grout", isDone: false, assignee: "unassigned" },
+  { id: "c", title: "Seal", isDone: false, assignee: "unassigned" },
 ];
 
 const project: Project = {
@@ -144,9 +144,9 @@ describe("an opened account project", () => {
 
     expect(result).toMatchObject({ ok: true });
     expect(server.saved().tasks).toEqual([
-      { id: "a", title: "Tiles", isDone: true },
-      { id: "b", title: "Grout", isDone: false },
-      { id: "c", title: "Seal twice", isDone: false },
+      { id: "a", title: "Tiles", isDone: true, assignee: "unassigned" },
+      { id: "b", title: "Grout", isDone: false, assignee: "unassigned" },
+      { id: "c", title: "Seal twice", isDone: false, assignee: "unassigned" },
     ]);
   });
 

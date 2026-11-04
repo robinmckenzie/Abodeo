@@ -6,6 +6,7 @@
 // overwritten or removed.
 import type { Queryable } from "../account/account-profile.server";
 import {
+  findUnassignChanges,
   isKnownAssignee,
   mapAssigneesByName,
   readPeople,
@@ -133,13 +134,32 @@ function hashText(text: string) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-// Whether two copies of a project differ only in who is assigned, as a
-// project does after a move whose answer was lost and a person was renamed.
+// Whether two copies of a project differ only in who the project and its
+// tasks are assigned to, as a project does after a move whose answer was lost
+// and a person was renamed.
 function isSameIgnoringAssignee(a: Project, b: Project) {
   return (
-    serialiseProject({ ...a, assignee: "" }) ===
-    serialiseProject({ ...b, assignee: "" })
+    serialiseProject(withoutAssignees(a)) ===
+    serialiseProject(withoutAssignees(b))
   );
+}
+
+function withoutAssignees(project: Project): Project {
+  return {
+    ...project,
+    assignee: unassignedId,
+    tasks: project.tasks.map((task) => ({ ...task, assignee: unassignedId })),
+  };
+}
+
+// The people a create or save chooses, for the project or any of its tasks
+// (AD #66 Assign Tasks To People), to check against the account's list.
+function listChosenPeople(fields: Partial<ProjectFields>) {
+  const ids = new Set<string>();
+  if (fields.assignee !== undefined) ids.add(fields.assignee);
+  fields.tasks?.forEach((task) => ids.add(task.assignee));
+  ids.delete(unassignedId);
+  return [...ids];
 }
 
 export function createProjectStore(
@@ -251,10 +271,11 @@ export function createProjectStore(
           ? { kind: "found", project }
           : read(userId, id, query);
       };
-      if (fields.assignee === unassignedId) return insert(database);
+      const chosen = listChosenPeople(fields);
+      if (chosen.length === 0) return insert(database);
       return inTransaction(database, async (client) => {
         const people = await readAccountPeople(client, userId, { lock: true });
-        if (!isKnownAssignee(people, fields.assignee)) {
+        if (!chosen.every((other) => isKnownAssignee(people, other))) {
           return { kind: "unknown-assignee" };
         }
         return insert(client);
@@ -292,15 +313,13 @@ export function createProjectStore(
         }
         return { kind: "busy" };
       };
-      const assignee = changes.assignee;
-      if (assignee === undefined || assignee === unassignedId) {
-        return trySave(database);
-      }
+      const chosen = listChosenPeople(changes);
+      if (chosen.length === 0) return trySave(database);
       // Choosing someone is checked against the list, held until the save is
       // done, so that a removal cannot come between.
       return inTransaction(database, async (client) => {
         const people = await readAccountPeople(client, userId, { lock: true });
-        if (!isKnownAssignee(people, assignee)) {
+        if (!chosen.every((other) => isKnownAssignee(people, other))) {
           return { kind: "unknown-assignee" };
         }
         return trySave(client);
@@ -319,6 +338,10 @@ export function createProjectStore(
         const withAssignee = (project: Project): Project => ({
           ...project,
           assignee: remap(project.assignee),
+          tasks: project.tasks.map((task) => ({
+            ...task,
+            assignee: remap(task.assignee),
+          })),
         });
         const outcomes: Record<string, ImportOutcome> = {};
         const moved = await insertMany(
@@ -409,10 +432,16 @@ export function createProjectStore(
         if (rows.length === 0) return { kind: "not-found" };
         const project = readStoredProject(id, rows[0].data);
         // Removing a person only changes the projects that are shown, so a
-        // binned project may still name someone who has gone.
+        // binned project, or its tasks, may still name someone who has gone.
+        const changes =
+          project &&
+          findUnassignChanges(
+            project,
+            (other) => !isKnownAssignee(people, other),
+          );
         const data =
-          project && !isKnownAssignee(people, project.assignee)
-            ? toStoredData({ ...project, assignee: unassignedId })
+          project && changes
+            ? toStoredData({ ...project, ...changes })
             : rows[0].data;
         await client.query(
           `update project set deleted_at = null, data = $3::jsonb,

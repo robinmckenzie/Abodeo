@@ -325,6 +325,23 @@ describe("uploading", () => {
     );
   });
 
+  it("stores a JPEG with data after its end unchanged (AD #53)", async () => {
+    const { handle } = createHandler();
+    const jpeg = Uint8Array.from([...makeJpeg(1000), ...makeJpeg(400), 1, 2]);
+    const response = await handle(upload("shed", "phone", { original: jpeg }));
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      image: { id: "phone", contentType: "image/jpeg" },
+      usedBytes: jpeg.length + jpegThumbnail.length,
+    });
+    const original = await handle(
+      request(buildImageBytesPath("shed", "phone", "original")),
+    );
+    expect(Buffer.from(await original.arrayBuffer())).toEqual(
+      Buffer.from(jpeg),
+    );
+  });
+
   it("accepts an image of exactly 4 MiB with a thumbnail of exactly 100 KB", async () => {
     const { handle } = createHandler();
     const original = makePng(maxImageBytes);

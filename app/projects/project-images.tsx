@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { ConfirmDialog } from "../ui/confirm-dialog";
 import { raiseFloatingMessages } from "../ui/floating-messages";
 import { ArrowIcon, BinIcon, PlusIcon } from "../ui/icons";
 import {
@@ -138,6 +139,8 @@ function SignedInImages({
     caption: string;
     createdAt: string;
   } | null>(null);
+  // The image whose removal is being asked about.
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const addFiles = images.addFiles;
   useEffect(() => {
@@ -280,11 +283,7 @@ function SignedInImages({
             thumbnailUrl={state.thumbnails[image.id]}
             onVisible={() => images.requestThumbnail(image.id)}
             onView={() => void view(image)}
-            onRemove={() => {
-              if (window.confirm("Remove this image? It cannot be undone.")) {
-                void images.remove(image.id);
-              }
-            }}
+            onRemove={() => setRemovingId(image.id)}
             onCaption={images.changeCaption}
           />
         ))}
@@ -292,6 +291,20 @@ function SignedInImages({
           <PendingEntry key={entry.key} entry={entry} />
         ))}
       </div>
+      {removingId &&
+        createPortal(
+          <ConfirmDialog
+            question="Remove this image?"
+            detail="It cannot be undone."
+            confirmLabel="Remove"
+            onConfirm={() => {
+              setRemovingId(null);
+              void images.remove(removingId);
+            }}
+            onCancel={() => setRemovingId(null)}
+          />,
+          document.body,
+        )}
       {viewing &&
         createPortal(
           <ImageViewer

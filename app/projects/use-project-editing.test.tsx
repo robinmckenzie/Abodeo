@@ -5,7 +5,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleProjectsRequest } from "./project-handler.server";
-import { newProjectFields, type Project } from "./projects";
+import { newProjectFields, unassignedId, type Project } from "./projects";
 import { createProject, listOwnProjects } from "./project-storage";
 import { TaskDrafts } from "./task-drafts";
 import { createMemoryProjectStore } from "./test-projects.server";
@@ -27,7 +27,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 }
 
 function makeTask(title: string): Task {
-  return { id: crypto.randomUUID(), title, isDone: false };
+  return { id: crypto.randomUUID(), title, isDone: false, assignee: unassignedId };
 }
 
 type Server = {

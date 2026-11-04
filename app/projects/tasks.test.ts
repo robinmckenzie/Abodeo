@@ -12,14 +12,15 @@ import {
   readTaskEntries,
   renameTask,
   restoreTask,
+  setTaskAssignee,
   setTaskDone,
   type Task,
 } from "./tasks";
 
 const tasks: Task[] = [
-  { id: "a", title: "Tiles", isDone: false },
-  { id: "b", title: "Grout", isDone: true },
-  { id: "c", title: "Seal", isDone: false },
+  { id: "a", title: "Tiles", isDone: false, assignee: "unassigned" },
+  { id: "b", title: "Grout", isDone: true, assignee: "unassigned" },
+  { id: "c", title: "Seal", isDone: false, assignee: "unassigned" },
 ];
 
 const ids = (list: Task[]) => list.map((task) => task.id).join("");
@@ -88,20 +89,31 @@ describe("changing tasks", () => {
 
   it("recognises only complete tasks with a title", () => {
     expect(isTask(tasks[0])).toBe(true);
-    expect(isTask({ id: "a", title: " ", isDone: false })).toBe(false);
+    expect(
+      isTask({ id: "a", title: " ", isDone: false, assignee: "unassigned" }),
+    ).toBe(false);
     expect(isTask({ id: "a", title: "A" })).toBe(false);
     expect(isTask(null)).toBe(false);
   });
 
   it("adds tasks at the end", () => {
-    expect(ids(addTasks(tasks, [{ id: "d", title: "D", isDone: false }]))).toBe(
-      "abcd",
-    );
+    expect(
+      ids(
+        addTasks(tasks, [
+          { id: "d", title: "D", isDone: false, assignee: "unassigned" },
+        ]),
+      ),
+    ).toBe("abcd");
   });
 
   it("marks a task done or not done without moving it", () => {
     const next = setTaskDone(tasks, "a", true);
-    expect(next[0]).toEqual({ id: "a", title: "Tiles", isDone: true });
+    expect(next[0]).toEqual({
+      id: "a",
+      title: "Tiles",
+      isDone: true,
+      assignee: "unassigned",
+    });
     expect(ids(next)).toBe("abc");
     expect(setTaskDone(next, "a", false)[0].isDone).toBe(false);
   });
@@ -152,7 +164,12 @@ describe("changing tasks", () => {
 });
 
 describe("merging task changes made in two places", () => {
-  const extra = { id: "d", title: "Polish", isDone: false };
+  const extra = {
+    id: "d",
+    title: "Polish",
+    isDone: false,
+    assignee: "unassigned",
+  };
 
   it("merges changes to different tasks", () => {
     expect(
@@ -208,6 +225,23 @@ describe("merging task changes made in two places", () => {
     ).toBe(false);
   });
 
+  it("treats assigning a task as changing it (AD #66)", () => {
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        setTaskAssignee(tasks, "a", "andy"),
+        setTaskDone(tasks, "a", true),
+      ),
+    ).toBe(false);
+    expect(
+      canMergeTaskChanges(
+        tasks,
+        setTaskAssignee(tasks, "a", "andy"),
+        setTaskDone(tasks, "b", false),
+      ),
+    ).toBe(true);
+  });
+
   it("refuses two changes of order", () => {
     expect(
       canMergeTaskChanges(
@@ -216,5 +250,42 @@ describe("merging task changes made in two places", () => {
         moveTask(tasks, "c", 0),
       ),
     ).toBe(false);
+  });
+});
+
+describe("assigning tasks (AD #66 Assign Tasks To People)", () => {
+  const assigned = setTaskAssignee(tasks, "b", "andy");
+
+  it("starts new tasks Unassigned", () => {
+    const created = createTasks([{ title: "Paint", isDone: false }]);
+    expect(created[0].assignee).toBe("unassigned");
+  });
+
+  it("assigns only the task chosen", () => {
+    expect(assigned.map((task) => task.assignee)).toEqual([
+      "unassigned",
+      "andy",
+      "unassigned",
+    ]);
+    expect(setTaskAssignee(assigned, "b", "unassigned")).toEqual(tasks);
+  });
+
+  it("keeps the assignee when a task is moved, renamed, ticked, deleted and put back", () => {
+    const b = (list: Task[]) => list.find((task) => task.id === "b");
+    expect(b(moveTask(assigned, "b", 0))?.assignee).toBe("andy");
+    expect(b(renameTask(assigned, "b", "Grout twice"))?.assignee).toBe("andy");
+    expect(b(setTaskDone(assigned, "b", false))?.assignee).toBe("andy");
+    const deleted = deleteTask(assigned, "b");
+    expect(b(restoreTask(deleted, assigned[1], 1))?.assignee).toBe("andy");
+  });
+
+  it("recognises only a task with an assignee that could be someone", () => {
+    expect(isTask({ id: "a", title: "Tiles", isDone: false })).toBe(false);
+    expect(
+      isTask({ id: "a", title: "Tiles", isDone: false, assignee: "not ok!" }),
+    ).toBe(false);
+    expect(
+      isTask({ id: "a", title: "Tiles", isDone: false, assignee: "andy" }),
+    ).toBe(true);
   });
 });

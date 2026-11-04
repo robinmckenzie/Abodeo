@@ -64,8 +64,18 @@ describe("project storage", () => {
     const created = await createProject(fields);
     if (!created.ok) throw new Error("not created");
     const { id } = created.project;
-    const tiles = { id: "t1", title: "Tiles", isDone: false };
-    const grout = { id: "t2", title: "Grout", isDone: false };
+    const tiles = {
+      id: "t1",
+      title: "Tiles",
+      isDone: false,
+      assignee: "unassigned",
+    };
+    const grout = {
+      id: "t2",
+      title: "Grout",
+      isDone: false,
+      assignee: "unassigned",
+    };
     expect(
       await saveProjectTasks(id, (tasks) => addTasks(tasks, [tiles])),
     ).toEqual({ ok: true, tasks: [tiles] });

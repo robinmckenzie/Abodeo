@@ -157,9 +157,10 @@ describe("an account's people", () => {
     expect(await countAccountAssignedProjects("ada", "andy", fetchFn)).toEqual({
       ok: true,
       count: 2,
+      taskCount: 0,
       unreadable: 0,
     });
-    expect(await removeAccountPerson("ada", "andy", 2, fetchFn)).toMatchObject({
+    expect(await removeAccountPerson("ada", "andy", { count: 2, taskCount: 0 }, fetchFn)).toMatchObject({
       ok: true,
       people: [],
     });
@@ -168,10 +169,11 @@ describe("an account's people", () => {
   it("is told the new count when it has changed", async () => {
     const { fake, fetchFn } = createServer({ p1: "andy" });
     await establishAccountPeople("ada", fetchFn);
-    expect(await removeAccountPerson("ada", "andy", 0, fetchFn)).toEqual({
+    expect(await removeAccountPerson("ada", "andy", { count: 0, taskCount: 0 }, fetchFn)).toEqual({
       ok: false,
       reason: "count-changed",
       count: 1,
+      taskCount: 0,
       unreadable: 0,
     });
     expect(fake.people.get("ada")?.revision).toBe(1);

@@ -26,17 +26,28 @@ export type PeopleOperation =
   | { op: "rename"; id: string; name: string; jobTitle?: string }
   // toIndex is the place in the list once the person is taken out of it.
   | { op: "move"; id: string; toIndex: number }
-  // dryRun only counts the projects that would be set to Unassigned.
-  // expectedCount is the count the person confirmed: if it has changed, nothing
-  // is changed.
-  | { op: "remove"; id: string; expectedCount?: number; dryRun?: boolean }
+  // dryRun only counts the projects and tasks that would be set to
+  // Unassigned. expectedCount and expectedTaskCount are the counts the person
+  // confirmed: if either has changed, nothing is changed.
+  | {
+      op: "remove";
+      id: string;
+      expectedCount?: number;
+      expectedTaskCount?: number;
+      dryRun?: boolean;
+    }
   // Saves the list as it is, once the move of the browser's projects is
   // settled.
   | { op: "establish" };
 
 // What removing would change: the readable projects assigned to the person,
-// and those that could not be read and so are left as they are.
-export type RemovalCount = { count: number; unreadable: number };
+// the tasks in readable projects assigned to them, and the projects that
+// could not be read and so are left as they are.
+export type RemovalCount = {
+  count: number;
+  taskCount: number;
+  unreadable: number;
+};
 
 export type PeopleErrorCode =
   | "not_signed_in"

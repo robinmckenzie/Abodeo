@@ -23,6 +23,16 @@ vi.mock("./thumbnail", () => ({
   ),
 }));
 
+// Answers the window that asks before an image is removed. jsdom has no modal
+// dialogs, so the window is not open there, and its buttons are found by text.
+function answerRemoval(answer: "Remove" | "Cancel") {
+  const button = [
+    ...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button"),
+  ].find((each) => each.textContent === answer);
+  if (!button) throw new Error("The removal window is not showing.");
+  fireEvent.click(button);
+}
+
 type Server = {
   session: string | null;
   store: ReturnType<typeof createMemoryImageStore>;
@@ -175,7 +185,7 @@ describe("ProjectImages", () => {
     expect(document.querySelectorAll(".image-entry")).toHaveLength(2);
     expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
     expect(onMessage).toHaveBeenCalledWith(
-      "holiday.png: Sorry, only JPEG and PNG images can be added.",
+      "holiday.png: This looks like a GIF file. Only JPEG and PNG can be added.",
     );
     // The size is checked after the type, so a large non-image is a format
     // problem, and a large image is a size problem.
@@ -184,6 +194,64 @@ describe("ProjectImages", () => {
     expect(server.store.accounts.get("ada")).toHaveLength(2);
     // The messages float, so none is left in the Images section.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("names a recognised other format named .jpg, and otherwise gives the general message (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const webp = new File(
+      ["RIFF\u0024\u0000\u0000\u0000WEBPVP8 "],
+      "photo.jpg",
+      { type: "image/jpeg" },
+    );
+    const unknown = new File(["just some text"], "notes.jpg", {
+      type: "image/jpeg",
+    });
+    chooseFiles([webp, unknown]);
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(2));
+    expect(onMessage).toHaveBeenCalledWith(
+      "photo.jpg: This looks like a WebP file. Only JPEG and PNG can be added.",
+    );
+    expect(onMessage).toHaveBeenCalledWith(
+      "notes.jpg: Sorry, only JPEG and PNG images can be added.",
+    );
+    expect(server.store.accounts.get("ada") ?? []).toHaveLength(0);
+  });
+
+  it("adds a JPEG with data after its end, as phones write (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const photo = new File(
+      [Uint8Array.from([...makeJpeg(500), ...makeJpeg(300)])],
+      "phone.jpg",
+      { type: "image/jpeg" },
+    );
+    chooseFiles([photo]);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
+    );
+    expect(server.store.accounts.get("ada")).toHaveLength(1);
+    expect(onMessage).not.toHaveBeenCalled();
   });
 
   it("refuses an image over 4 MiB as too large", async () => {
@@ -494,7 +562,6 @@ describe("ProjectImages", () => {
   it("tells the newest image's id once loaded, and as images are added and removed", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const onLatestImageChange = vi.fn();
     render(
       <ProjectImages
@@ -519,6 +586,7 @@ describe("ProjectImages", () => {
 
     const removes = screen.getAllByRole("button", { name: "Remove image" });
     fireEvent.click(removes[2]);
+    answerRemoval("Remove");
     await waitFor(() =>
       expect(onLatestImageChange).toHaveBeenLastCalledWith("two"),
     );
@@ -597,15 +665,23 @@ describe("ProjectImages", () => {
     });
   });
 
-  it("removes an image after confirming", async () => {
+  it("asks in a window before removing an image, and removes it on Remove", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ProjectImages accountId="ada" projectId="shed" />);
     const [first] = await screen.findAllByRole("button", {
       name: "Remove image",
     });
     fireEvent.click(first);
+    const dialog = document.querySelector(".confirm-dialog");
+    expect(dialog?.querySelector("h2")?.textContent).toBe("Remove this image?");
+    expect(dialog?.querySelector("p")?.textContent).toBe(
+      "It cannot be undone.",
+    );
+    expect(server.store.accounts.get("ada")).toHaveLength(2);
+
+    answerRemoval("Remove");
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
     );
@@ -613,14 +689,35 @@ describe("ProjectImages", () => {
     expect(document.querySelector("[data-image-id=one]")).toBeNull();
   });
 
-  it("keeps an image when the person does not confirm", async () => {
+  it("keeps an image when the person cancels", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<ProjectImages accountId="ada" projectId="shed" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Remove image" }),
     );
+    answerRemoval("Cancel");
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(server.store.accounts.get("ada")).toHaveLength(1);
+    expect(document.querySelector("[data-image-id=one]")).not.toBeNull();
+  });
+
+  it("keeps an image when the person presses Esc in the window", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove image" }),
+    );
+    // A browser sends cancel to an open modal dialog on Esc.
+    fireEvent(
+      document.querySelector(".confirm-dialog")!,
+      new Event("cancel", { cancelable: true }),
+    );
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
     expect(server.store.accounts.get("ada")).toHaveLength(1);
   });
 
