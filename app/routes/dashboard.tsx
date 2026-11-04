@@ -912,10 +912,13 @@ export default function Dashboard() {
   // The people the projects can be assigned to. An account's list is saved
   // once the browser has no projects left to move in with its people.
   const people = usePeople(account.view, {
+    // Not while the browser still has projects to move in, even once a failed
+    // move's notice is dismissed: their people would no longer match.
     isEstablishDue:
       currentMove !== null &&
       currentMove.status !== "moving" &&
-      currentMove.status !== "failed",
+      currentMove.status !== "failed" &&
+      listOwnProjects().length === 0,
     onAccountFailure: noteAccountFailure,
   });
   useEffect(() => {

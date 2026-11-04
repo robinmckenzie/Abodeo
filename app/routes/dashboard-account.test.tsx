@@ -33,6 +33,7 @@ import { handleProjectsRequest } from "../projects/project-handler.server";
 import { createFakeDatabase } from "../projects/test-database.server";
 import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { makeJpeg, makePng } from "../projects/test-images";
+import { createProjectStore } from "../projects/project-store.server";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
@@ -1654,6 +1655,59 @@ describe("a signed-in account's people (AD #61)", () => {
     expect(await server.people.read("ada")).toMatchObject({
       established: true,
     });
+  });
+
+  it("keeps the browser's people and assignments through a failed move, a dismissed notice, a reload and a retry", async () => {
+    browserProject("andy");
+    refreshProjects();
+    refreshPeople();
+    // The real project and people stores, over one database.
+    const { database } = createFakeDatabase();
+    const realProjects = createProjectStore(database);
+    const server = fakeServer({
+      session: ada,
+      people: createPeopleStore(database),
+    });
+    vi.spyOn(server.projects.store, "list").mockImplementation((userId) =>
+      realProjects.list(userId),
+    );
+    vi.spyOn(server.projects.store, "importProjects")
+      .mockRejectedValueOnce(new Error("unreachable"))
+      .mockImplementation((...args) => realProjects.importProjects(...args));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = localStorage.getItem("abodeo-people");
+    const browserProjectIds = () =>
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith("abodeo-project:"),
+      );
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: "Dismiss" }));
+    await settle();
+
+    // Dismissed, the browser's projects still await the move, so the
+    // account's list is not saved empty.
+    expect(sentPeople(server)).toEqual([]);
+    expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
+    expect(localStorage.getItem("abodeo-people")).toBe(before);
+
+    // A new page load stands in for the retry at the next sign-in.
+    cleanup();
+    await renderDashboard();
+    await settle();
+
+    const people = await server.people.read("ada");
+    expect(people).toMatchObject({
+      established: true,
+      people: [{ name: "Andy" }],
+    });
+    const andy = (people as { people: { id: string }[] }).people[0].id;
+    const moved = await realProjects.list("ada");
+    expect(moved.projects.map(({ id, assignee }) => [id, assignee])).toEqual([
+      ["b1", andy],
+    ]);
+    expect(browserProjectIds()).toEqual([]);
+    expect(localStorage.getItem("abodeo-people")).toBeNull();
   });
 
   it("saves the account's list at once when the browser has nothing to move", async () => {
