@@ -7,6 +7,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { calculateDragScroll } from "./drag-scroll";
 import type { Person } from "./people";
+import type { AddPerson } from "./project-form";
 import { ArrowIcon, BinIcon, DragHandleIcon } from "../ui/icons";
 import { canAnimate } from "./project-bar";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
@@ -52,6 +53,7 @@ export function TaskList({
   projectId,
   tasks,
   people,
+  onAddPerson,
   drafts,
   onChange,
   finishEditRef,
@@ -62,6 +64,9 @@ export function TaskList({
   tasks: Task[];
   // Who a task can be assigned to, besides Unassigned.
   people: readonly Person[];
+  // Adds someone from a task's list of people, who is then assigned to it
+  // (AD #128). Without it, there is no box to add someone.
+  onAddPerson?: AddPerson;
   // Keeps text typed into the box but not yet added, so that closing the
   // project does not lose it.
   drafts: TaskDrafts;
@@ -509,6 +514,7 @@ export function TaskList({
                   taskTitle={task.title}
                   assignee={task.assignee}
                   people={people}
+                  onAddPerson={onAddPerson}
                   onChoose={(assignee) =>
                     void save((current) =>
                       setTaskAssignee(current, task.id, assignee),
