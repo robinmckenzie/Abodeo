@@ -43,6 +43,13 @@ export type ImageCaptionResponse = { image: ImageInfo };
 export type ImageRemoveResponse = { usedBytes: number };
 export type ImageConflictResponse = { error: "conflict"; image: ImageInfo };
 
+// For each task of a project with photos (AD #67 Add Photos To Tasks), how
+// many it has and its newest.
+export type TaskImageSummary = { count: number; latestImageId: string };
+export type TaskImageSummaryResponse = {
+  tasks: Record<string, TaskImageSummary>;
+};
+
 export type ImageErrorCode =
   | "not_signed_in"
   | "invalid_request"
@@ -73,6 +80,22 @@ export function buildImageBytesPath(
   kind: ImageKind,
 ) {
   return `${buildImagePath(projectId, imageId)}/${kind}`;
+}
+
+// A task's photos, reached only through the task's own project. Reading,
+// captioning and removing one photo use the project's image paths.
+export function buildTaskImagesPath(projectId: string, taskId: string) {
+  return `${projectsPath}/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/images`;
+}
+
+export function buildTaskImageSummaryPath(projectId: string) {
+  return `${projectsPath}/${encodeURIComponent(projectId)}/task-images`;
+}
+
+// A task id, as the browser makes it (a UUID), with the same characters
+// allowed as an image id.
+export function isTaskId(value: unknown): value is string {
+  return isImageId(value);
 }
 
 // An image id made by the browser.

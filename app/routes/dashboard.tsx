@@ -54,6 +54,13 @@ import {
 import { ProjectForm, type FormMessage } from "../projects/project-form";
 import { useFileDrag } from "../projects/use-file-drag";
 import { ProjectImages, type AddFiles } from "../projects/project-images";
+import { removeTaskImages } from "../projects/images-client";
+import { TaskPhotosDialog } from "../projects/task-photos-dialog";
+import { useTaskImageSummaries } from "../projects/use-task-image-summaries";
+import {
+  noteStorageUsage,
+  type StorageUsage,
+} from "../projects/use-project-images";
 import {
   describeReturnResult,
   ProjectAppointments,
@@ -385,8 +392,63 @@ export default function Dashboard() {
     if (reason === "unknown-assignee") reloadPeopleRef.current();
   };
 
-  // Pictures dropped on the page go to the open account project's images.
+  // Pictures dropped on the page go to the open account project's images,
+  // or, dropped on one of its tasks, to that task's photos (AD #67).
   const addFilesRef = useRef<AddFiles | null>(null);
+  const addTaskFilesRef = useRef<AddFiles | null>(null);
+  // The account's storage use as last given by the server, shared by the
+  // project's images, its tasks' photos and their removal (AD #67).
+  const storageUsageRef = useRef<StorageUsage | null>(null);
+  // The task whose photos are shown in their dialog, over the open project,
+  // and files to add to them once it opens.
+  const [taskPhotos, setTaskPhotos] = useState<{
+    accountId: string;
+    projectId: string;
+    taskId: string;
+    title: string;
+    filesToAdd: File[] | null;
+  } | null>(null);
+  const photosAccountId = view.kind === "account" ? view.accountId : null;
+  const photosProjectId = photosAccountId && open?.id ? open.id : null;
+  if (
+    taskPhotos &&
+    (taskPhotos.accountId !== photosAccountId ||
+      taskPhotos.projectId !== photosProjectId)
+  ) {
+    setTaskPhotos(null);
+  }
+  const taskSummaries = useTaskImageSummaries(
+    photosAccountId,
+    photosProjectId,
+    noteAccountFailure,
+  );
+  const openTaskPhotos = (task: Task, filesToAdd: File[] | null) => {
+    if (!photosAccountId || !photosProjectId) return;
+    setTaskPhotos({
+      accountId: photosAccountId,
+      projectId: photosProjectId,
+      taskId: task.id,
+      title: task.title,
+      filesToAdd,
+    });
+  };
+  // Once a deleted task's Undo has ended, its photos are removed and their
+  // allowance given back. The server keeps them if the task is saved again.
+  // If removing them fails, they stay hidden, as the ticket accepts.
+  const removeDeletedTaskPhotos = (
+    accountId: string,
+    projectId: string,
+    taskId: string,
+  ) => {
+    void removeTaskImages(accountId, projectId, taskId).then((result) => {
+      if (result.ok) {
+        noteStorageUsage(storageUsageRef, accountId, result.usedBytes);
+        taskSummaries.forget(taskId);
+      } else if (result.reason !== "conflict") {
+        noteAccountFailure(result.reason);
+      }
+    });
+  };
   const { boxes: messageBoxes, showMessage } = useFloatingMessages();
   const dropRefusal =
     view.kind !== "account"
@@ -402,8 +464,23 @@ export default function Dashboard() {
       (areAllTypesUnsupported(fileTypes) ? unsupportedFilesMessage : null),
     onRefusal: (message) =>
       showMessage(message, message === unsupportedFilesMessage),
-    onDrop: (files) => {
-      if (addFilesRef.current) addFilesRef.current(files);
+    onDrop: (files, target) => {
+      // While a task's photos are open, anything dropped goes to them.
+      if (taskPhotos && addTaskFilesRef.current) {
+        addTaskFilesRef.current(files);
+        return;
+      }
+      // Only the open project's rows are marked, not those of a project
+      // squashing closed.
+      const row =
+        target instanceof Element
+          ? target.closest<HTMLElement>("[data-photo-task-id]")
+          : null;
+      const task = row
+        ? open?.values.tasks.find(({ id }) => id === row.dataset.photoTaskId)
+        : undefined;
+      if (task) openTaskPhotos(task, files);
+      else if (addFilesRef.current) addFilesRef.current(files);
       else showMessage(noProjectOpenMessage);
     },
   });
@@ -430,9 +507,13 @@ export default function Dashboard() {
       id: open.id,
       title: open.values.title,
       tasks: open.values.tasks,
+      // With its tasks' photos, which go with it (AD #67). Until both are
+      // shown, the count the server gave with the list, which has both.
       imageCount:
         view.kind === "account"
-          ? (imageCountRef.current ?? view.imageCounts[open.id] ?? 0)
+          ? imageCountRef.current !== null && taskSummaries.total !== null
+            ? imageCountRef.current + taskSummaries.total
+            : (view.imageCounts[open.id] ?? 0)
           : 0,
       appointmentCount: appointmentCountRef.current,
       mode: view.kind === "account" ? "bin" : "browser",
@@ -1070,6 +1151,7 @@ export default function Dashboard() {
           <ProjectImages
             accountId={view.kind === "account" ? view.accountId : null}
             projectId={open.id}
+            usageRef={storageUsageRef}
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
@@ -1118,6 +1200,30 @@ export default function Dashboard() {
             drafts={taskDrafts}
             onChange={changeOpenTasks}
             finishEditRef={finishTaskEditRef}
+            photos={
+              photosProjectId
+                ? {
+                    summaries: taskSummaries.summaries,
+                    thumbnails: taskSummaries.thumbnails,
+                    isDropTarget,
+                    onAdd: openTaskPhotos,
+                    onOpen: (task) => openTaskPhotos(task, null),
+                  }
+                : null
+            }
+            onUndoEnd={(task) => {
+              if (
+                photosAccountId &&
+                photosProjectId &&
+                taskSummaries.summaries[task.id]
+              ) {
+                removeDeletedTaskPhotos(
+                  photosAccountId,
+                  photosProjectId,
+                  task.id,
+                );
+              }
+            }}
           />
         )
       }
@@ -1292,6 +1398,32 @@ export default function Dashboard() {
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </ScreenPanel>
+      {taskPhotos && (
+        <TaskPhotosDialog
+          key={`${taskPhotos.accountId}/${taskPhotos.projectId}/${taskPhotos.taskId}`}
+          accountId={taskPhotos.accountId}
+          projectId={taskPhotos.projectId}
+          taskId={taskPhotos.taskId}
+          taskTitle={
+            open?.values.tasks.find(({ id }) => id === taskPhotos.taskId)
+              ?.title ?? taskPhotos.title
+          }
+          filesToAdd={taskPhotos.filesToAdd}
+          onFilesTaken={() =>
+            setTaskPhotos(
+              (current) => current && { ...current, filesToAdd: null },
+            )
+          }
+          addFilesRef={addTaskFilesRef}
+          usageRef={storageUsageRef}
+          onSummaryChange={(count, latestImageId) =>
+            taskSummaries.report(taskPhotos.taskId, count, latestImageId)
+          }
+          onFailure={noteAccountFailure}
+          onMessage={showMessage}
+          onClose={() => setTaskPhotos(null)}
+        />
+      )}
       {deletion && (
         <DeleteProjectDialog
           project={deletion}

@@ -1,26 +1,25 @@
--- Version: v1.76.0
+-- Version: v1.67.0
 
 -- Create script for Abodeo's account tables. Run it in the Neon SQL Editor
 -- for each account store: production (DATABASE_URL) and abodeo-local (used
 -- by npm run dev). Safe to run again. The app never creates these tables.
 -- Keep this file under about 7 KB: Neon's editor truncates longer pastes.
--- v1.76.0 drops a table that earlier app versions read: run it only once
--- AD #76 is deployed.
+-- Run it only once AD #76 is deployed (it drops an old table).
 
--- auth_ tables: Better Auth's user, session, account and verification
--- tables, renamed with snake_case columns. The token, scope, image, IP and
--- user agent columns exist because Better Auth expects them; the app leaves
--- them empty. Deleting an auth_user row deletes everything of that account.
+-- auth_ tables: Better Auth's tables, with snake_case columns. The token,
+-- scope, image, IP and user agent columns are for Better Auth; the app leaves
+-- them empty. Deleting an auth_user row deletes all its data.
 -- calendar_link (AD #10): the ID of the account's Abodeo calendar. No token.
 -- account_sign_in, account_visit (AD #46, #51): sign-in and visit times, and
 -- the self-declared label ('' if none). No IP address or device details.
 -- project (AD #41): an account's projects. data is the saved form;
 -- revision changes on every write.
--- deleted_at (AD #62): when a project was put in the Bin, or null. Binned
--- projects are cleared for good by the dashboard's next load or save once
--- past the cooling-off period, or at once by Delete permanently.
+-- deleted_at (AD #62): when a project was put in the Bin, or null. Cleared
+-- for good by the next load or save after the cooling-off period, or at
+-- once by Delete permanently.
 -- project_image, project_image_bytes (AD #48): images, details apart from
 -- bytes. Removing a project or account removes its images.
+-- task_id (AD #67): the task a photo is on; null for a project image.
 -- account_people (AD #61): one row per account, the ordered people list.
 -- site_visit (AD #94): a visit before sign-in: time, label, ?welcome, bot
 -- flag, host's country and city, emailed. No account, IP or user agent.
@@ -146,9 +145,12 @@ create table if not exists project_image (
     content_hash text not null,
     caption text not null default '' check (char_length(caption) <= 500),
     created_at timestamptz not null default now(),
+    task_id text,
     primary key (user_id, project_id, id),
     foreign key (user_id, project_id) references project (user_id, id) on delete cascade
 );
+
+alter table project_image add column if not exists task_id text;
 
 create index if not exists project_image_account_idx
     on project_image (user_id);

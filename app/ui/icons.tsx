@@ -35,6 +35,16 @@ export function BinIcon() {
   );
 }
 
+// A picture with a hill and the sun, for adding photos to a task (AD #67).
+export function PhotoIcon() {
+  return (
+    <CircledIcon name="photo">
+      <path d="M6 7h8v6H6zM6 12l2.5-2.5 2 2 1.2-1.2L14 12.6" />
+      <circle cx="11.9" cy="8.9" r="0.7" />
+    </CircledIcon>
+  );
+}
+
 export function CloseIcon() {
   return (
     <CircledIcon name="close">
