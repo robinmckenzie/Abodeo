@@ -1658,54 +1658,107 @@ describe("a signed-in account's people (AD #61)", () => {
   });
 
   it("keeps the browser's people and assignments through a failed move, a dismissed notice, a reload and a retry", async () => {
-    browserProject("andy");
+    // The browser's own projects, assigned to people from its own list.
+    const people = [
+      { id: "p-bea", name: "Bea", jobTitle: "Plumber" },
+      { id: "p-cy", name: "Cy", jobTitle: "Electrician" },
+    ];
+    localStorage.setItem(
+      "abodeo-people",
+      JSON.stringify({ version: 1, people }),
+    );
+    const stored = (id: string, title: string, assignee: string) =>
+      localStorage.setItem(
+        `abodeo-project:${id}`,
+        JSON.stringify({
+          version: 3,
+          title,
+          notes: "",
+          assignee,
+          dueDate: null,
+          tasks: [],
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-01T00:00:00.000Z",
+        }),
+      );
+    stored("b1", "Fix the tap", "p-bea");
+    stored("b2", "Rewire the shed", "p-cy");
     refreshProjects();
     refreshPeople();
+    const browserPeople = localStorage.getItem("abodeo-people");
+    expect(browserPeople).not.toBeNull();
+    const browserProjectIds = () =>
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith("abodeo-project:"))
+        .sort();
+
     // The real project and people stores, over one database.
     const { database } = createFakeDatabase();
     const realProjects = createProjectStore(database);
     const server = fakeServer({
       session: ada,
+      projects: { ...createMemoryProjectStore(), store: realProjects },
       people: createPeopleStore(database),
     });
-    vi.spyOn(server.projects.store, "list").mockImplementation((userId) =>
-      realProjects.list(userId),
-    );
-    vi.spyOn(server.projects.store, "importProjects")
-      .mockRejectedValueOnce(new Error("unreachable"))
-      .mockImplementation((...args) => realProjects.importProjects(...args));
+    // The account cannot be reached for the first move.
+    const answer = vi.mocked(fetch).getMockImplementation()!;
+    let failedImports = 0;
+    vi.mocked(fetch).mockImplementation(async (path, init) => {
+      if (path === "/api/projects/import" && failedImports === 0) {
+        failedImports++;
+        throw new TypeError("Failed to fetch");
+      }
+      return answer(path, init);
+    });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const before = localStorage.getItem("abodeo-people");
-    const browserProjectIds = () =>
-      Object.keys(localStorage).filter((key) =>
-        key.startsWith("abodeo-project:"),
-      );
+
     await renderDashboard();
     await settle();
+    expect(failedImports).toBe(1);
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     await click(screen.getByRole("button", { name: "Dismiss" }));
     await settle();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    // Coming back to the page, as on focus, loads the people again.
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await settle();
 
-    // Dismissed, the browser's projects still await the move, so the
-    // account's list is not saved empty.
+    // Dismissed, the projects still await the move: the account's list is
+    // not saved, and the browser keeps everything.
     expect(sentPeople(server)).toEqual([]);
-    expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
-    expect(localStorage.getItem("abodeo-people")).toBe(before);
+    expect(await server.people.read("ada")).toMatchObject({
+      established: false,
+    });
+    expect(browserProjectIds()).toEqual([
+      "abodeo-project:b1",
+      "abodeo-project:b2",
+    ]);
+    expect(localStorage.getItem("abodeo-people")).toBe(browserPeople);
 
     // A new page load stands in for the retry at the next sign-in.
     cleanup();
     await renderDashboard();
     await settle();
 
-    const people = await server.people.read("ada");
-    expect(people).toMatchObject({
+    expect(await server.people.read("ada")).toMatchObject({
       established: true,
-      people: [{ name: "Andy" }],
+      people,
     });
-    const andy = (people as { people: { id: string }[] }).people[0].id;
     const moved = await realProjects.list("ada");
-    expect(moved.projects.map(({ id, assignee }) => [id, assignee])).toEqual([
-      ["b1", andy],
+    expect(
+      moved.projects
+        .map(({ id, assignee }) => [id, assignee])
+        .sort(([a], [b]) => a.localeCompare(b)),
+    ).toEqual([
+      ["b1", "p-bea"],
+      ["b2", "p-cy"],
     ]);
+    expect(
+      screen.getByRole("button", { name: "Fix the tap, Bea, Plumber" }),
+    ).toBeTruthy();
+    // Only now is the browser's copy gone.
     expect(browserProjectIds()).toEqual([]);
     expect(localStorage.getItem("abodeo-people")).toBeNull();
   });
