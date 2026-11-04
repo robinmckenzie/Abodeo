@@ -783,8 +783,8 @@ html:has(.app-layout) {
   color: var(--red);
 }
 
-/* The offer to move a browser's projects into the account: a question,
-   not an error. */
+/* The notice of moving a browser's projects into the account (AD #68):
+   under way, done, or failed and to be tried again. */
 .dashboard-move-notice {
   display: flex;
   flex-wrap: wrap;

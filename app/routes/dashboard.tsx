@@ -30,7 +30,10 @@ import {
   DeleteProjectDialog,
   type DeleteMode,
 } from "../projects/delete-project-dialog";
-import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
+import {
+  FloatingMessages,
+  useFloatingMessages,
+} from "../ui/floating-messages";
 import {
   areAllTypesUnsupported,
   noProjectOpenMessage,
@@ -1175,9 +1178,7 @@ export default function Dashboard() {
       <ScreenPanel
         title="Projects"
         icon={<ProjectsIcon />}
-        className={
-          isDropTarget ? "projects-screen is-drop-target" : "projects-screen"
-        }
+        className={isDropTarget ? "projects-screen is-drop-target" : "projects-screen"}
         ref={mainRef}
         tabIndex={-1}
         isTitleInert={isAddingInPlace}
@@ -1230,8 +1231,8 @@ export default function Dashboard() {
           <div className="dashboard-notice dashboard-move-notice" role="alert">
             <p>
               {currentMove.projects.length === 1
-                ? "The project saved in this browser could not be moved into your account just now. It is kept here, and will be moved when you try again or next sign in."
-                : `The ${currentMove.projects.length} projects saved in this browser could not be moved into your account just now. They are kept here, and will be moved when you try again or next sign in.`}
+                ? "The project saved in this browser could not be moved into your account just now. It is kept here, and will be moved when you try again or next come back."
+                : `The ${currentMove.projects.length} projects saved in this browser could not be moved into your account just now. They are kept here, and will be moved when you try again or next come back.`}
             </p>
             <button
               type="button"
