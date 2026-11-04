@@ -48,13 +48,26 @@ export function describeFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export type RefusedImage = { name: string; reason: ImageFailure };
+// A refused image, with the format it was recognised as when it is another
+// image format, such as WebP.
+export type RefusedImage = {
+  name: string;
+  reason: ImageFailure;
+  format?: string;
+};
+
+// Why a file in a recognised format other than JPEG or PNG was refused.
+export function describeUnsupportedFormat(format: string) {
+  return `This looks like a ${format} file. Only JPEG and PNG can be added.`;
+}
 
 // One line for each image that was refused, with its name, so that when
 // several are added at once the person can tell which were not.
 export function describeRefusals(refused: RefusedImage[]) {
-  return refused.map(
-    ({ name, reason }) => `${name}: ${describeImageFailure(reason)}`,
+  return refused.map(({ name, reason, format }) =>
+    format
+      ? `${name}: ${describeUnsupportedFormat(format)}`
+      : `${name}: ${describeImageFailure(reason)}`,
   );
 }
 
