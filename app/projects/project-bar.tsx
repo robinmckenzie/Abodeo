@@ -1,5 +1,5 @@
-// A project's horizontal bar on the dashboard. In the in-place presentation,
-// an opened project's bar expands to show the form instead.
+// A project's horizontal bar on the Projects screen. In the in-place
+// presentation, an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { ArrowIcon } from "../ui/icons";

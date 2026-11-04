@@ -61,7 +61,7 @@ async function renderPeople() {
   const Stub = createRoutesStub(
     withAppLayout([
       { path: "/people", Component: People },
-      { path: "/dashboard", Component: () => <p>Dashboard</p> },
+      { path: "/projects", Component: () => <p>Projects screen</p> },
     ]),
   );
   const rendered = render(<Stub initialEntries={["/people"]} />);
@@ -189,7 +189,7 @@ describe("the People screen", () => {
     await act(async () => { fireEvent.click(screen.getByRole("link", { name: link })); });
     expect((addBox() as HTMLInputElement).value).toBe("unfinished");
     await act(async () => { fireEvent.click(screen.getByRole("link", { name: link })); });
-    expect(screen.getByText("Dashboard")).toBeTruthy();
+    expect(screen.getByText("Projects screen")).toBeTruthy();
     expect(confirm).toHaveBeenCalledTimes(2);
   });
 

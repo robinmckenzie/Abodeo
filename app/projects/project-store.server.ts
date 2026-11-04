@@ -436,7 +436,7 @@ export function createProjectStore(
   };
 
   // Clears the projects binned for longer than the cooling-off period, and
-  // with them their images. Only the dashboard's load and saves do this
+  // with them their images. Only the Projects screen's load and saves do this
   // (AD #62 Delete Projects).
   async function purgeExpired(userId: string) {
     const cutoff = new Date(Date.parse(now()) - binPeriodMs).toISOString();

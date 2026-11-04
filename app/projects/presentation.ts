@@ -1,6 +1,6 @@
-// Whether the Add project form and opened projects show in a floating window
-// or in place, in the project's expanding bar, so that Robin can try both.
-// E on the dashboard switches between them, and the choice is kept in local
+// Whether the Add project form and opened projects show in a floating window or
+// in place, in the project's expanding bar, so that Robin can try both. E on
+// the Projects screen switches between them, and the choice is kept in local
 // storage. When one is chosen for good, this file can go.
 import { useEffect, useSyncExternalStore } from "react";
 

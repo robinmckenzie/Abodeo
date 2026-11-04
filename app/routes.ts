@@ -4,7 +4,7 @@ export default [
   index("routes/home.tsx"),
   // The left-hand column and the account, shared by every screen.
   layout("routes/app-layout.tsx", [
-    route("dashboard", "routes/dashboard.tsx"),
+    route("projects", "routes/projects.tsx"),
     route("people", "routes/people.tsx"),
     route("bin", "routes/bin.tsx"),
   ]),

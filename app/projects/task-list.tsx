@@ -1,7 +1,7 @@
-// An opened project's tasks: a checklist below its notes, with a box below
-// it for adding tasks, several at once, one per line. Each change is saved
-// straight away by the dashboard, which shows it at once and puts it back if
-// saving fails.
+// An opened project's tasks: a checklist below its notes, with a box below it
+// for adding tasks, several at once, one per line. Each change is saved
+// straight away by the Projects screen, which shows it at once and puts it back
+// if saving fails.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { calculateDragScroll } from "./drag-scroll";

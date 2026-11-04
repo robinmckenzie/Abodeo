@@ -82,8 +82,8 @@ const menuLink = (name: string) =>
 describe("the shared layout", () => {
   it("looks the account up once and keeps the column while moving between screens", async () => {
     await renderLayout(
-      { dashboard: undefined, people: undefined, bin: undefined },
-      "/dashboard",
+      { projects: undefined, people: undefined, bin: undefined },
+      "/projects",
     );
     const column = document.querySelector("header");
     const lookups = () =>
@@ -105,7 +105,7 @@ describe("the shared layout", () => {
       onBeforeLeave: vi.fn(async () => true),
       onLeaveFailed: vi.fn(),
     };
-    await renderLayout({ dashboard: undefined, people }, "/people");
+    await renderLayout({ projects: undefined, people }, "/people");
 
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
@@ -115,38 +115,38 @@ describe("the shared layout", () => {
   });
 
   it("uses the handlers of the screen shown now, not the one left", async () => {
-    const dashboard = { onBeforeLeave: vi.fn(async () => true) };
+    const projects = { onBeforeLeave: vi.fn(async () => true) };
     const people = { onBeforeLeave: vi.fn(async () => true) };
-    await renderLayout({ dashboard, people }, "/dashboard");
+    await renderLayout({ projects, people }, "/projects");
 
     await click(menuLink("People"));
-    expect(dashboard.onBeforeLeave).toHaveBeenCalledOnce();
+    expect(projects.onBeforeLeave).toHaveBeenCalledOnce();
     expect(people.onBeforeLeave).not.toHaveBeenCalled();
 
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
     expect(people.onBeforeLeave).toHaveBeenCalledOnce();
-    expect(dashboard.onBeforeLeave).toHaveBeenCalledOnce();
+    expect(projects.onBeforeLeave).toHaveBeenCalledOnce();
   });
 
   it("stays on the screen when it is not ready to be left", async () => {
-    const dashboard = { onBeforeLeave: vi.fn(async () => false) };
-    await renderLayout({ dashboard, people: undefined }, "/dashboard");
+    const projects = { onBeforeLeave: vi.fn(async () => false) };
+    await renderLayout({ projects, people: undefined }, "/projects");
 
     await click(menuLink("People"));
 
-    expect(screen.getByText("dashboard screen")).toBeTruthy();
+    expect(screen.getByText("projects screen")).toBeTruthy();
   });
 
   it("makes the logo a link that leaves the screen first, and does nothing on Projects", async () => {
     const people = { onBeforeLeave: vi.fn(async () => true) };
-    await renderLayout({ dashboard: undefined, people }, "/people");
+    await renderLayout({ projects: undefined, people }, "/people");
 
     await click(screen.getByRole("link", { name: /Abodeo - Your home/ }));
     expect(people.onBeforeLeave).toHaveBeenCalledOnce();
-    expect(screen.getByText("dashboard screen")).toBeTruthy();
+    expect(screen.getByText("projects screen")).toBeTruthy();
 
     await click(screen.getByRole("link", { name: /Abodeo - Your home/ }));
-    expect(screen.getByText("dashboard screen")).toBeTruthy();
+    expect(screen.getByText("projects screen")).toBeTruthy();
   });
 });

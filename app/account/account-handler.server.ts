@@ -156,7 +156,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
 // How long a response waits for the database connections to close.
 export const accountCloseTimeout = 1000;
 
-// A sign-in that reached the dashboard with Calendar allowed also keeps
+// A sign-in that reached the Projects screen with Calendar allowed also keeps
 // Google's token in the Calendar cookie, as the separate Calendar flow does.
 // Anything else, including a redirect that carries an error, is left as is.
 export async function addSignInCalendarToken(
@@ -171,10 +171,10 @@ export async function addSignInCalendarToken(
     return response;
   }
   const target = new URL(location, request.url);
-  const reachedDashboard =
+  const reachedProjects =
     target.pathname === accountReturnPath && !target.searchParams.has("error");
   const { calendarToken, userId } = signIn;
-  if (!reachedDashboard || !calendarToken || !userId) return response;
+  if (!reachedProjects || !calendarToken || !userId) return response;
   const withToken = new Response(response.body, response);
   withToken.headers.append(
     "Set-Cookie",
@@ -193,8 +193,8 @@ function reportAuthFailure(code: string | undefined) {
 }
 
 // Starting sign-in always asks Google for sign-in's own permissions only and
-// returns to the dashboard, whatever the browser asked for, so a page cannot
-// request more of Google or send the person elsewhere afterwards.
+// returns to the Projects screen, whatever the browser asked for, so a page
+// cannot request more of Google or send the person elsewhere afterwards.
 async function fixSignInRequest(request: Request) {
   const body = JSON.stringify({
     provider: "google",
@@ -251,7 +251,7 @@ export function createAccountRequestHandler(
       });
     }
     // Google sends the browser itself back here, so a failure returns it to
-    // the dashboard, which says that sign-in did not complete.
+    // the Projects screen, which says that sign-in did not complete.
     const fail = () =>
       pathname === `${authBasePath}/callback/google`
         ? Response.redirect(

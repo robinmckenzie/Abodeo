@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useViewTransitionState } from "react-router";
 
-import type { Route } from "./+types/dashboard";
+import type { Route } from "./+types/projects";
 import { isTextField, useIsTextFieldFocused } from "../keyboard";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { ScreenPanel } from "../screen-panel";
@@ -98,7 +98,7 @@ import {
 import { useBarThumbnails } from "../projects/use-bar-thumbnails";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Dashboard - Abodeo" },
+  { title: "Projects - Abodeo" },
   { name: "description", content: "Your home, sorted." },
 ];
 
@@ -193,7 +193,7 @@ function createOpeningKey() {
   return `opening-${openings}`;
 }
 
-export default function Dashboard() {
+export default function Projects() {
   const mainRef = useRef<HTMLElement>(null);
   const presentation = usePresentation();
   const isInPlace = presentation === "in-place";
@@ -231,7 +231,8 @@ export default function Dashboard() {
   const appointmentCountRef = useRef<number | null>(null);
   const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
   // Text typed into projects' add-task boxes but not yet added. It lasts as
-  // long as this dashboard, so moving to another screen or reloading drops it.
+  // long as this Projects screen, so moving to another screen or reloading
+  // drops it.
   const [taskDrafts] = useState(() => new TaskDrafts());
 
   useSwitchPresentationKey();
@@ -240,15 +241,15 @@ export default function Dashboard() {
   const isTextFieldFocused = useIsTextFieldFocused();
 
   // The Get Started link disappears when it is used, so focus moves to the
-  // dashboard's content and screen readers announce the new screen, unless
-  // the Add project form has already taken it.
+  // Projects screen's content and screen readers announce the new screen,
+  // unless the Add project form has already taken it.
   useEffect(() => {
     const main = mainRef.current;
     if (!main?.contains(document.activeElement)) main?.focus();
   }, []);
 
   // Saves an opened project's changes when the page is left or hidden, or
-  // the dashboard is left for another screen.
+  // the Projects screen is left for another screen.
   // Saves sent then can finish after the page has gone.
   useEffect(() => {
     const saveNow = () => saverRef.current?.saveNow();
@@ -642,11 +643,11 @@ export default function Dashboard() {
   };
 
   // Pressing Get Started opens the Add project form as the crossfade to the
-  // dashboard ends, or straight away where there is no crossfade. The
+  // Projects screen ends, or straight away where there is no crossfade. The
   // request is then removed, so that a reload does not open it again.
   const location = useLocation();
   const navigate = useNavigate();
-  const isTransitioning = useViewTransitionState("/dashboard");
+  const isTransitioning = useViewTransitionState("/projects");
   const isAddProjectDue =
     (location.state as { openAddProject?: boolean } | null)?.openAddProject ===
       true && !isTransitioning;
@@ -876,7 +877,7 @@ export default function Dashboard() {
   const isAccountUnavailable =
     view.kind === "unavailable" ||
     (view.kind === "account" && view.state === "unavailable");
-  // In place, a new project's form is the only part of the dashboard that
+  // In place, a new project's form is the only part of the Projects screen that
   // can be used, as in the floating window, so that what was typed is not
   // lost by opening something else.
   const isAddingInPlace = isInPlace && open?.id === null;
@@ -1182,18 +1183,18 @@ export default function Dashboard() {
         }
       >
         {view.kind === "browser" && view.result && !view.result.ok && (
-          <p className="dashboard-notice" role="alert">
+          <p className="screen-notice" role="alert">
             This browser is not letting Abodeo use its storage, so projects
             cannot be saved here.
           </p>
         )}
         {isAccountUnavailable && (
-          <p className="dashboard-notice" role="alert">
+          <p className="screen-notice" role="alert">
             Your projects cannot be loaded right now. Please try again later.
           </p>
         )}
         {offeredCount > 0 && moveOffer && (
-          <div className="dashboard-notice dashboard-move-offer" role="status">
+          <div className="screen-notice projects-move-offer" role="status">
             <p>
               {offeredCount === 1
                 ? "This browser has 1 project saved while signed out. Move it into your account?"
@@ -1220,7 +1221,7 @@ export default function Dashboard() {
           </div>
         )}
         {unreadableCount > 0 && (
-          <p className="dashboard-notice" role="alert">
+          <p className="screen-notice" role="alert">
             {unreadableCount === 1
               ? "1 saved project cannot be read, so it is not shown. It has been left as it is."
               : `${unreadableCount} saved projects cannot be read, so they are not shown. They have been left as they are.`}
@@ -1283,7 +1284,7 @@ export default function Dashboard() {
           ]}
         </ul>
         {isShowingList && list.length === 0 && unreadableCount === 0 && (
-          <p className="dashboard-empty">No projects added yet.</p>
+          <p className="screen-empty">No projects added yet.</p>
         )}
         {!isInPlace && open && (
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>

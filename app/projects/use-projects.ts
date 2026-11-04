@@ -1,6 +1,6 @@
-// The browser's saved projects, read from storage when first needed and
-// again after each save, or when another tab saves. The server cannot see
-// local storage, so it renders without projects, and the dashboard fills them
+// The browser's saved projects, read from storage when first needed and again
+// after each save, or when another tab saves. The server cannot see local
+// storage, so it renders without projects, and the Projects screen fills them
 // in once the page has loaded, without a hydration mismatch.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -51,7 +51,7 @@ export function useProjects(): LoadResult | null {
   return useSyncExternalStore(subscribe, readProjects, () => null);
 }
 
-// Where the dashboard's projects come from: the browser while signed out,
+// Where the Projects screen's projects come from: the browser while signed out,
 // or where sign-in is not set up, and the account while signed in. While
 // the sign-in is being checked, or cannot be checked, no projects are
 // shown, so that a signed-in person never edits the browser's projects by

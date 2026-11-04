@@ -28,9 +28,9 @@ export const weekdayNames = [
   "Sunday",
 ] as const;
 
-// The month strips' colours on the dashboard, following Robin's reference:
-// muted blue, pink, red, green, coral pink, light green, golden yellow,
-// orange, brown, deep pink, purple and deep blue.
+// The month strips' colours on the Projects screen, following Robin's
+// reference: muted blue, pink, red, green, coral pink, light green, golden
+// yellow, orange, brown, deep pink, purple and deep blue.
 export const monthColours = [
   "#4a78b5",
   "#e88cc0",

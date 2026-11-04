@@ -8,8 +8,8 @@ export const projectsPath = "/api/projects";
 export const projectsImportPath = `${projectsPath}/import`;
 export const projectsBinPath = `${projectsPath}/bin`;
 
-// How long a deleted project can be restored from the Bin before the
-// dashboard next clears it for good (AD #62 Delete Projects). Provisional,
+// How long a deleted project can be restored from the Bin before the Projects
+// screen next clears it for good (AD #62 Delete Projects). Provisional,
 // expected to be tuned.
 export const binPeriodMs = 2 * 24 * 60 * 60 * 1000;
 

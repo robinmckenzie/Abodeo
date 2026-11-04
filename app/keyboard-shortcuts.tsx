@@ -3,7 +3,7 @@
 // applies only some of the time, such as Esc while a project is open, keeps
 // its row's space while it is not shown, so that the panel does not change
 // size. Part of an action can be marked with the is-current class, which
-// underlines it, such as the current presentation on the dashboard. The
+// underlines it, such as the current presentation on the Projects screen. The
 // panel shows in every build.
 //
 // Each keycap is also a button. Clicking it presses its key, for the

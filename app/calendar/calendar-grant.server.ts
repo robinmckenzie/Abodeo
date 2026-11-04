@@ -31,7 +31,7 @@ export type CalendarGrant = {
   userId: string;
   // The browser's IANA time zone, or null if it gave none that is valid.
   timeZone: string | null;
-  // The project to return the browser to, or null for the dashboard.
+  // The project to return the browser to, or null for the Projects screen.
   returnProjectId: string | null;
   // Whether to open the project's new appointment form on return.
   openForm: boolean;

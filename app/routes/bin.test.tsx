@@ -95,7 +95,7 @@ async function renderBin() {
   const Stub = createRoutesStub(
     withAppLayout([
       { path: "/bin", Component: Bin },
-      { path: "/dashboard", Component: () => <p>Dashboard</p> },
+      { path: "/projects", Component: () => <p>Projects screen</p> },
     ]),
   );
   render(<Stub initialEntries={["/bin"]} />);
@@ -147,7 +147,7 @@ describe("the Bin page", () => {
     ).toBeTruthy();
   });
 
-  it("restores a project, even one past the period, without reading the dashboard's list", async () => {
+  it("restores a project, even one past the period, without reading the Projects screen's list", async () => {
     const server = fakeServer();
     await binProject(server, "a1", "Fence", binPeriodMs + 1000);
     await renderBin();

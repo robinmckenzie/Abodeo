@@ -287,9 +287,9 @@ export function isProjectKey(key: string | null) {
 }
 
 // Any project counts, including one that cannot be read, so that a returning
-// visitor whose projects are damaged is told so on the dashboard rather than
-// being welcomed as new. Tuning settings do not count. While signed in, the
-// account's hint decides instead.
+// visitor whose projects are damaged is told so on the Projects screen rather
+// than being welcomed as new. Tuning settings do not count. While signed in,
+// the account's hint decides instead.
 export function hasOwnProjects() {
   const hint = readAccountHint();
   if (hint !== null) return hint;

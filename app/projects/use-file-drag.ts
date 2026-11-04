@@ -1,6 +1,6 @@
-// Whether files are being dragged over the page, for the dashboard to show
-// where a drop would go, or why it would not (AD #54 Change UX While Dropped
-// Images Are Added). Dragging text or a task is left alone.
+// Whether files are being dragged over the page, for the Projects screen to
+// show where a drop would go, or why it would not (AD #54 Change UX While
+// Dropped Images Are Added). Dragging text or a task is left alone.
 import { useEffect, useRef, useState } from "react";
 
 // A drag that goes quiet this long has ended, as when it is cancelled with

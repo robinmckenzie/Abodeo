@@ -775,7 +775,7 @@ html:has(.app-layout) {
   outline-offset: 3px;
 }
 
-.dashboard-notice {
+.screen-notice {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
@@ -785,7 +785,7 @@ html:has(.app-layout) {
 
 /* The offer to move a browser's projects into the account: a question,
    not an error. */
-.dashboard-move-offer {
+.projects-move-offer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -794,16 +794,17 @@ html:has(.app-layout) {
   color: var(--ink);
 }
 
-.dashboard-move-offer .button-secondary:hover:not(:disabled) {
+.projects-move-offer .button-secondary:hover:not(:disabled) {
   background: var(--paper);
 }
 
-.dashboard-move-offer p {
+.projects-move-offer p {
   flex: 1 1 20rem;
   margin: 0;
 }
-/* Centred in the space below the button, as the dashboard's message was. */
-.dashboard-empty {
+/* Centred in the space below the button, as the Projects screen's message
+   was. */
+.screen-empty {
   margin: auto 0;
   padding-bottom: 6rem;
   text-align: center;
@@ -1212,8 +1213,9 @@ html:has(.app-layout) {
 
 /* As the form appears, its parts arrive one by one (see arriveAt in
    project-form.tsx): each fades in over 1.15 seconds, 0.07 seconds after
-   the one before. --arrival is its place in the sequence. The dashboard's T
-   panel can tune both times, through --assignee-fade and --assignee-gap. */
+   the one before. --arrival is its place in the sequence. The Projects
+   screen's T panel can tune both times, through --assignee-fade and
+   --assignee-gap. */
 @media (prefers-reduced-motion: no-preference) {
   .project-form .arrives-in-turn {
     animation: form-arrive var(--assignee-fade, 1.15s) ease-out both;
@@ -1221,7 +1223,7 @@ html:has(.app-layout) {
   }
 }
 
-/* The dashboard's T panel, fixed at the left-hand edge of the window. */
+/* The Projects screen's T panel, fixed at the left-hand edge of the window. */
 .assignee-tuning-panel {
   position: fixed;
   top: 50%;
@@ -1258,7 +1260,7 @@ html:has(.app-layout) {
 }
 
 /* The keyboard shortcuts panel (keyboard-shortcuts.tsx), fixed at the
-   bottom left and styled like the tuning panels. On the dashboard it fits
+   bottom left and styled like the tuning panels. On the Projects screen it fits
    under the logo, in the left-hand column (13.5rem, as --side-column),
    behind the T panel and the floating window's dimming. */
 .keyboard-shortcuts {
@@ -1894,7 +1896,7 @@ html:has(.app-layout) {
   }
 
   /* Switches the whole screen at once, without a separate snapshot of the
-     button that could linger over the dashboard for a frame. */
+     button that could linger over the Projects screen for a frame. */
   .get-started {
     view-transition-name: none;
   }
@@ -1908,17 +1910,17 @@ html:has(.app-layout) {
 
 /* With projects saved, the welcome screen shows only the logo, which fades
    in over 0.6 seconds and holds until 1.4 seconds, when Home crossfades to
-   the dashboard. The returning-clock animation changes nothing visible: Home
-   waits for it to end, so the hold counts from when the logo appears. The
-   selector outranks the F panel's :root .welcome h1, so its timings do not
-   apply here, while its curve still does. hasProjectsScript sets the
-   attribute before the page first appears. */
+   the Projects screen. The returning-clock animation changes nothing
+   visible: Home waits for it to end, so the hold counts from when the logo
+   appears. The selector outranks the F panel's :root .welcome h1, so its
+   timings do not apply here, while its curve still does. hasProjectsScript
+   sets the attribute before the page first appears. */
 html[data-has-projects] .welcome h1 {
   animation-name: welcome-fade-in, returning-clock;
   animation-duration: 0.6s, 1.4s;
 }
 
-/* The attribute stays set on the dashboard, so the shortcuts panel is
+/* The attribute stays set on the Projects screen, so the shortcuts panel is
    hidden only on this screen. */
 html[data-has-projects] :is(.get-started, .tuning-panel, .fade-tuning-panel),
 html[data-has-projects] .welcome .keyboard-shortcuts {
@@ -2636,7 +2638,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
    left one, so its row goes to the bottom of it, with at least a rem above.
    The button is outlined, like Cancel, so that it stands back from the
    save. */
-/* The link from the dashboard to the Bin. */
+/* The link from the Projects screen to the Bin. */
 .bin-link {
   align-self: center;
   color: var(--ink);

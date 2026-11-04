@@ -207,7 +207,7 @@ export function useAccount({
     }
   };
 
-  // Sign-in leaves for Google, which returns to the dashboard.
+  // Sign-in leaves for Google, which returns to the Projects screen.
   const signIn = () =>
     void leave(async () => {
       try {
@@ -220,7 +220,7 @@ export function useAccount({
       }
     });
 
-  // Sign-out loads the dashboard afresh, signed out, as sign-in does.
+  // Sign-out loads the Projects screen afresh, signed out, as sign-in does.
   const signOut = () =>
     void leave(async () => {
       try {

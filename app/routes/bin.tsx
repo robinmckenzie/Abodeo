@@ -1,8 +1,8 @@
 // The Bin (AD #62 Delete Projects): the account's deleted projects, which can
-// be restored until the dashboard next clears those past the cooling-off
+// be restored until the Projects screen next clears those past the cooling-off
 // period, or deleted for good at once. Loading this page never clears
 // anything, so a project past the period stays here, and can be restored,
-// until the dashboard does.
+// until the Projects screen does.
 import { useEffect, useRef, useState } from "react";
 
 import type { Route } from "./+types/bin";
@@ -73,9 +73,9 @@ export default function Bin() {
     recheckRef.current = account.recheck;
   });
 
-  // Only the Bin's own list is read, never the dashboard's, which would clear
-  // the projects past the cooling-off period. Changing reloadCount reads it
-  // again.
+  // Only the Bin's own list is read, never the Projects screen's, which would
+  // clear the projects past the cooling-off period. Changing reloadCount reads
+  // it again.
   const [reloadCount, setReloadCount] = useState(0);
   const reload = () => {
     setReloadCount((count) => count + 1);
@@ -168,7 +168,7 @@ export default function Bin() {
           </p>
         )}
         {account.view.kind === "unavailable" && (
-          <p className="dashboard-notice" role="alert">
+          <p className="screen-notice" role="alert">
             Your Bin cannot be loaded right now. Please try again later.
           </p>
         )}
@@ -176,21 +176,21 @@ export default function Bin() {
           <p role="status">Loading…</p>
         )}
         {accountId && state.status === "unavailable" && (
-          <p className="dashboard-notice" role="alert">
+          <p className="screen-notice" role="alert">
             Your Bin cannot be loaded right now. Please try again later.
           </p>
         )}
         {state.status === "ready" && (
           <>
             {state.unreadableCount > 0 && (
-              <p className="dashboard-notice" role="alert">
+              <p className="screen-notice" role="alert">
                 {state.unreadableCount === 1
                   ? "1 deleted project cannot be read, so it is not shown. It has been left as it is."
                   : `${state.unreadableCount} deleted projects cannot be read, so they are not shown. They have been left as they are.`}
               </p>
             )}
             {state.projects.length === 0 ? (
-              <p className="dashboard-empty">The Bin is empty.</p>
+              <p className="screen-empty">The Bin is empty.</p>
             ) : (
               <ul className="bin-list" aria-label="Deleted projects">
                 {state.projects.map((binned) => {

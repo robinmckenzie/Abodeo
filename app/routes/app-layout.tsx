@@ -64,7 +64,7 @@ export default function AppLayout() {
     >
       <header>
         <h1>
-          <Link to="/dashboard" onClick={getClickHandler("/dashboard", current)}>
+          <Link to="/projects" onClick={getClickHandler("/projects", current)}>
             <img
               src={logo}
               alt="Abodeo - Your home, sorted."

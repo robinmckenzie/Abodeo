@@ -1,5 +1,5 @@
-// Signing in and out on the dashboard, with the account endpoints stood in
-// for by a fake fetch.
+// Signing in and out on the Projects screen, with the account endpoints stood
+// in for by a fake fetch.
 import {
   act,
   cleanup,
@@ -19,7 +19,7 @@ import {
   vi,
 } from "vitest";
 
-import Dashboard from "./dashboard";
+import Projects from "./projects";
 import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
@@ -218,11 +218,11 @@ function fakeServer(overrides: Partial<Server> = {}) {
   return server;
 }
 
-async function renderDashboard(search = "") {
+async function renderProjects(search = "") {
   const Stub = createRoutesStub(
-    withAppLayout([{ path: "/dashboard", Component: Dashboard }]),
+    withAppLayout([{ path: "/projects", Component: Projects }]),
   );
-  render(<Stub initialEntries={[`/dashboard${search}`]} />);
+  render(<Stub initialEntries={[`/projects${search}`]} />);
   // Lets the account lookups finish.
   await act(async () => {});
 }
@@ -244,10 +244,10 @@ async function addProject(title: string) {
   await click(screen.getByRole("button", { name: "Create" }));
 }
 
-describe("the dashboard's account control", () => {
+describe("the Projects screen's account control", () => {
   it("offers sign-in when signed out, showing no identity", async () => {
     fakeServer();
-    await renderDashboard();
+    await renderProjects();
 
     expect(signInButton()).toBeTruthy();
     expect(screen.queryByText(/Signed in as/)).toBeNull();
@@ -255,7 +255,7 @@ describe("the dashboard's account control", () => {
 
   it("shows the Google name, then the preferred name once set, and the Google name once cleared", async () => {
     fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
-    await renderDashboard();
+    await renderProjects();
 
     const account = screen.getByRole("button", { name: /Signed in as/ });
     expect(account.textContent).toBe("Signed in as Ada Lovelace");
@@ -274,7 +274,7 @@ describe("the dashboard's account control", () => {
 
   it("says sign-in is unavailable when it is not configured, leaving projects usable", async () => {
     fakeServer({ configured: false });
-    await renderDashboard();
+    await renderProjects();
 
     expect(screen.getByText("Sign-in is unavailable")).toBeTruthy();
     await addProject("Paint the fence");
@@ -288,14 +288,14 @@ describe("the dashboard's account control", () => {
       "fetch",
       vi.fn(async () => Promise.reject(new TypeError())),
     );
-    await renderDashboard();
+    await renderProjects();
 
     expect(screen.getByText("Sign-in is unavailable")).toBeTruthy();
   });
 
   // Until the sign-in is known, no projects are shown, so that a signed-in
   // person never edits the browser's by mistake.
-  it("does not hold up the dashboard while the account service does not answer", async () => {
+  it("does not hold up the Projects screen while the account service does not answer", async () => {
     localStorage.setItem(
       "abodeo-project:p1",
       JSON.stringify({
@@ -311,7 +311,7 @@ describe("the dashboard's account control", () => {
     );
     refreshProjects();
     fakeServer({ hang: true });
-    await renderDashboard();
+    await renderProjects();
 
     expect(screen.getByRole("button", { name: "Add project" })).toBeTruthy();
     expect(
@@ -323,14 +323,14 @@ describe("the dashboard's account control", () => {
   it("gives up on a request that does not answer", async () => {
     const timeout = vi.spyOn(AbortSignal, "timeout");
     fakeServer();
-    await renderDashboard();
+    await renderProjects();
 
     expect(timeout).toHaveBeenCalledWith(8000);
   });
 
   it("says when sign-in did not complete, and removes the error from the address", async () => {
     fakeServer();
-    await renderDashboard("?error=access_denied");
+    await renderProjects("?error=access_denied");
 
     expect(screen.getByRole("alert").textContent).toBe(
       "Sign-in did not complete. Please try again.",
@@ -342,7 +342,7 @@ describe("the dashboard's account control", () => {
     const server = fakeServer({
       session: { name: "Ada Lovelace", email: "ada@example.com" },
     });
-    await renderDashboard();
+    await renderProjects();
     expect(screen.getByText(/Signed in as/)).toBeTruthy();
 
     server.session = null;
@@ -360,7 +360,7 @@ describe("the dashboard's account control", () => {
     const server = fakeServer({
       session: { name: "Ada Lovelace", email: "ada@example.com" },
     });
-    await renderDashboard();
+    await renderProjects();
     const reports = () =>
       server.calls.filter((call) => call === "POST /api/account/activity");
     // An idle page reports nothing.
@@ -389,7 +389,7 @@ describe("the dashboard's account control", () => {
 
   it("lists the sign-in record without saying it ends on sign-out", async () => {
     fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
-    await renderDashboard();
+    await renderProjects();
 
     await click(screen.getByRole("button", { name: /Signed in as/ }));
 
@@ -400,7 +400,7 @@ describe("the dashboard's account control", () => {
 
   it("closes the account panel on a press outside it, not inside it", async () => {
     fakeServer({ session: { name: "Ada Lovelace", email: "ada@example.com" } });
-    await renderDashboard();
+    await renderProjects();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     const panel = screen.getByRole("region", { name: "Your account" });
 
@@ -419,7 +419,7 @@ describe("the dashboard's account control", () => {
 
   it("reports no activity while signed out", async () => {
     const server = fakeServer();
-    await renderDashboard();
+    await renderProjects();
 
     await act(async () => {
       fireEvent.pointerDown(document.body);
@@ -434,7 +434,7 @@ describe("the dashboard's account control", () => {
       session: { name: "Ada Lovelace", email: "ada@example.com" },
       signOutStatus: 503,
     });
-    await renderDashboard();
+    await renderProjects();
 
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
@@ -447,7 +447,7 @@ describe("the dashboard's account control", () => {
 
   it("leaves the browser's projects and settings as they are when signing in or out", async () => {
     const server = fakeServer();
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     const before = { ...localStorage };
 
@@ -455,7 +455,7 @@ describe("the dashboard's account control", () => {
     server.session = { name: "Ada Lovelace", email: "ada@example.com" };
     server.signOutStatus = 503;
     cleanup();
-    await renderDashboard();
+    await renderProjects();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
 
@@ -481,7 +481,7 @@ describe("leaving to sign in or out", () => {
   it("goes straight on when nothing would be lost", async () => {
     const server = fakeServer();
     const confirm = vi.spyOn(window, "confirm");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
 
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
@@ -494,7 +494,7 @@ describe("leaving to sign in or out", () => {
   it("asks before losing tasks typed in a new project not yet added", async () => {
     const server = fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Add tasks, one per line" }),
@@ -511,7 +511,7 @@ describe("leaving to sign in or out", () => {
   it("asks before losing a new project not yet added, and stays if asked to", async () => {
     const server = fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
       target: { value: "Paint the fence" },
@@ -531,7 +531,7 @@ describe("leaving to sign in or out", () => {
   it("continues without it if the person chooses to", async () => {
     const server = fakeServer();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
       target: { value: "Paint the fence" },
@@ -545,7 +545,7 @@ describe("leaving to sign in or out", () => {
   it("does not ask about an Add project form left empty", async () => {
     fakeServer();
     const confirm = vi.spyOn(window, "confirm");
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
 
     await click(signInButton());
@@ -556,7 +556,7 @@ describe("leaving to sign in or out", () => {
   it("asks before leaving a project whose title is blank", async () => {
     fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
@@ -570,7 +570,7 @@ describe("leaving to sign in or out", () => {
 
   it("saves changes still waiting to be saved before leaving", async () => {
     fakeServer();
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "Notes" }), {
@@ -588,7 +588,7 @@ describe("leaving to sign in or out", () => {
   it("asks before losing changes that could not be saved", async () => {
     const server = fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "Notes" }), {
@@ -607,7 +607,7 @@ describe("leaving to sign in or out", () => {
   it("asks before losing tasks typed but not yet added", async () => {
     fakeServer();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     fireEvent.change(
@@ -623,7 +623,7 @@ describe("leaving to sign in or out", () => {
   it("does not ask about tasks typed as blank text", async () => {
     fakeServer();
     const confirm = vi.spyOn(window, "confirm");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     fireEvent.change(
@@ -639,7 +639,7 @@ describe("leaving to sign in or out", () => {
   it("does not ask about tasks once they are added", async () => {
     fakeServer();
     const confirm = vi.spyOn(window, "confirm");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Paint the fence");
     await click(screen.getByRole("button", { name: /Paint the fence/ }));
     const box = screen.getByRole("textbox", { name: "Add tasks, one per line" });
@@ -658,7 +658,7 @@ describe("leaving to sign in or out", () => {
       session: { name: "Ada Lovelace", email: "ada@example.com" },
     });
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
@@ -679,7 +679,7 @@ describe("the Calendar test", () => {
 
   it("is offered in the account panel when signed in", async () => {
     fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
 
     await click(screen.getByRole("button", { name: /Signed in as/ }));
 
@@ -689,7 +689,7 @@ describe("the Calendar test", () => {
 
   it("sends the browser's time zone, and says so when the test cannot start", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
 
     await click(testButton());
@@ -706,7 +706,7 @@ describe("the Calendar test", () => {
   it("asks before losing unsaved work, and stays if asked to", async () => {
     const server = fakeServer({ session: ada });
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderDashboard();
+    await renderProjects();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
@@ -721,7 +721,7 @@ describe("the Calendar test", () => {
 
   it("shows the result Google's return brought, with a link to the signed-in account's calendar once created", async () => {
     fakeServer({ session: ada });
-    await renderDashboard("?calendar=created");
+    await renderProjects("?calendar=created");
 
     expect(
       screen
@@ -737,7 +737,7 @@ describe("the Calendar test", () => {
 
   it("holds back the link until the signed-in account is known", async () => {
     fakeServer({ hang: true });
-    await renderDashboard("?calendar=created");
+    await renderProjects("?calendar=created");
 
     expect(
       screen.getByText(/^Test appointment created in your Abodeo calendar\./),
@@ -749,19 +749,19 @@ describe("the Calendar test", () => {
 
   it("says when access was not given or another account was chosen, and ignores unknown results", async () => {
     fakeServer({ session: ada });
-    await renderDashboard("?calendar=denied");
+    await renderProjects("?calendar=denied");
     expect(screen.getByRole("alert").textContent).toBe(
       "Calendar access was not given, so no appointment was created.",
     );
     cleanup();
 
-    await renderDashboard("?calendar=wrong-account");
+    await renderProjects("?calendar=wrong-account");
     expect(screen.getByRole("alert").textContent).toBe(
       "Choose the Google account you signed in with. No appointment was created.",
     );
     cleanup();
 
-    await renderDashboard("?calendar=nonsense");
+    await renderProjects("?calendar=nonsense");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
@@ -820,7 +820,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       title: "Account shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     expect(screen.getByRole("button", { name: /Account shed/ })).toBeTruthy();
@@ -829,7 +829,7 @@ describe("a signed-in account's projects (AD #41)", () => {
 
   it("adds a project to the account and not to the browser", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     await addProject("Paint the fence");
@@ -845,7 +845,7 @@ describe("a signed-in account's projects (AD #41)", () => {
 
   it("adds a new project once when Create is pressed again after a failure", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Paint the fence" } });
@@ -866,7 +866,7 @@ describe("a signed-in account's projects (AD #41)", () => {
   describe("when a Create's answer was lost", () => {
     async function createWithLostAnswer() {
       const server = fakeServer({ session: ada });
-      await renderDashboard();
+      await renderProjects();
       await settle();
       fireEvent.click(screen.getByRole("button", { name: "Add project" }));
       fireEvent.change(titleField(), { target: { value: "Shed" } });
@@ -934,7 +934,7 @@ describe("a signed-in account's projects (AD #41)", () => {
     browserProject("b1", "Browser shed");
     refreshProjects();
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     expect(
       screen.getByText(
@@ -955,14 +955,14 @@ describe("a signed-in account's projects (AD #41)", () => {
     browserProject("b1", "Browser shed");
     refreshProjects();
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     await click(screen.getByRole("button", { name: "Not now" }));
     expect(browserProjectIds()).toEqual(["abodeo-project:b1"]);
     expect(server.projects.accounts.get("ada")!.size).toBe(0);
     cleanup();
-    await renderDashboard();
+    await renderProjects();
     await settle();
     expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
 
@@ -973,7 +973,7 @@ describe("a signed-in account's projects (AD #41)", () => {
     await click(screen.getByRole("button", { name: "Sign out" }));
     await settle();
     cleanup();
-    await renderDashboard();
+    await renderProjects();
     await settle();
     expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
   });
@@ -982,7 +982,7 @@ describe("a signed-in account's projects (AD #41)", () => {
     browserProject("b1", "Browser shed");
     refreshProjects();
     fakeServer({ session: ada, projectsStatus: 503 });
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     expect(screen.getByRole("alert").textContent).toBe(
@@ -1002,7 +1002,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       title: "Old",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await server.projects.store.saveChanges(
       "ada",
@@ -1027,7 +1027,7 @@ describe("a signed-in account's projects (AD #41)", () => {
         title: "Old",
         ...fields,
       });
-      await renderDashboard();
+      await renderProjects();
       await settle();
       await openProject("Old");
       await settle();
@@ -1052,7 +1052,7 @@ describe("a signed-in account's projects (AD #41)", () => {
           { id: "t2", title: "Grout", isDone: false },
         ],
       });
-      await renderDashboard();
+      await renderProjects();
       await settle();
       await openProject(title);
       await click(screen.getByRole("button", { name: "Delete project" }));
@@ -1118,7 +1118,7 @@ describe("a signed-in account's projects (AD #41)", () => {
         title: "Old",
         ...fields,
       });
-      await renderDashboard();
+      await renderProjects();
       await settle();
       await openProject("Old");
       fireEvent.change(titleField(), { target: { value: "New" } });
@@ -1152,7 +1152,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       title: "Old",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     server.projectsStatus = 503;
 
@@ -1170,7 +1170,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await openProject("Shed");
     server.projectsStatus = 503;
@@ -1196,7 +1196,7 @@ describe("a signed-in account's projects (AD #41)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await openProject("Shed");
     await server.projects.store.saveChanges(
@@ -1221,7 +1221,7 @@ describe("a signed-in account's projects (AD #41)", () => {
         title: "Shed",
         ...fields,
       });
-      await renderDashboard();
+      await renderProjects();
       await settle();
       await openProject("Shed");
       await server.projects.store.saveChanges(
@@ -1270,7 +1270,7 @@ describe("a signed-in account's projects (AD #41)", () => {
 
   it("chooses the welcome screen by the account's projects, until signed out", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     const hint = () =>
       JSON.parse(localStorage.getItem("abodeo-account-has-projects") ?? "null");
@@ -1282,13 +1282,13 @@ describe("a signed-in account's projects (AD #41)", () => {
 
     server.session = null;
     cleanup();
-    await renderDashboard();
+    await renderProjects();
     await settle();
     expect(hint()).toBeNull();
   });
 });
 
-describe("images on the dashboard (AD #48)", () => {
+describe("images on the Projects screen (AD #48)", () => {
   const ada = { name: "Ada Lovelace", email: "ada@example.com" };
   const fields = {
     notes: "",
@@ -1314,7 +1314,7 @@ describe("images on the dashboard (AD #48)", () => {
 
   it("says to sign in on a drop while signed out, and in place of the button", async () => {
     fakeServer();
-    await renderDashboard();
+    await renderProjects();
     await drop([png()]);
     expect(screen.getByText("Sign in to add images")).toBeTruthy();
 
@@ -1333,7 +1333,7 @@ describe("images on the dashboard (AD #48)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await drop([png()]);
     expect(
@@ -1344,7 +1344,7 @@ describe("images on the dashboard (AD #48)", () => {
 
   it("says to save a new project first, and adds nothing", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     await settle();
@@ -1361,7 +1361,7 @@ describe("images on the dashboard (AD #48)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /Shed/ }));
     await settle();
@@ -1385,7 +1385,7 @@ describe("images on the dashboard (AD #48)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /Shed/ }));
     await settle();
@@ -1420,7 +1420,7 @@ describe("images on the dashboard (AD #48)", () => {
 
   it("says why a drop would be refused as files are dragged over, once, with a not-allowed cursor", async () => {
     fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await drag("dragenter");
     const dataTransfer = await drag("dragover");
@@ -1438,7 +1438,7 @@ describe("images on the dashboard (AD #48)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /Shed/ }));
     await settle();
@@ -1458,7 +1458,7 @@ describe("images on the dashboard (AD #48)", () => {
       title: "Shed",
       ...fields,
     });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /Shed/ }));
     await settle();
@@ -1475,7 +1475,7 @@ describe("images on the dashboard (AD #48)", () => {
 
   it("leaves a drag of something that is not a file alone", async () => {
     fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     const event = new Event("drop", { bubbles: true, cancelable: true });
     Object.defineProperty(event, "dataTransfer", {
       value: { types: ["text/plain"], files: [] },
@@ -1525,7 +1525,7 @@ describe("a signed-in account's people (AD #61)", () => {
     const server = fakeServer({ session: ada });
     await server.people.apply("ada", { op: "add", id: "d1", name: "Dora" });
     await server.projects.store.create("ada", "p1", project("p1", "d1"));
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     await click(screen.getByRole("button", { name: "Shed, Dora" }));
@@ -1542,7 +1542,7 @@ describe("a signed-in account's people (AD #61)", () => {
   it("adds a person from Assigned To to the account and assigns them to the open project", async () => {
     const server = fakeServer({ session: ada });
     await server.projects.store.create("ada", "p1", project("p1"));
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /^Shed/ }));
     await settle();
@@ -1570,7 +1570,7 @@ describe("a signed-in account's people (AD #61)", () => {
     browserProject("unassigned");
     refreshProjects();
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     // The offer is pending, so the account's list is left unsaved.
     expect(sentPeople(server)).toEqual([]);
@@ -1585,7 +1585,7 @@ describe("a signed-in account's people (AD #61)", () => {
 
   it("saves the account's list at once when the browser has nothing to move", async () => {
     const server = fakeServer({ session: ada });
-    await renderDashboard();
+    await renderProjects();
     await settle();
     expect(sentPeople(server)).toHaveLength(1);
   });
@@ -1596,7 +1596,7 @@ describe("a signed-in account's people (AD #61)", () => {
     refreshPeople();
     const server = fakeServer({ session: ada });
     const importProjects = vi.spyOn(server.projects.store, "importProjects");
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     await click(screen.getByRole("button", { name: "Move" }));
@@ -1612,7 +1612,7 @@ describe("a signed-in account's people (AD #61)", () => {
     const server = fakeServer({ session: ada });
     await server.people.apply("ada", { op: "add", id: "d1", name: "Dora" });
     await server.projects.store.create("ada", "p1", project("p1"));
-    await renderDashboard();
+    await renderProjects();
     await settle();
     await click(screen.getByRole("button", { name: /^Shed/ }));
     await settle();
@@ -1635,7 +1635,7 @@ describe("a signed-in account's people (AD #61)", () => {
     const server = fakeServer({ session: ada });
     vi.spyOn(server.people, "read").mockRejectedValue(new Error("down"));
     await server.projects.store.create("ada", "p1", project("p1", "andy"));
-    await renderDashboard();
+    await renderProjects();
     await settle();
 
     await click(screen.getByRole("button", { name: /^Shed/ }));
@@ -1669,7 +1669,7 @@ describe("returning from Google to a project (AD #70)", () => {
 
   it("opens the project and its new appointment form, and cleans the address", async () => {
     await serverWithProject();
-    await renderDashboard(
+    await renderProjects(
       "?project=3f2a-copy-9c1d&appointment=new&calendar=connected",
     );
     await settle();
@@ -1684,7 +1684,7 @@ describe("returning from Google to a project (AD #70)", () => {
 
   it("opens the project without the form when the form was not asked for", async () => {
     await serverWithProject();
-    await renderDashboard("?project=3f2a-copy-9c1d&calendar=connected");
+    await renderProjects("?project=3f2a-copy-9c1d&calendar=connected");
     await settle();
 
     expect(
@@ -1695,7 +1695,7 @@ describe("returning from Google to a project (AD #70)", () => {
 
   it("opens the form once only: closing and reopening the project does not bring it back", async () => {
     await serverWithProject();
-    await renderDashboard(
+    await renderProjects(
       "?project=3f2a-copy-9c1d&appointment=new&calendar=connected",
     );
     await settle();
@@ -1707,7 +1707,7 @@ describe("returning from Google to a project (AD #70)", () => {
     const server = await serverWithProject({
       appointmentsAnswer: { status: "needs-grant", connectedBefore: true },
     });
-    await renderDashboard("?project=3f2a-copy-9c1d&calendar=denied");
+    await renderProjects("?project=3f2a-copy-9c1d&calendar=denied");
     await settle();
 
     expect(
@@ -1727,7 +1727,7 @@ describe("returning from Google to a project (AD #70)", () => {
 
   it("ignores a project the account does not have", async () => {
     await serverWithProject();
-    await renderDashboard("?project=nope&appointment=new&calendar=connected");
+    await renderProjects("?project=nope&appointment=new&calendar=connected");
     await settle();
 
     expect(screen.queryByRole("group", { name: "New appointment" })).toBeNull();

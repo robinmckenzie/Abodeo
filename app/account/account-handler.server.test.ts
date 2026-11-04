@@ -164,7 +164,7 @@ describe("createAccountRequestHandler", () => {
     }
   });
 
-  it("returns the browser to the dashboard when Google's return cannot be completed", async () => {
+  it("returns the browser to the Projects screen when Google's return cannot be completed", async () => {
     vi.useFakeTimers();
     try {
       const handle = createAccountRequestHandler(
@@ -192,14 +192,14 @@ describe("createAccountRequestHandler", () => {
 
       expect((await response).status).toBe(302);
       expect((await response).headers.get("Location")).toBe(
-        `${testBaseUrl}/dashboard?error=unavailable`,
+        `${testBaseUrl}/projects?error=unavailable`,
       );
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("returns the browser to the dashboard when Better Auth answers Google's return with an error", async () => {
+  it("returns the browser to the Projects screen when Better Auth answers Google's return with an error", async () => {
     const handle = createAccountRequestHandler(
       () => ({
         handleAuthRequest: async () => new Response(null, { status: 500 }),
@@ -222,7 +222,7 @@ describe("createAccountRequestHandler", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe(
-      `${testBaseUrl}/dashboard?error=unavailable`,
+      `${testBaseUrl}/projects?error=unavailable`,
     );
   });
 
@@ -338,12 +338,12 @@ describe("createAccountRequestHandler", () => {
     expect(start.status).toBe(503);
     expect(callback.status).toBe(302);
     expect(callback.headers.get("Location")).toBe(
-      `${testBaseUrl}/dashboard?calendar=failed`,
+      `${testBaseUrl}/projects?calendar=failed`,
     );
     expect(other.status).toBe(404);
   });
 
-  it("asks Google only for sign-in's own permissions and returns to the dashboard, whatever the page asks", async () => {
+  it("asks Google only for sign-in's own permissions and returns to the Projects screen, whatever the page asks", async () => {
     const { handle, rows } = createTestHandler();
 
     const response = await handle(
@@ -371,8 +371,8 @@ describe("createAccountRequestHandler", () => {
       `${testBaseUrl}/api/auth/callback/google`,
     );
     const saved = JSON.stringify(rows.auth_verification);
-    expect(saved).toContain('\\"callbackURL\\":\\"/dashboard\\"');
-    expect(saved).toContain('\\"errorURL\\":\\"/dashboard\\"');
+    expect(saved).toContain('\\"callbackURL\\":\\"/projects\\"');
+    expect(saved).toContain('\\"errorURL\\":\\"/projects\\"');
     expect(saved).not.toContain("elsewhere");
   });
 
@@ -845,12 +845,12 @@ describe("Google's return to sign-in", () => {
 
   it("keeps the Calendar token when Calendar was allowed", async () => {
     const response = await returnFromGoogle(
-      redirect(`${testBaseUrl}/dashboard`),
+      redirect(`${testBaseUrl}/projects`),
       allowed,
     );
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe(`${testBaseUrl}/dashboard`);
+    expect(response.headers.get("Location")).toBe(`${testBaseUrl}/projects`);
     expect(response.headers.getSetCookie()).toContain("session=abc; Path=/");
     const cookie = readTokenCookie(response);
     expect(cookie).toContain("Path=/api/calendar");
@@ -860,15 +860,15 @@ describe("Google's return to sign-in", () => {
     );
   });
 
-  it("keeps the token when the dashboard address is relative", async () => {
-    const response = await returnFromGoogle(redirect("/dashboard"), allowed);
+  it("keeps the token when the Projects screen's address is relative", async () => {
+    const response = await returnFromGoogle(redirect("/projects"), allowed);
 
     expect(readTokenCookie(response)).toBeDefined();
   });
 
   it("keeps no token when Calendar was declined", async () => {
     const response = await returnFromGoogle(
-      redirect(`${testBaseUrl}/dashboard`),
+      redirect(`${testBaseUrl}/projects`),
       { userId: "ada" },
     );
 
@@ -878,7 +878,7 @@ describe("Google's return to sign-in", () => {
 
   it("keeps no token when sign-in returns with an error", async () => {
     const response = await returnFromGoogle(
-      redirect(`${testBaseUrl}/dashboard?error=access_denied`),
+      redirect(`${testBaseUrl}/projects?error=access_denied`),
       allowed,
     );
 
@@ -892,7 +892,7 @@ describe("Google's return to sign-in", () => {
     );
 
     expect(response.headers.get("Location")).toBe(
-      `${testBaseUrl}/dashboard?error=unavailable`,
+      `${testBaseUrl}/projects?error=unavailable`,
     );
     expect(readTokenCookie(response)).toBeUndefined();
   });
