@@ -1,8 +1,9 @@
 // A signed-in account's projects, in the project table of
-// db/account-tables.sql (AD #41 Access Projects Across Devices). Every query is limited to the account it is
-// given, which only the handler decides, from the sign-in. Each row holds a
-// project's saved form, as the browser keeps it, so the same rules apply: a
-// project this version cannot read is never overwritten or removed.
+// db/account-tables.sql (AD #41 Access Projects Across Devices). Every query
+// is limited to the account it is given, which only the handler decides, from
+// the sign-in. Each row holds a project's saved form, as the browser keeps
+// it, so the same rules apply: a project this version cannot read is never
+// overwritten or removed.
 import type { Queryable } from "../account/account-profile.server";
 import {
   isKnownAssignee,
