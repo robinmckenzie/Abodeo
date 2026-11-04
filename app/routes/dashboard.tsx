@@ -1113,6 +1113,7 @@ export default function Dashboard() {
             style={{ "--arrival": 4 } as React.CSSProperties}
             projectId={open.id}
             tasks={open.values.tasks}
+            people={readyPeople?.people ?? noPeople}
             drafts={taskDrafts}
             onChange={changeOpenTasks}
             finishEditRef={finishTaskEditRef}
@@ -1151,6 +1152,7 @@ export default function Dashboard() {
             <TaskList
               projectId={bar.id}
               tasks={bar.values.tasks}
+              people={readyPeople?.people ?? noPeople}
               drafts={taskDrafts}
               onChange={async () => null}
             />

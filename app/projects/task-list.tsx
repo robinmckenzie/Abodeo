@@ -1,13 +1,16 @@
 // An opened project's tasks: a checklist below its notes, with a box below
 // it for adding tasks, several at once, one per line. Each change is saved
 // straight away by the dashboard, which shows it at once and puts it back if
-// saving fails.
+// saving fails. Each task shows who it is assigned to, which can be changed
+// on its row (AD #66 Assign Tasks To People).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { calculateDragScroll } from "./drag-scroll";
+import type { Person } from "./people";
 import { ArrowIcon, BinIcon, DragHandleIcon } from "../ui/icons";
 import { canAnimate } from "./project-bar";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
+import { TaskAssigneePicker } from "./task-assignee-picker";
 import {
   addTasks,
   createTasks,
@@ -17,6 +20,7 @@ import {
   readTaskEntries,
   renameTask,
   restoreTask,
+  setTaskAssignee,
   setTaskDone,
   type Task,
 } from "./tasks";
@@ -47,6 +51,7 @@ const titleSteps: Partial<Record<string, -1 | 1>> = {
 export function TaskList({
   projectId,
   tasks,
+  people,
   drafts,
   onChange,
   finishEditRef,
@@ -55,6 +60,8 @@ export function TaskList({
 }: {
   projectId: string;
   tasks: Task[];
+  // Who a task can be assigned to, besides Unassigned.
+  people: readonly Person[];
   // Keeps text typed into the box but not yet added, so that closing the
   // project does not lose it.
   drafts: TaskDrafts;
@@ -497,6 +504,17 @@ export function TaskList({
                     {task.title}
                   </button>
                 )}
+                <TaskAssigneePicker
+                  taskId={task.id}
+                  taskTitle={task.title}
+                  assignee={task.assignee}
+                  people={people}
+                  onChoose={(assignee) =>
+                    void save((current) =>
+                      setTaskAssignee(current, task.id, assignee),
+                    )
+                  }
+                />
                 <span className="task-controls">
                   <TaskButton
                     label={`Move ${task.title} up`}

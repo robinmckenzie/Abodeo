@@ -12,7 +12,12 @@ const deletedAt = "2026-10-22T00:00:00.000Z";
 const at = (offsetMs: number) => Date.parse(deletedAt) + offsetMs;
 
 describe("listing what is lost", () => {
-  const task = (n: number) => ({ id: String(n), title: "T", isDone: false });
+  const task = (n: number) => ({
+    id: String(n),
+    title: "T",
+    isDone: false,
+    assignee: "unassigned",
+  });
 
   it("gives the counts of the tasks and images the project has", () => {
     expect(listLosses({ tasks: [1, 2, 3].map(task) }, 2)).toEqual([

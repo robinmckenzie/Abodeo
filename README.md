@@ -156,22 +156,30 @@ AD #61 Manage People and AD #90 People Page Rework. The code is in `app/projects
   assigned to are shown, and the list is saved by the first change to it, by moving the browser's
   projects in, or once the offer to move them has been settled.
 - A text box below the people in Assigned To adds a person and assigns them to the open project.
-- Delete always asks first near the row's Delete control, including at zero projects. It says how many projects are affected, and then sets those projects
-  to Unassigned. The server counts them (a dry run), and a removal sent with that count changes
-  nothing, and answers with the new count, if the count has changed since. Projects that cannot
+- Each task in an opened project has its own person (AD #66 Assign Tasks To People), shown after
+  its title and chosen from a list styled like Assigned To, with the mouse or the keyboard (Enter
+  or Down opens it, Up, Down, Home and End move, Escape closes). It is saved like any other task
+  change. A task starts Unassigned however it is created, and the project's own assignee never
+  changes it. Tasks saved before this (project version 3) are read as Unassigned.
+- Delete always asks first near the row's Delete control, including at zero projects. It says how
+  many projects and tasks are assigned to the person, and then sets those projects and tasks
+  to Unassigned. The server counts them (a dry run), and a removal sent with those counts changes
+  nothing, and answers with the new counts, if either has changed since. Projects that cannot
   be read are left as they are, and are reported. In the browser, removal sets the projects one
   by one, so it is not atomic, and takes turns with assigning in other tabs using Web Locks where
   the browser has them.
-- The server checks that a person chosen for a project is in the account's list, as the write is
+- The server checks that a person chosen for a project or a task is in the account's list, as the write is
   made (the list row is held until then), and refuses with `unknown_assignee` otherwise, as
   happens when someone is removed on another device. The browser does the same for its own list.
-  A project already assigned to someone no longer in the list shows as Unassigned until edited.
+  A project or task already assigned to someone no longer in the list shows as Unassigned until
+  edited, and a project restored from the Bin has such people set to Unassigned.
 - Moving the browser's projects in takes its list too. If the account has no list, the browser's
   becomes the account's and people carry by id. If it has one, each project's person is matched
   to the account's by name, whatever the case, and anyone without a match becomes Unassigned.
+  Each task's person is matched in the same way.
   Sending the same move again after someone was renamed finds the projects already moved.
 - Rolling the app back to a version before this makes projects assigned to people added since
-  unreadable to it.
+  unreadable to it. Rolling back before AD #66 makes every project saved since unreadable to it.
 
 ### Images on projects
 

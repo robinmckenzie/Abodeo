@@ -217,6 +217,36 @@ export function countAssignedProjects(
   return projects.filter((project) => project.assignee === id).length;
 }
 
+// How many tasks, across the projects, are assigned to the person (AD #66
+// Assign Tasks To People).
+export function countAssignedTasks(
+  projects: readonly Pick<Project, "tasks">[],
+  id: string,
+) {
+  return projects.reduce(
+    (count, project) =>
+      count + project.tasks.filter((task) => task.assignee === id).length,
+    0,
+  );
+}
+
+// The changes that set to Unassigned the project, and each of its tasks, if
+// assigned to someone gone. Null if none is.
+export function findUnassignChanges(
+  project: Pick<Project, "assignee" | "tasks">,
+  isGone: (id: string) => boolean,
+): Partial<Pick<Project, "assignee" | "tasks">> | null {
+  const hasGone = (id: string) => id !== unassignedId && isGone(id);
+  const changes: Partial<Pick<Project, "assignee" | "tasks">> = {};
+  if (hasGone(project.assignee)) changes.assignee = unassignedId;
+  if (project.tasks.some((task) => hasGone(task.assignee))) {
+    changes.tasks = project.tasks.map((task) =>
+      hasGone(task.assignee) ? { ...task, assignee: unassignedId } : task,
+    );
+  }
+  return Object.keys(changes).length > 0 ? changes : null;
+}
+
 // The list of a store that has none saved yet: whichever of the starting
 // people its projects are assigned to, so that projects assigned before the
 // list could be changed keep their assignees.

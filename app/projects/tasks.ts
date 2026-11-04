@@ -1,10 +1,14 @@
 // A project's checklist of tasks, and the changes that can be made to it,
 // without any storage or user interface, so that each can be tested alone.
+import { isAssigneeId, unassignedId } from "./projects";
 
 export type Task = {
   id: string;
   title: string;
   isDone: boolean;
+  // A person's id, or Unassigned, separate from the project's own (AD #66
+  // Assign Tasks To People).
+  assignee: string;
 };
 
 export type TaskEntry = Pick<Task, "title" | "isDone">;
@@ -34,8 +38,14 @@ export function readTaskEntries(text: string): TaskEntry[] {
   return entries;
 }
 
+// New tasks start Unassigned, whoever the project is assigned to.
 export function createTasks(entries: TaskEntry[]): Task[] {
-  return entries.map((entry) => ({ ...entry, id: crypto.randomUUID() }));
+  return entries.map(({ title, isDone }) => ({
+    id: crypto.randomUUID(),
+    title,
+    isDone,
+    assignee: unassignedId,
+  }));
 }
 
 export function isTask(value: unknown): value is Task {
@@ -44,7 +54,22 @@ export function isTask(value: unknown): value is Task {
     typeof task?.id === "string" &&
     typeof task.title === "string" &&
     task.title.trim() !== "" &&
-    typeof task.isDone === "boolean"
+    typeof task.isDone === "boolean" &&
+    isAssigneeId(task.assignee)
+  );
+}
+
+// Only a task's own fields, so that nothing else is saved with it.
+export function copyTask({ id, title, isDone, assignee }: Task): Task {
+  return { id, title, isDone, assignee };
+}
+
+export function isSameTask(a: Task, b: Task) {
+  return (
+    a.id === b.id &&
+    a.title === b.title &&
+    a.isDone === b.isDone &&
+    a.assignee === b.assignee
   );
 }
 
@@ -54,6 +79,10 @@ export function addTasks(tasks: Task[], added: Task[]) {
 
 export function setTaskDone(tasks: Task[], id: string, isDone: boolean) {
   return tasks.map((task) => (task.id === id ? { ...task, isDone } : task));
+}
+
+export function setTaskAssignee(tasks: Task[], id: string, assignee: string) {
+  return tasks.map((task) => (task.id === id ? { ...task, assignee } : task));
 }
 
 // Trims the title. An empty one leaves the task as it was.
@@ -109,7 +138,7 @@ export function describeTaskCount(tasks: Task[]) {
 }
 
 // The tasks one side changed, going from base to result: added, removed,
-// renamed, ticked or unticked, or moved. A task counts as moved when it is
+// renamed, ticked or unticked, assigned, or moved. A task counts as moved when it is
 // not among the most tasks that kept their order, so that moving one task
 // counts only that task.
 function findTouchedTasks(base: Task[], result: Task[]) {
@@ -118,9 +147,7 @@ function findTouchedTasks(base: Task[], result: Task[]) {
   const touched = new Set<string>();
   for (const task of result) {
     const old = before.get(task.id);
-    if (!old || old.title !== task.title || old.isDone !== task.isDone) {
-      touched.add(task.id);
-    }
+    if (!old || !isSameTask(old, task)) touched.add(task.id);
   }
   for (const task of base) if (!after.has(task.id)) touched.add(task.id);
   const moved = findMovedTasks(

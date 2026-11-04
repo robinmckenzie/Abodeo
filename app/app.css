@@ -1722,6 +1722,86 @@ html:has(.app-layout) {
 .task:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
   opacity: 0;
 }
+
+/* Who a task is assigned to, after its title and level with its first line
+   (AD #66 Assign Tasks To People). Always shown, lighter when Unassigned,
+   and a long name is cut short. */
+.task-assignee {
+  flex: none;
+  align-self: flex-start;
+  max-width: 9rem;
+  margin-top: calc(2px + 0.375rem);
+  padding: 0.125rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.task-assignee.is-unassigned {
+  color: #a39d90;
+}
+
+.task-assignee:is(:hover, [aria-expanded="true"]) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.app-layout .task-assignee:focus-visible {
+  outline-offset: 0;
+}
+
+/* The people to choose from, as in the project's Assigned to, on a card
+   below the task's assignee. Placed by task-assignee-picker.tsx. */
+.task-assignee-list {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+  width: max-content;
+  min-width: 11rem;
+  max-width: 16rem;
+  max-height: 15.4rem;
+  padding: 0.375rem;
+  overflow-y: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 8px 28px rgb(26 26 26 / 0.12);
+  color: var(--ink);
+}
+
+.task-assignee-list .assignee-option {
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.task-assignee-list .assignee-option:is(:hover, :focus-visible) {
+  background: var(--row-tint);
+}
+
+.task-assignee-list .assignee-option[aria-checked="true"] {
+  color: var(--ink);
+}
+
+.app-layout .task-assignee-list .assignee-option:focus-visible {
+  outline: none;
+}
+
+.task-assignee-list .assignee-option:focus-visible .assignee-icon {
+  border-radius: 50%;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 /* The bin on tasks and People. */
 .task-undo {
   display: flex;

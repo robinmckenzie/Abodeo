@@ -19,12 +19,14 @@ import { ScreenPanel } from "../screen-panel";
 export const meta: Route.MetaFunction = () => [
   { title: "People - Abodeo" }, { name: "description", content: "Who projects can be assigned to." },
 ];
-type Removal = { storeKey: string; person: Person; count: number; unreadable: number; notice?: string };
-export function describeRemoval({ person, count, unreadable }: Pick<Removal, "person" | "count" | "unreadable">) {
+type Removal = { storeKey: string; person: Person; count: number; taskCount: number; unreadable: number; notice?: string };
+const countOf = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+// The projects and the tasks assigned to the person, each left out when there are none (AD #66 Assign Tasks To People).
+export function describeRemoval({ person, count, taskCount, unreadable }: Pick<Removal, "person" | "count" | "taskCount" | "unreadable">) {
   const name = describePerson(person);
-  const assigned = count === 0 ? `${name} is not assigned to any project.`
-    : count === 1 ? `${name} is assigned to 1 project. Removing ${name} sets it to Unassigned.`
-      : `${name} is assigned to ${count} projects. Removing ${name} sets them to Unassigned.`;
+  const parts = [...(count > 0 ? [countOf(count, "project")] : []), ...(taskCount > 0 ? [countOf(taskCount, "task")] : [])];
+  const assigned = parts.length === 0 ? `${name} is not assigned to any project or task.`
+    : `${name} is assigned to ${parts.join(" and ")}. Removing ${name} sets ${count + taskCount === 1 ? "it" : "them"} to Unassigned.`;
   return assigned + (unreadable === 0 ? "" : unreadable === 1 ? " 1 project could not be read and was not changed." : ` ${unreadable} projects could not be read and were not changed.`);
 }
 
@@ -111,11 +113,11 @@ function PeoplePanel({ controller, people, disabled }: { controller: PeopleDraft
     if (controller.departing) return;
     setBusyId(confirmed.person.id);
     await controller.prepareRemoval(confirmed.person.id);
-    const result = await source.removePerson(confirmed.person.id, confirmed.count);
+    const result = await source.removePerson(confirmed.person.id, confirmed);
     controller.finishRemoval(confirmed.person.id, result.ok);
     setBusyId(null);
     if (result.ok) { setRemoval(null); showMessage(`${describePerson(confirmed.person)} was removed.`); }
-    else if (result.reason === "count-changed") setRemoval({ ...confirmed, count: result.count, unreadable: result.unreadable, notice: "The projects assigned to them changed. Please check again." });
+    else if (result.reason === "count-changed") setRemoval({ ...confirmed, count: result.count, taskCount: result.taskCount, unreadable: result.unreadable, notice: "The projects or tasks assigned to them changed. Please check again." });
     else setMessage(describePersonFailure(result.reason));
   };
   const endDrag = () => { setDraggedId(null); setDropIndex(null); };

@@ -14,7 +14,9 @@ const saved: Project = {
   notes: "Green",
   assignee: "andy",
   dueDate: "2026-11-01",
-  tasks: [{ id: "t1", title: "Buy paint", isDone: false }],
+  tasks: [
+    { id: "t1", title: "Buy paint", isDone: false, assignee: "unassigned" },
+  ],
   createdAt: "2026-10-01T00:00:00.000Z",
   updatedAt: "2026-10-02T00:00:00.000Z",
 };
@@ -47,7 +49,9 @@ describe("findConflictingFields", () => {
   });
 
   it("compares tasks by their ids, titles, completion and order", () => {
-    const base = [{ id: "t1", title: "Buy paint", isDone: true }];
+    const base = [
+      { id: "t1", title: "Buy paint", isDone: true, assignee: "unassigned" },
+    ];
     expect(
       findConflictingFields(saved, { tasks: base }, { tasks: [] }),
     ).toEqual(["tasks"]);

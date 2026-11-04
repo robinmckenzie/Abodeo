@@ -2,7 +2,7 @@
 // same rules can apply whether projects are kept in the browser or, later, in
 // a database.
 import { isCalendarDate } from "./due-date";
-import { isTask, type Task } from "./tasks";
+import { copyTask, isTask, type Task } from "./tasks";
 
 // What is saved is a person's id, so that the names shown can change without
 // affecting saved projects. Unassigned is not a person (see people.ts).
@@ -34,17 +34,21 @@ export const newProjectFields: ProjectFields = {
 // The version of the saved form of a project. A project saved by a later
 // version of the app counts as unreadable, so that it is never overwritten
 // with fields this version does not know about. Version 1 had no due date,
-// and versions 1 and 2 had no tasks.
+// versions 1 and 2 had no tasks, and version 3's tasks had no assignee.
 const versionWithoutDueDate = 1;
 const versionWithoutTasks = 2;
-export const projectVersion = 3;
+const versionWithoutTaskAssignees = 3;
+export const projectVersion = 4;
 
 // Whether this version of the app can read a project saved in the given
 // version: the current one, or an older one that lacked some fields.
 function isReadableVersion(version: unknown) {
-  return [versionWithoutDueDate, versionWithoutTasks, projectVersion].includes(
-    version as number,
-  );
+  return [
+    versionWithoutDueDate,
+    versionWithoutTasks,
+    versionWithoutTaskAssignees,
+    projectVersion,
+  ].includes(version as number);
 }
 
 export function hasTitle(title: string) {
@@ -77,7 +81,7 @@ export function serialiseProject(project: Project) {
     notes,
     assignee,
     dueDate,
-    tasks: tasks.map(({ id, title, isDone }) => ({ id, title, isDone })),
+    tasks: tasks.map(copyTask),
     createdAt,
     updatedAt,
   });
@@ -85,7 +89,7 @@ export function serialiseProject(project: Project) {
 
 // Reads a project's saved form, or returns null if it is damaged, incomplete
 // or from a later version. A project saved before due dates or tasks has
-// none.
+// none, and tasks saved before they could be assigned are Unassigned.
 export function parseProject(id: string, json: string | null): Project | null {
   try {
     const saved = JSON.parse(json ?? "null");
@@ -94,7 +98,13 @@ export function parseProject(id: string, json: string | null): Project | null {
     const tasks =
       version === versionWithoutDueDate || version === versionWithoutTasks
         ? []
-        : saved?.tasks;
+        : version === versionWithoutTaskAssignees && Array.isArray(saved.tasks)
+          ? saved.tasks.map((task: unknown) =>
+              typeof task === "object" && task !== null
+                ? { ...task, assignee: unassignedId }
+                : task,
+            )
+          : saved?.tasks;
     if (
       !isReadableVersion(version) ||
       typeof saved.title !== "string" ||
@@ -115,11 +125,7 @@ export function parseProject(id: string, json: string | null): Project | null {
       notes: saved.notes,
       assignee: saved.assignee,
       dueDate,
-      tasks: tasks.map(({ id, title, isDone }: Task) => ({
-        id,
-        title,
-        isDone,
-      })),
+      tasks: tasks.map(copyTask),
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };

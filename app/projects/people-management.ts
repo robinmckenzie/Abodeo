@@ -1,10 +1,12 @@
 // Changing the list of people in the browser while signed out (AD #61 Manage
 // People): the first read, adding, renaming and removing. Removing someone
-// also sets their projects to Unassigned, so this uses both the people's
-// storage and the projects'.
+// also sets their projects and tasks to Unassigned, so this uses both the
+// people's storage and the projects'.
 import {
   addPerson,
   countAssignedProjects,
+  countAssignedTasks,
+  findUnassignChanges,
   movePerson,
   derivePeopleFromProjects,
   removePerson,
@@ -21,7 +23,8 @@ import {
   writeStoredPeople,
 } from "./people-storage";
 import { loadProjects, saveProjectChanges } from "./project-storage";
-import { unassignedId } from "./projects";
+import type { RemovalCount } from "./people-api";
+import { type Project } from "./projects";
 
 export type PeopleLoad =
   | { ok: true; people: Person[] }
@@ -87,28 +90,38 @@ export function updateStoredPersonDetails(id: string, details: PersonDetails) {
   return changeList(people => updatePersonDetails(people, id, details));
 }
 
-// How many readable projects are assigned to the person.
+type StoredRemovalCount = Pick<RemovalCount, "count" | "taskCount">;
+
+function countAssigned(projects: Project[], id: string): StoredRemovalCount {
+  return {
+    count: countAssignedProjects(projects, id),
+    taskCount: countAssignedTasks(projects, id),
+  };
+}
+
+// How many readable projects, and tasks in them, are assigned to the person.
 export function countStoredAssignedProjects(id: string) {
   const loaded = loadProjects();
-  return loaded.ok ? countAssignedProjects(loaded.projects, id) : null;
+  return loaded.ok ? countAssigned(loaded.projects, id) : null;
 }
 
 export type RemovalResult =
   | { ok: true; people: Person[] }
-  // The projects assigned changed since the person was shown the count.
-  | { ok: false; reason: "count-changed"; count: number }
+  // The projects or tasks assigned changed since the person was shown the
+  // counts.
+  | ({ ok: false; reason: "count-changed" } & StoredRemovalCount)
   | { ok: false; reason: "unreadable" | "unavailable" };
 
-// Removes the person and sets their projects to Unassigned. With Web Locks,
-// the projects go first, so that a failure part way leaves the person in the
-// list and the removal can be tried again, and no other tab can assign them
-// meanwhile. Without, the list goes first, so that no tab can assign them
+// Removes the person and sets their projects and tasks to Unassigned. With
+// Web Locks, the projects go first, so that a failure part way leaves the
+// person in the list and the removal can be tried again, and no other tab can
+// assign them meanwhile. Without, the list goes first, so that no tab can assign them
 // once it is saved, and a sweep then sets right anything assigned in between.
 // Projects that cannot be read are left as they are. Not atomic: a failure
 // part way leaves some projects changed.
 export function removeStoredPerson(
   id: string,
-  expectedCount?: number,
+  expected?: StoredRemovalCount,
 ): Promise<RemovalResult> {
   return withPeopleLock(async (): Promise<RemovalResult> => {
     const loaded = loadPeople();
@@ -118,18 +131,23 @@ export function removeStoredPerson(
     }
     const projects = loadProjects();
     if (!projects.ok) return { ok: false, reason: "unavailable" };
-    const affected = projects.projects.filter(
-      (project) => project.assignee === id,
-    );
-    if (expectedCount !== undefined && expectedCount !== affected.length) {
-      return { ok: false, reason: "count-changed", count: affected.length };
+    const counts = countAssigned(projects.projects, id);
+    if (
+      expected !== undefined &&
+      (expected.count !== counts.count ||
+        expected.taskCount !== counts.taskCount)
+    ) {
+      return { ok: false, reason: "count-changed", ...counts };
     }
     const people = removePerson(loaded.people, id);
-    const unassign = async (ids: string[]) => {
-      for (const projectId of ids) {
-        const result = await saveProjectChanges(projectId, {
-          assignee: unassignedId,
-        });
+    const unassign = async (
+      list: Project[],
+      isGone: (assignee: string) => boolean,
+    ) => {
+      for (const project of list) {
+        const changes = findUnassignChanges(project, isGone);
+        if (!changes) continue;
+        const result = await saveProjectChanges(project.id, changes);
         // A project that cannot be read or has gone is left as it is.
         if (!result.ok && result.reason === "unavailable") return false;
         if (!result.ok && result.reason === "full") return false;
@@ -137,7 +155,7 @@ export function removeStoredPerson(
       return true;
     };
     if (hasWebLocks()) {
-      if (!(await unassign(affected.map((project) => project.id)))) {
+      if (!(await unassign(projects.projects, (other) => other === id))) {
         return { ok: false, reason: "unavailable" };
       }
       if (!writeStoredPeople(people)) {
@@ -148,18 +166,10 @@ export function removeStoredPerson(
     if (!writeStoredPeople(people)) {
       return { ok: false, reason: "unavailable" };
     }
-    const sweepIds = (): string[] => {
-      const current = loadProjects();
-      if (!current.ok) return [];
-      return current.projects
-        .filter(
-          (project) =>
-            project.assignee !== unassignedId &&
-            !people.some((person) => person.id === project.assignee),
-        )
-        .map((project) => project.id);
-    };
-    if (!(await unassign(sweepIds()))) {
+    const current = loadProjects();
+    const isGone = (assignee: string) =>
+      !people.some((person) => person.id === assignee);
+    if (!(await unassign(current.ok ? current.projects : [], isGone))) {
       return { ok: false, reason: "unavailable" };
     }
     return { ok: true, people };

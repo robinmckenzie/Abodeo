@@ -9,7 +9,7 @@ import {
   type Project,
   type ProjectFields,
 } from "./projects";
-import { isTask, type Task } from "./tasks";
+import { copyTask, isSameTask, isTask, type Task } from "./tasks";
 
 export type ProjectField = keyof ProjectFields;
 
@@ -31,15 +31,7 @@ export function isSameFieldValue(
 }
 
 function isSameTasks(a: Task[], b: Task[]) {
-  return (
-    a.length === b.length &&
-    a.every(
-      (task, index) =>
-        task.id === b[index].id &&
-        task.title === b[index].title &&
-        task.isDone === b[index].isDone,
-    )
-  );
+  return a.length === b.length && a.every((task, i) => isSameTask(task, b[i]));
 }
 
 // The fields being changed whose saved value is no longer the one the change
@@ -72,11 +64,7 @@ export function applyProjectChanges(
 
 function copyValue(field: ProjectField, value: unknown) {
   if (field !== "tasks") return value;
-  return (value as Task[]).map(({ id, title, isDone }) => ({
-    id,
-    title,
-    isDone,
-  }));
+  return (value as Task[]).map(copyTask);
 }
 
 // Whether a value would be valid as a saved project's field. A title must

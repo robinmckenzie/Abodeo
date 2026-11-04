@@ -237,27 +237,34 @@ export function createFakeDatabase() {
       }
       return { rows: [] };
     }
+    // The projects with the person assigned to them or to any of their
+    // tasks (AD #66 Assign Tasks To People).
     if (sql.includes("data->>'assignee' = $2")) {
+      const isAssigned = (data: unknown) => {
+        const project = data as {
+          assignee?: unknown;
+          tasks?: { assignee?: unknown }[];
+        } | null;
+        return (
+          project?.assignee === values[1] ||
+          (Array.isArray(project?.tasks) &&
+            project.tasks.some((task) => task?.assignee === values[1]))
+        );
+      };
       return {
         rows: projects
           .filter(
             (row) =>
               row.user_id === userId &&
               isReached(row, sql) &&
-              (row.data as { assignee?: string })?.assignee === values[1],
+              isAssigned(row.data),
           )
-          .map(({ id, data }) => ({ id, data })),
+          .map(({ id, data, revision }) => ({
+            id,
+            data,
+            revision: String(revision),
+          })),
       };
-    }
-    if (sql.startsWith("update project set data = jsonb_set(")) {
-      const ids = JSON.parse(values[1] as string) as string[];
-      for (const id of ids) {
-        const row = find(userId, id);
-        if (!row) continue;
-        row.data = { ...(row.data as object), assignee: "unassigned" };
-        row.revision++;
-      }
-      return { rows: [] };
     }
     if (sql.startsWith("update project set data")) {
       beforeUpdate?.();
