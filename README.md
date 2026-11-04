@@ -34,36 +34,6 @@ Run these from the repository root.
 | `npm run lint` | Checks the code with ESLint. |
 | `npm test` | Runs the tests once with Vitest. |
 
-## Default projects
-
-The default projects are currently empty (AD #75), so new visitors start with a blank dashboard and
-anyone who received the earlier defaults has them removed. The rest of this section describes the
-mechanism, which still works if projects are saved as defaults again.
-
-Every visitor receives the default projects in `app/projects/default-projects.json`, which each
-deployment includes. When a visitor loads a version whose defaults differ from those their browser
-last received, the defaults are added or replaced, overwriting any edits to them, and defaults the
-file no longer has are removed. Projects the visitor created are left alone, and default projects
-alone do not skip the welcome screen. A signed-in account receives the default projects once, by
-the same rules, rather than one copy per browser, and a browser's default projects are never moved
-into an account. The deployed site is public, so keep anything private out of the default
-projects. An account's copy of a default that is kept under the same id keeps its images when the
-defaults are refreshed; a default that the file no longer has is removed with its images.
-
-When the app runs with `npm run dev` and `.env.local` has `VITE_SHOW_DEVELOPMENT_PANEL=true`, the
-dashboard shows a Development panel (hidden by default):
-
-- **Save as defaults** writes every project in this browser to `app/projects/default-projects.json`.
-  Commit that file to include them in the next deployment. In this browser, they then count as the
-  default projects, so later edits to them are replaced by the next change to the file unless they
-  are saved again first.
-- **Reset to defaults** leaves exactly the saved default projects in this browser, removing any
-  others and discarding edits.
-
-The panel is not in the deployed app. It always works on this browser's signed-out projects, even
-while signed in, and never changes an account's projects. Switching to a branch with a different
-defaults file applies that branch's defaults in local development too.
-
 ## Sign-in
 
 Anyone with a Google account can sign in, from the dashboard, and set a preferred name that only
@@ -111,8 +81,7 @@ their columns exist because Better Auth expects them, and are always empty. Test
 `app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
-projects and their tasks are in `project`, and which default
-projects it has received in `project_defaults_received`. The images added to its projects are in
+projects and their tasks are in `project`. The images added to its projects are in
 `project_image` (details, caption and sizes) and `project_image_bytes` (the files), with a task's
 photos marked by `task_id`. The people its
 projects can be assigned to are in `account_people`.
@@ -183,8 +152,7 @@ AD #61 Manage People and AD #90 People Page Rework. The code is in `app/projects
   in, in the account (`account_people`, one row holding the whole list, reached through
   `/api/people`, which is read with GET and changed with POST: add, rename, details, move, remove and
   establish). A new list starts empty. A store whose projects are already assigned to Andy, Boris
-  or Clement starts with those people, saved the first time it is read. The default projects are
-  all Unassigned, so receiving them once resets any edits to received default projects.
+  or Clement starts with those people, saved the first time it is read.
 - Reading an account's list never writes. With no list saved yet, the people its projects are
   assigned to are shown, and the list is saved by the first change to it, by moving the browser's
   projects in, or once the offer to move them has been settled.
@@ -453,8 +421,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
 3. **Tables**: in each database's SQL Editor in Neon, replace the sample query with the contents
    of `db/account-tables.sql` and run it. It is safe to run again. The Tables view then lists
    `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `user_profile`,
-   `calendar_link`, `account_sign_in`, `account_visit`, `project`,
-   `project_defaults_received`, `project_image`, `project_image_bytes` and `account_people`.
+   `calendar_link`, `account_sign_in`, `account_visit`, `project`, `project_image`,
+   `project_image_bytes` and `account_people`.
 4. **Variables**:
 
     | Variable | Production (Vercel) | `.env.local` |

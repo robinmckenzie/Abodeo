@@ -170,7 +170,6 @@ function fakeServer(overrides: Partial<Server> = {}) {
             readSessionUserId: async () => (server.session ? "ada" : undefined),
             store: server.projects.store,
             reportFailure: () => {},
-            defaultIds: [],
           },
         );
         if (server.lostAnswers > 0) {
@@ -952,20 +951,6 @@ describe("a signed-in account's projects (AD #41)", () => {
     expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
   });
 
-  it("does not offer default projects", async () => {
-    browserProject("d1", "Welcome");
-    localStorage.setItem(
-      "abodeo-default-projects",
-      JSON.stringify({ hash: "h", ids: ["d1"] }),
-    );
-    refreshProjects();
-    fakeServer({ session: ada });
-    await renderDashboard();
-    await settle();
-
-    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
-  });
-
   it("says the projects cannot be loaded, showing none of the browser's", async () => {
     browserProject("b1", "Browser shed");
     refreshProjects();
@@ -1273,27 +1258,6 @@ describe("a signed-in account's projects (AD #41)", () => {
     await renderDashboard();
     await settle();
     expect(hint()).toBeNull();
-  });
-
-  it("resets only the browser's projects to the defaults while signed in", async () => {
-    const server = fakeServer({ session: ada });
-    await server.projects.store.create("ada", "a1", {
-      title: "Shed",
-      ...fields,
-    });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "true");
-    await renderDashboard();
-    await settle();
-
-    expect(
-      screen.getByText("Acts on this browser's signed-out projects"),
-    ).toBeTruthy();
-    await click(screen.getByRole("button", { name: "Reset to defaults" }));
-    await settle();
-
-    expect(accountProject(server, "a1")?.title).toBe("Shed");
-    expect(screen.getByRole("button", { name: /Shed/ })).toBeTruthy();
   });
 });
 

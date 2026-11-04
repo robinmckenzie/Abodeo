@@ -56,7 +56,6 @@ async function createServer() {
         readSessionUserId: async () => "ada",
         store: memory.store,
         reportFailure: () => {},
-        defaultIds: [],
       },
     );
   }) as unknown as typeof fetch;

@@ -1,16 +1,14 @@
 // The browser's saved projects, read from storage when first needed and
 // again after each save, or when another tab saves. The server cannot see
 // local storage, so it renders without projects, and the dashboard fills them
-// in once the page has loaded, without a hydration mismatch. The app's default
-// projects are received once per page load, before projects are first read.
+// in once the page has loaded, without a hydration mismatch.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { recheckInterval, type AccountView } from "../account/use-account";
 import { loadAccountProjects } from "./account-projects";
 import {
   isProjectKey,
-  loadProjects as loadSavedProjects,
-  receiveDefaultProjects,
+  loadProjects,
   removeAccountHint,
   writeAccountHint,
   type LoadResult,
@@ -19,20 +17,6 @@ import { sortProjectsByDueDate, type Project } from "./projects";
 
 let current: LoadResult | null = null;
 const listeners = new Set<() => void>();
-let hasReceivedDefaults = false;
-
-// Also needed before the people are first read, as it is the default
-// projects' assignees that they are made from.
-export function receiveDefaultProjectsOnce() {
-  if (hasReceivedDefaults) return;
-  hasReceivedDefaults = true;
-  receiveDefaultProjects();
-}
-
-function loadProjects() {
-  receiveDefaultProjectsOnce();
-  return loadSavedProjects();
-}
 
 function readProjects() {
   current ??= loadProjects();
@@ -84,7 +68,6 @@ export type ProjectsView =
       state: "loading" | "ready" | "unavailable";
       projects: Project[];
       unreadableCount: number;
-      defaultIds: string[];
       // The newest image of each project that has any (AD #48 Add Images To
       // Projects), for its bar's thumbnail.
       latestImageIds: Record<string, string>;
@@ -166,7 +149,6 @@ export function useProjectsSource(
           state: "unavailable",
           projects: [],
           unreadableCount: 0,
-          defaultIds: [],
           latestImageIds: {},
           imageCounts: {},
         });
@@ -178,14 +160,13 @@ export function useProjectsSource(
         void load();
         return;
       }
-      const { unreadableCount, defaultIds, latestImageIds, imageCounts } =
-        result;
+      const { unreadableCount, latestImageIds, imageCounts } = result;
       const projects = result.projects.filter(
         ({ id }) => !deletedIdsRef.current.has(id),
       );
       writeAccountHint(
         accountId,
-        hasOwnAccountProjects(projects, unreadableCount, defaultIds),
+        hasOwnAccountProjects(projects, unreadableCount),
       );
       setState({
         kind: "account",
@@ -194,7 +175,6 @@ export function useProjectsSource(
         state: "ready",
         projects,
         unreadableCount,
-        defaultIds,
         latestImageIds,
         imageCounts,
       });
@@ -231,7 +211,6 @@ export function useProjectsSource(
       state: "loading",
       projects: [],
       unreadableCount: 0,
-      defaultIds: [],
       latestImageIds: {},
       imageCounts: {},
     };
@@ -271,11 +250,7 @@ export function useProjectsSource(
         const projects = sortProjectsByDueDate([...others, project]);
         writeAccountHint(
           current.accountId,
-          hasOwnAccountProjects(
-            projects,
-            current.unreadableCount,
-            current.defaultIds,
-          ),
+          hasOwnAccountProjects(projects, current.unreadableCount),
         );
         return { ...current, projects };
       });
@@ -295,11 +270,7 @@ export function useProjectsSource(
           );
         writeAccountHint(
           current.accountId,
-          hasOwnAccountProjects(
-            projects,
-            current.unreadableCount,
-            current.defaultIds,
-          ),
+          hasOwnAccountProjects(projects, current.unreadableCount),
         );
         return {
           ...current,
@@ -314,13 +285,7 @@ export function useProjectsSource(
 }
 
 // As in the browser, a project that cannot be read counts as the person's
-// own, and default projects do not.
-function hasOwnAccountProjects(
-  projects: Project[],
-  unreadableCount: number,
-  defaultIds: string[],
-) {
-  return (
-    unreadableCount > 0 || projects.some(({ id }) => !defaultIds.includes(id))
-  );
+// own.
+function hasOwnAccountProjects(projects: Project[], unreadableCount: number) {
+  return unreadableCount > 0 || projects.length > 0;
 }

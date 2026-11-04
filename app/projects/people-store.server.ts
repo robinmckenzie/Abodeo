@@ -150,16 +150,7 @@ function describeProblem(
   return { kind: "invalid-name", problem: change.problem };
 }
 
-export function createPeopleStore(
-  database: TransactionalDatabase,
-  {
-    prepare,
-  }: {
-    // Runs before the list is first made from the projects, such as to bring
-    // the default projects up to date, so that those are what count.
-    prepare?: (userId: string) => Promise<unknown>;
-  } = {},
-): PeopleStore {
+export function createPeopleStore(database: TransactionalDatabase): PeopleStore {
   // The readable projects with the person assigned to them or to any of
   // their tasks, with each row's revision, and how many such projects could
   // not be read. With lock, the rows are held until the transaction ends.
@@ -257,7 +248,6 @@ export function createPeopleStore(
 
   return {
     async read(userId) {
-      await prepare?.(userId);
       const { rows } = await database.query(
         "select data, revision from account_people where user_id = $1",
         [userId],
@@ -276,7 +266,6 @@ export function createPeopleStore(
     },
 
     async apply(userId, operation) {
-      await prepare?.(userId);
       if (operation.op === "remove" && operation.dryRun) {
         return preview(userId, operation.id);
       }

@@ -21,7 +21,6 @@ function createHandler(
       readSessionUserId,
       store: memory.store,
       reportFailure: () => {},
-      defaultIds: ["default-1"],
       ...overrides,
     });
   return { ...memory, handle };
@@ -200,24 +199,10 @@ describe("the projects endpoints", () => {
     expect(response.status).toBe(413);
   });
 
-  it("refuse invalid values and default project ids", async () => {
+  it("refuse invalid values, and the Bin's path as an id", async () => {
     const { handle } = createHandler();
     expect((await create(handle, "ada", "p1", " ")).status).toBe(400);
-    expect((await create(handle, "ada", "default-1")).status).toBe(400);
-    const imported = await handle(
-      send("/api/projects/import", {
-        method: "POST",
-        body: {
-          projects: [
-            {
-              id: "default-1",
-              ...JSON.parse(serialiseProject(project("default-1"))),
-            },
-          ],
-        },
-      }),
-    );
-    expect(imported.status).toBe(400);
+    expect((await create(handle, "ada", "bin")).status).toBe(400);
   });
 
   it("move a browser's projects into the account", async () => {

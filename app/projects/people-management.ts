@@ -32,8 +32,7 @@ export type PeopleLoad =
 
 // The saved list. With none saved yet, it is whichever of the starting people
 // the browser's projects are assigned to, and is saved then so that it stays
-// as it is. A list that cannot be read is left as it is. The caller receives
-// the default projects first, so that their assignees are the ones counted.
+// as it is. A list that cannot be read is left as it is.
 export function loadPeople(): PeopleLoad {
   const stored = readStoredPeople();
   if (stored.state === "found") return { ok: true, people: stored.people };

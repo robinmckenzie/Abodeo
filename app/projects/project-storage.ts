@@ -7,12 +7,6 @@
 // The saving functions are async, as a database's would be, but they write to
 // local storage before they first wait, so that a save started as the page is
 // left is complete before it goes.
-import {
-  bundledDefaultProjects,
-  planDefaultsReceipt,
-  type DefaultProjects,
-  type DefaultsRecord,
-} from "./default-projects";
 import { isKnownAssignee } from "./people";
 import { readStoredPeople, withPeopleLock } from "./people-storage";
 import {
@@ -27,10 +21,6 @@ import {
 import type { Task } from "./tasks";
 
 const keyPrefix = "abodeo-project:";
-
-// Which default projects this browser last received: their hash and ids. Its
-// name does not start with keyPrefix, so it is not counted as a project.
-const defaultsKey = "abodeo-default-projects";
 
 // While signed in: whether the account has projects of its own, so that the
 // welcome screen can be chosen before the account's projects load. Only yes
@@ -189,83 +179,10 @@ function writeProject(project: Project): SaveResult {
   }
 }
 
-// Brings this browser's default projects up to date with the app's, when
-// they differ from those it last received: adds new ones, replaces existing
-// ones, overwriting any edits, and removes those the app no longer has. The
-// visitor's own projects are never touched, nor is an entry this version
-// cannot read, such as one saved by a later version. The record is written
-// last, so that if storage fails part way, the next load tries again.
-//
-// Unlike the saving functions, this is not async, as it runs before projects
-// are first read, which React needs straight away.
-export function receiveDefaultProjects(
-  defaults = bundledDefaultProjects,
-): SaveResult {
-  try {
-    const receipt = planDefaultsReceipt(
-      readDefaultsRecord(),
-      defaults,
-      isUnreadableEntry,
-    );
-    if (!receipt) return { ok: true };
-    for (const project of receipt.write) {
-      localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
-    }
-    for (const id of receipt.remove) localStorage.removeItem(keyPrefix + id);
-    writeDefaultsRecord(receipt.record.hash, receipt.record.ids);
-    return { ok: true };
-  } catch (error) {
-    return toFailure(error);
-  }
-}
-
-// Records the projects just saved as the defaults, in development, as the
-// defaults this browser has received, so that they count as default
-// projects here rather than being added again as copies.
-export function markProjectsAsDefaults(defaults: DefaultProjects): SaveResult {
-  try {
-    writeDefaultsRecord(
-      defaults.hash,
-      defaults.projects.map(({ id }) => id),
-    );
-    return { ok: true };
-  } catch (error) {
-    return toFailure(error);
-  }
-}
-
-// Leaves exactly the default projects, in development: writes them, then
-// removes every other project, readable or not. Writing first means a
-// failure removes nothing.
-export function resetToDefaultProjects(
-  defaults = bundledDefaultProjects,
-): SaveResult {
-  if (!defaults) return { ok: false, reason: "unreadable" };
-  try {
-    const ids = new Set(defaults.projects.map(({ id }) => id));
-    for (const project of defaults.projects) {
-      localStorage.setItem(keyPrefix + project.id, serialiseProject(project));
-    }
-    for (const key of listProjectKeys()) {
-      if (!ids.has(key.slice(keyPrefix.length))) localStorage.removeItem(key);
-    }
-    writeDefaultsRecord(defaults.hash, [...ids]);
-    return { ok: true };
-  } catch (error) {
-    return toFailure(error);
-  }
-}
-
-// The visitor's own projects that can be read, not default projects, to
-// offer to move into an account.
+// The visitor's projects that can be read, to offer to move into an account.
 export function listOwnProjects(): Project[] {
   const loaded = loadProjects();
-  if (!loaded.ok) return [];
-  const defaultIds = new Set([
-    ...(readDefaultsRecord()?.ids ?? []),
-    ...(bundledDefaultProjects?.projects.map(({ id }) => id) ?? []),
-  ]);
-  return loaded.projects.filter(({ id }) => !defaultIds.has(id));
+  return loaded.ok ? loaded.projects : [];
 }
 
 // Removes a project for good (AD #62 Delete Projects): signed out there is
@@ -348,31 +265,6 @@ export function forgetDeclinedMove() {
   }
 }
 
-function isUnreadableEntry(id: string) {
-  const json = localStorage.getItem(keyPrefix + id);
-  return json !== null && parseProject(id, json) === null;
-}
-
-function readDefaultsRecord(): DefaultsRecord | null {
-  try {
-    const saved = JSON.parse(localStorage.getItem(defaultsKey) ?? "null");
-    if (
-      typeof saved?.hash === "string" &&
-      Array.isArray(saved.ids) &&
-      saved.ids.every((id: unknown) => typeof id === "string")
-    ) {
-      return { hash: saved.hash, ids: saved.ids };
-    }
-  } catch {
-    // An unreadable record counts as no defaults received.
-  }
-  return null;
-}
-
-function writeDefaultsRecord(hash: string, ids: string[]) {
-  localStorage.setItem(defaultsKey, JSON.stringify({ hash, ids }));
-}
-
 function toFailure(error: unknown): SaveResult {
   return { ok: false, reason: isQuotaError(error) ? "full" : "unavailable" };
 }
@@ -394,19 +286,15 @@ export function isProjectKey(key: string | null) {
   return key === null || key.startsWith(keyPrefix);
 }
 
-// A visitor's own projects are those that are not default projects. Any
-// counts, including one that cannot be read, so that a returning visitor
-// whose projects are damaged is told so on the dashboard rather than being
-// welcomed as new. Default projects and tuning settings do not count. While
-// signed in, the account's hint decides instead.
+// Any project counts, including one that cannot be read, so that a returning
+// visitor whose projects are damaged is told so on the dashboard rather than
+// being welcomed as new. Tuning settings do not count. While signed in, the
+// account's hint decides instead.
 export function hasOwnProjects() {
   const hint = readAccountHint();
   if (hint !== null) return hint;
   try {
-    const defaultIds = new Set(readDefaultsRecord()?.ids);
-    return listProjectKeys().some(
-      (key) => !defaultIds.has(key.slice(keyPrefix.length)),
-    );
+    return listProjectKeys().length > 0;
   } catch {
     return false;
   }
@@ -429,11 +317,9 @@ if(!new URLSearchParams(location.search).has("welcome")){
 var h=null;try{h=JSON.parse(localStorage.getItem(${JSON.stringify(accountHintKey)}))}catch(e){}
 if(h&&typeof h.hasProjects==="boolean"){
 if(h.hasProjects)document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"")}else{
-var d=[];try{var r=JSON.parse(localStorage.getItem(${JSON.stringify(defaultsKey)}));
-if(r&&typeof r.hash==="string"&&Array.isArray(r.ids))d=r.ids}catch(e){}
 var p=${JSON.stringify(keyPrefix)};
 for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i)||"";
-if(k.indexOf(p)===0&&d.indexOf(k.slice(p.length))<0){
+if(k.indexOf(p)===0){
 document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"");break}}}}
 }catch(e){}`;
 

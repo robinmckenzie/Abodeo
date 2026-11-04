@@ -32,25 +32,18 @@ import {
 import type { RemovalCount } from "./people-api";
 import { isPeopleKey } from "./people-storage";
 import type { PersonFailure } from "./people-messages";
-import { receiveDefaultProjectsOnce, refreshProjects } from "./use-projects";
+import { refreshProjects } from "./use-projects";
 
 let current: PeopleLoad | null = null;
 const listeners = new Set<() => void>();
 
-// The default projects are received first, so that their assignees are the
-// ones the first list is made from.
-function loadPeopleAfterDefaults() {
-  receiveDefaultProjectsOnce();
-  return loadPeople();
-}
-
 function readPeople() {
-  current ??= loadPeopleAfterDefaults();
+  current ??= loadPeople();
   return current;
 }
 
 export function refreshPeople() {
-  current = loadPeopleAfterDefaults();
+  current = loadPeople();
   listeners.forEach((listener) => listener());
 }
 
@@ -62,7 +55,7 @@ function onStorage(event: StorageEvent) {
 // while nothing was listening.
 function subscribe(listener: () => void) {
   if (listeners.size === 0) {
-    current = loadPeopleAfterDefaults();
+    current = loadPeople();
     window.addEventListener("storage", onStorage);
   }
   listeners.add(listener);

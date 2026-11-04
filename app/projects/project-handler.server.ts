@@ -10,7 +10,6 @@ import {
   withTimeout,
   type ReadSessionUserId,
 } from "../account/account-profile.server";
-import { bundledDefaultProjects } from "./default-projects";
 import { readProjectFields, readProjectSave } from "./project-changes";
 import type { ProjectStore } from "./project-store.server";
 import { peopleVersion, readPeople, type Person } from "./people";
@@ -40,8 +39,6 @@ export type ProjectRequestDependencies = {
   store: ProjectStore;
   timeout?: number;
   reportFailure?: (code: string | undefined) => void;
-  // Default projects come only from the app, never from a browser.
-  defaultIds?: readonly string[];
 };
 
 function respondWithProjectError(status: number, error: ProjectErrorCode) {
@@ -157,7 +154,6 @@ export async function handleProjectsRequest(
     store,
     timeout = accountStoreTimeout,
     reportFailure = reportProjectFailure,
-    defaultIds = bundledDefaultProjects?.projects.map(({ id }) => id) ?? [],
   }: ProjectRequestDependencies,
 ): Promise<Response> {
   const route = findRoute(request);
@@ -233,7 +229,7 @@ export async function handleProjectsRequest(
         if (!isProjectId(id) || !read || !hasTitle(read.title ?? "")) {
           return respondWithProjectError(400, "invalid_request");
         }
-        if (defaultIds.includes(id) || id === "bin") {
+        if (id === "bin") {
           return respondWithProjectError(400, "invalid_request");
         }
         const outcome = await run(
@@ -277,7 +273,7 @@ export async function handleProjectsRequest(
 
       case "import": {
         const projects = readImport(body);
-        if (!projects || projects.some(({ id }) => defaultIds.includes(id))) {
+        if (!projects) {
           return respondWithProjectError(400, "invalid_request");
         }
         const people = readImportPeople(body);

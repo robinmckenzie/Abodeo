@@ -4,6 +4,7 @@
 -- for each account store: production (DATABASE_URL) and abodeo-local (used
 -- by npm run dev). Safe to run again. The app never creates these tables.
 -- Keep this file under about 7 KB: Neon's editor truncates longer pastes.
+-- Run it only once AD #76 is deployed (it drops an old table).
 
 -- auth_ tables: Better Auth's tables, with snake_case columns. The token,
 -- scope, image, IP and user agent columns are for Better Auth; the app leaves
@@ -11,8 +12,8 @@
 -- calendar_link (AD #10): the ID of the account's Abodeo calendar. No token.
 -- account_sign_in, account_visit (AD #46, #51): sign-in and visit times, and
 -- the self-declared label ('' if none). No IP address or device details.
--- project, project_defaults_received (AD #41): an account's projects. data
--- is the saved form; revision changes on every write.
+-- project (AD #41): an account's projects. data is the saved form;
+-- revision changes on every write.
 -- deleted_at (AD #62): when a project was put in the Bin, or null. Cleared
 -- for good by the next load or save after the cooling-off period, or at
 -- once by Delete permanently.
@@ -131,11 +132,8 @@ create table if not exists project (
 
 alter table project add column if not exists deleted_at timestamptz;
 
-create table if not exists project_defaults_received (
-    user_id text primary key references auth_user (id) on delete cascade,
-    hash text not null,
-    ids jsonb not null
-);
+-- AD #76: default projects were removed. Run only after deployment.
+drop table if exists project_defaults_received;
 
 create table if not exists project_image (
     user_id text not null,
