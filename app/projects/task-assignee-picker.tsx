@@ -62,7 +62,13 @@ export function TaskAssigneePicker({
     ...people,
   ];
 
+  // The person being added, if any, who is assigned to the task once added.
+  // Closing the list, or choosing someone, drops it, so that a late answer
+  // only adds them to the People list.
+  const pendingAddRef = useRef<object | null>(null);
+
   const close = (isFocusReturned: boolean) => {
+    pendingAddRef.current = null;
     setIsOpen(false);
     if (isFocusReturned) buttonRef.current?.focus();
   };
@@ -72,38 +78,54 @@ export function TaskAssigneePicker({
     if (chosen !== assignee) onChoose(chosen);
   };
 
-  // Once added, the person is assigned to the task and the list closes. If
-  // adding fails, the box says why and the task keeps its person.
+  // Once added, the person is assigned to the task and the list closes,
+  // unless the list was closed or someone chosen meanwhile. If adding fails,
+  // the box says why and the task keeps its person.
   const addPerson = async (add: AddPerson, name: string) => {
+    const pending = {};
+    pendingAddRef.current = pending;
     const result = await add(name);
-    if (result.ok && isMountedRef.current) {
+    if (pendingAddRef.current !== pending || !isMountedRef.current) {
+      return result;
+    }
+    if (result.ok) {
       close(true);
       onChooseRef.current(result.person.id);
+    } else {
+      pendingAddRef.current = null;
     }
     return result;
   };
 
   // Shown in the top layer, below the button with its right edges level, or
-  // above it if there is no room below. The chosen person is focused, and
-  // scrolled to if the list is long.
+  // above it if there is no room below, and placed again when its height
+  // changes, such as when the box shows why a name was refused. The chosen
+  // person is focused, and scrolled to if the list is long.
   useLayoutEffect(() => {
     const list = listRef.current;
     const options = optionsRef.current;
     const button = buttonRef.current;
     if (!isOpen || !list || !options || !button) return;
     list.showPopover?.();
-    const place = button.getBoundingClientRect();
-    const height = list.offsetHeight;
-    const isBelow =
-      place.bottom + listGap + height <= window.innerHeight ||
-      place.top - listGap - height < 0;
-    list.style.top = `${isBelow ? place.bottom + listGap : place.top - listGap - height}px`;
-    list.style.left = `${Math.max(listGap, place.right - list.offsetWidth)}px`;
+    const placeList = () => {
+      const place = button.getBoundingClientRect();
+      const height = list.offsetHeight;
+      const isBelow =
+        place.bottom + listGap + height <= window.innerHeight ||
+        place.top - listGap - height < 0;
+      list.style.top = `${isBelow ? place.bottom + listGap : place.top - listGap - height}px`;
+      list.style.left = `${Math.max(listGap, place.right - list.offsetWidth)}px`;
+    };
+    placeList();
     const chosen = list.querySelector<HTMLElement>('[aria-checked="true"]');
     if (chosen) {
       options.scrollTop = chosen.offsetTop - options.clientHeight / 2;
       chosen.focus({ preventScroll: true });
     }
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(placeList);
+    observer.observe(list);
+    return () => observer.disconnect();
   }, [isOpen]);
 
   // Closes on a press outside, and when the page or the task list scrolls,
