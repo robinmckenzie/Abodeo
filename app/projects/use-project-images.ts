@@ -79,6 +79,9 @@ type Session = {
 export type ImagesOptions = {
   accountId: string;
   projectId: string;
+  // A task's photos instead of the project's own images (AD #67). The
+  // caller mounts the hook keyed by account, project and task.
+  taskId?: string | null;
   // A failure that means the sign-in has changed, for the dashboard to check.
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, for the floating messages.
@@ -103,6 +106,7 @@ const initialState: ProjectImagesState = {
 export function useProjectImages({
   accountId,
   projectId,
+  taskId = null,
   onFailure,
   onMessage,
   fetchFn = fetch,
@@ -179,6 +183,7 @@ export function useProjectImages({
       projectId,
       null,
       optionsRef.current.fetchFn,
+      taskId,
     ).then((result) => {
       if (!session.isCurrent) return;
       if (!result.ok) {
@@ -202,7 +207,7 @@ export function useProjectImages({
       session.queued = [];
       sessionRef.current = null;
     };
-  }, [accountId, projectId, reloads]);
+  }, [accountId, projectId, taskId, reloads]);
 
   const fail = (reason: ImageFailure) => optionsRef.current.onFailure?.(reason);
   const say = (text: string) => optionsRef.current.onMessage?.(text);
@@ -284,6 +289,7 @@ export function useProjectImages({
       projectId,
       first,
       optionsRef.current.fetchFn,
+      taskId,
     ).finally(() => {
       isLoadingOlderRef.current = false;
     });
@@ -322,6 +328,7 @@ export function useProjectImages({
         thumbnail,
         original,
         optionsRef.current.fetchFn,
+        taskId,
       );
       if (result.ok) return result;
       if (result.reason !== "unreachable" || !session.isCurrent) return result;
@@ -330,6 +337,7 @@ export function useProjectImages({
         projectId,
         null,
         optionsRef.current.fetchFn,
+        taskId,
       );
       const found =
         list.ok && list.page.images.find((image) => image.id === id);

@@ -113,7 +113,8 @@ their columns exist because Better Auth expects them, and are always empty. Test
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
 projects and their tasks are in `project`, and which default
 projects it has received in `project_defaults_received`. The images added to its projects are in
-`project_image` (details, caption and sizes) and `project_image_bytes` (the files). The people its
+`project_image` (details, caption and sizes) and `project_image_bytes` (the files), with a task's
+photos marked by `task_id`. The people its
 projects can be assigned to are in `account_people`.
 
 ### Projects while signed in
@@ -240,6 +241,16 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   (`image-bytes-store.server.ts`), so they can move to another store later, such as Vercel Blob,
   without touching the details. They are read as base64, as the driver would give bytea as hex,
   twice the size.
+- A task's photo (AD #67) is an image whose `task_id` names the task; a project's own images have
+  none, so images saved before stay project images. The project's list and the bar's newest image
+  leave task photos out; the allowance and the server's image counts (`imageCounts`) include them.
+  A task's photos are listed and added at `/api/projects/:projectId/tasks/:taskId/images` (only
+  for a task in the project's saved tasks), counted with their newest at
+  `/api/projects/:projectId/task-images`, and read, captioned and removed through the project's
+  image paths. `DELETE` on the task's path removes the photos of a task no longer in the saved
+  tasks, and refuses with `conflict` while it is there, as after Undo. Run
+  `db/account-tables.sql` v1.67.0 before deploying this: without the column, the signed-in
+  dashboard's project list fails.
 - The browser decodes each file, draws a thumbnail (at most 100 KB, usually 20 to 40 KB) and sends
   both in one binary request, with an id it made, so that sending it again after a lost answer
   gives the same image. The server decides the type from the file's content, and checks the

@@ -337,10 +337,11 @@ export function createProjectStore(
         else unreadableCount++;
       }
       // Thumbnails are optional: without the image tables, the projects load.
+      // A task's photos (AD #67) are not shown on the project's bar.
       const latestRows = await database
         .query(
           `select distinct on (project_id) project_id, id from project_image
-           where user_id = $1
+           where user_id = $1 and task_id is null
            and project_id in (
              select id from project where user_id = $1 and deleted_at is null)
            order by project_id, created_at desc, id desc`,

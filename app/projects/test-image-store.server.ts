@@ -2,6 +2,7 @@
 // images in memory, with the same rules as the database's (an account sees
 // only its own, a retry with the same id gives the image already added, and
 // the allowance is 100 MB), and records which account each call was for.
+// A task's photos (AD #67) carry its task id; a project's images have none.
 import { createHash } from "node:crypto";
 
 import type { ImageStore } from "./image-store.server";
@@ -10,6 +11,7 @@ import { accountImageBytes, listPageSize, type ImageInfo } from "./images-api";
 type Stored = {
   image: ImageInfo;
   projectId: string;
+  taskId: string | null;
   hash: string;
   original: Buffer;
   thumbnail: Buffer;
@@ -17,8 +19,11 @@ type Stored = {
 
 export function createMemoryImageStore({
   hasProject = () => true,
+  hasTask = () => true,
 }: {
   hasProject?: (userId: string, projectId: string) => boolean;
+  // Whether the task is in the project's saved tasks.
+  hasTask?: (userId: string, projectId: string, taskId: string) => boolean;
 } = {}) {
   const accounts = new Map<string, Stored[]>();
   const calls: string[] = [];
@@ -39,11 +44,13 @@ export function createMemoryImageStore({
     );
 
   const store: ImageStore = {
-    async list(userId, projectId, before) {
+    async list(userId, projectId, before, taskId = null) {
       calls.push(userId);
       if (!hasProject(userId, projectId)) return null;
       const all = imagesOf(userId)
-        .filter((entry) => entry.projectId === projectId)
+        .filter(
+          (entry) => entry.projectId === projectId && entry.taskId === taskId,
+        )
         .map((entry) => entry.image)
         .sort(
           (a, b) =>
@@ -62,16 +69,27 @@ export function createMemoryImageStore({
         limitBytes: accountImageBytes,
       };
     },
-    async upload(userId, projectId, imageId, contentType, original, thumbnail) {
+    async upload(
+      userId,
+      projectId,
+      imageId,
+      contentType,
+      original,
+      thumbnail,
+      taskId = null,
+    ) {
       calls.push(userId);
       if (!hasProject(userId, projectId)) return { kind: "not-found" };
+      if (taskId !== null && !hasTask(userId, projectId, taskId)) {
+        return { kind: "not-found" };
+      }
       const hash = createHash("sha256")
         .update(original)
         .update(thumbnail)
         .digest("hex");
       const existing = find(userId, projectId, imageId);
       if (existing) {
-        return existing.hash === hash
+        return existing.hash === hash && existing.taskId === taskId
           ? {
               kind: "existing",
               image: existing.image,
@@ -92,7 +110,14 @@ export function createMemoryImageStore({
         originalSize: original.length,
         caption: "",
       };
-      imagesOf(userId).push({ image, projectId, hash, original, thumbnail });
+      imagesOf(userId).push({
+        image,
+        projectId,
+        taskId,
+        hash,
+        original,
+        thumbnail,
+      });
       return { kind: "added", image, usedBytes: used(userId) };
     },
     async read(userId, projectId, imageId, kind) {
@@ -119,6 +144,33 @@ export function createMemoryImageStore({
       if (!entry) return null;
       imagesOf(userId).splice(imagesOf(userId).indexOf(entry), 1);
       return { usedBytes: used(userId) };
+    },
+    async summarizeTasks(userId, projectId) {
+      calls.push(userId);
+      if (!hasProject(userId, projectId)) return null;
+      const tasks: Record<string, { count: number; latestImageId: string }> =
+        {};
+      for (const entry of imagesOf(userId)) {
+        if (entry.projectId !== projectId || entry.taskId === null) continue;
+        const summary = tasks[entry.taskId];
+        tasks[entry.taskId] = {
+          count: (summary?.count ?? 0) + 1,
+          latestImageId: entry.image.id,
+        };
+      }
+      return { tasks };
+    },
+    async removeTaskImages(userId, projectId, taskId) {
+      calls.push(userId);
+      if (!hasProject(userId, projectId)) return { kind: "not-found" };
+      if (hasTask(userId, projectId, taskId)) return { kind: "task-present" };
+      accounts.set(
+        userId,
+        imagesOf(userId).filter(
+          (entry) => entry.projectId !== projectId || entry.taskId !== taskId,
+        ),
+      );
+      return { kind: "removed", usedBytes: used(userId) };
     },
   };
   return { store, accounts, calls };

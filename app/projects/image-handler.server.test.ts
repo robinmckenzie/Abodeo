@@ -7,6 +7,8 @@ import {
   buildImageBytesPath,
   buildImagePath,
   buildImagesPath,
+  buildTaskImageSummaryPath,
+  buildTaskImagesPath,
   buildUploadFrame,
   imageIdHeader,
   listPageSize,
@@ -114,6 +116,13 @@ describe("routing", () => {
     expect(isImagesPath("/api/projects/shed")).toBe(false);
     expect(isImagesPath("/api/projects/images")).toBe(false);
     expect(isImagesPath("/api/projects/import")).toBe(false);
+  });
+
+  it("recognises a task's photo paths (AD #67), so the projects handler never answers them", () => {
+    expect(isImagesPath("/api/projects/shed/tasks/t1/images")).toBe(true);
+    expect(isImagesPath("/api/projects/shed/task-images")).toBe(true);
+    expect(isImagesPath("/api/projects/shed/tasks")).toBe(false);
+    expect(isImagesPath("/api/projects/shed/tasks/t1")).toBe(false);
   });
 
   it("refuses the wrong method and unknown paths", async () => {
@@ -644,5 +653,179 @@ describe("removing", () => {
         )
       ).status,
     ).toBe(404);
+  });
+});
+
+describe("a task's photos (AD #67 Add Photos To Tasks)", () => {
+  const taskPath = buildTaskImagesPath("shed", "t1");
+
+  function taskUpload(imageId: string, options: Options = {}) {
+    return request(taskPath, {
+      method: "POST",
+      body: buildUploadFrame(jpegThumbnail, png),
+      contentType: "application/octet-stream",
+      ...options,
+      headers: { [imageIdHeader]: imageId, ...options.headers },
+    });
+  }
+
+  const removeTask = (options: Options = {}) =>
+    request(taskPath, { method: "DELETE", ...options });
+
+  it("adds, lists and counts a task's photos apart from the project's images", async () => {
+    const { handle } = createHandler();
+    expect((await handle(upload("shed", "project"))).status).toBe(200);
+    expect((await handle(taskUpload("first"))).status).toBe(200);
+    expect((await handle(taskUpload("second"))).status).toBe(200);
+
+    const project = await json(await handle(request(buildImagesPath("shed"))));
+    expect((project.images as ImageInfo[]).map((image) => image.id)).toEqual([
+      "project",
+    ]);
+    const task = await json(await handle(request(taskPath)));
+    expect((task.images as ImageInfo[]).map((image) => image.id)).toEqual([
+      "first",
+      "second",
+    ]);
+    const summary = await handle(request(buildTaskImageSummaryPath("shed")));
+    expect(summary.status).toBe(200);
+    expect(await json(summary)).toEqual({
+      tasks: { t1: { count: 2, latestImageId: "second" } },
+    });
+  });
+
+  it("serves, captions and removes a task photo through its project's image paths", async () => {
+    const { handle } = createHandler();
+    await handle(taskUpload("one"));
+    expect(
+      (await handle(request(buildImageBytesPath("shed", "one", "original"))))
+        .status,
+    ).toBe(200);
+    expect(
+      (await handle(caption("shed", "one", { base: "", caption: "Tap" })))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await handle(
+          request(buildImagePath("shed", "one"), { method: "DELETE" }),
+        )
+      ).status,
+    ).toBe(200);
+  });
+
+  it("refuses a photo for a task that is not saved", async () => {
+    const { handle, accounts } = createHandler(
+      {},
+      { hasTask: (_user, _project, taskId) => taskId !== "t1" },
+    );
+    const response = await handle(taskUpload("one"));
+    expect(response.status).toBe(404);
+    expect(await json(response)).toEqual({ error: "not_found" });
+    expect(accounts.get("ada") ?? []).toHaveLength(0);
+  });
+
+  it("removes a deleted task's photos, and keeps those of a task saved again", async () => {
+    let isSaved = true;
+    const { handle, accounts } = createHandler({}, { hasTask: () => isSaved });
+    await handle(taskUpload("one"));
+    const kept = await handle(removeTask());
+    expect(kept.status).toBe(409);
+    expect(await json(kept)).toEqual({ error: "conflict" });
+    expect(accounts.get("ada")).toHaveLength(1);
+
+    isSaved = false;
+    const removed = await handle(removeTask());
+    expect(removed.status).toBe(200);
+    expect(await json(removed)).toEqual({ usedBytes: 0 });
+    expect(accounts.get("ada")).toHaveLength(0);
+  });
+
+  it("answers not found for a project the account does not have", async () => {
+    const { handle } = createHandler({}, { hasProject: () => false });
+    for (const built of [
+      request(taskPath),
+      request(buildTaskImageSummaryPath("shed")),
+      removeTask(),
+    ]) {
+      expect((await handle(built)).status).toBe(404);
+    }
+  });
+
+  it("refuses unknown task paths and methods", async () => {
+    const { handle } = createHandler();
+    expect((await handle(request(taskPath, { method: "PATCH" }))).status).toBe(
+      405,
+    );
+    expect(
+      (
+        await handle(
+          request(buildTaskImageSummaryPath("shed"), { method: "DELETE" }),
+        )
+      ).status,
+    ).toBe(405);
+    expect((await handle(request(`${taskPath}/one`))).status).toBe(404);
+    expect(
+      (await handle(request("/api/projects/shed/tasks/bad%20id/images")))
+        .status,
+    ).toBe(404);
+  });
+
+  const routes: [string, (options: Options) => Request][] = [
+    ["list", (options) => request(taskPath, options)],
+    ["upload", (options) => taskUpload("one", options)],
+    ["remove", (options) => removeTask(options)],
+    [
+      "summary",
+      (options) => request(buildTaskImageSummaryPath("shed"), options),
+    ],
+  ];
+
+  it.each(routes)("refuses %s without a sign-in", async (_name, build) => {
+    const { handle, calls } = createHandler();
+    const response = await handle(build({ account: null, pageAccount: "ada" }));
+    expect(response.status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
+  it.each(routes)(
+    "refuses %s from a page that expects another account",
+    async (_name, build) => {
+      const { handle, calls } = createHandler();
+      const response = await handle(build({ pageAccount: "bob" }));
+      expect(response.status).toBe(409);
+      expect(await json(response)).toEqual({ error: "account_changed" });
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it.each(routes.filter(([name]) => name === "upload" || name === "remove"))(
+    "refuses %s from another site",
+    async (_name, build) => {
+      const { handle, calls } = createHandler();
+      const response = await handle(build({ origin: "https://evil.example" }));
+      expect(response.status).toBe(403);
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it("keeps each account's task photos from another, taking the account from the sign-in alone", async () => {
+    const { handle, accounts } = createHandler();
+    await handle(taskUpload("one"));
+    const bob = { account: "bob", pageAccount: "bob" };
+    const listed = await json(await handle(request(taskPath, bob)));
+    expect(listed.images).toEqual([]);
+    expect(
+      await json(await handle(request(buildTaskImageSummaryPath("shed"), bob))),
+    ).toEqual({ tasks: {} });
+    expect(
+      (
+        await handle(
+          request(buildImageBytesPath("shed", "one", "original"), bob),
+        )
+      ).status,
+    ).toBe(404);
+    await handle(removeTask(bob));
+    expect(accounts.get("ada")).toHaveLength(1);
   });
 });

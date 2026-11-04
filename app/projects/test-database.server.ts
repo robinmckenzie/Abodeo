@@ -19,9 +19,14 @@ export function createFakeDatabase() {
   const records = new Map<string, { hash: string; ids: string[] }>();
   // Each account's list of people (AD #61 Manage People).
   const people = new Map<string, { data: unknown; revision: number }>();
-  // The newest image of each project, as the database would answer.
-  const latestImages: { user_id: string; project_id: string; id: string }[] =
-    [];
+  // The newest image of each project, as the database would answer, and
+  // any task photo (AD #67), which the query must leave out.
+  const latestImages: {
+    user_id: string;
+    project_id: string;
+    id: string;
+    task_id?: string;
+  }[] = [];
   // Every image, for counts: the newest of each project is in latestImages.
   const images: { user_id: string; project_id: string; id: string }[] = [];
   const statements: { text: string; values: unknown[] }[] = [];
@@ -197,7 +202,9 @@ export function createFakeDatabase() {
       return {
         rows: latestImages.filter(
           (row) =>
-            row.user_id === userId && !find(userId, row.project_id)?.deletedAt,
+            row.user_id === userId &&
+            !find(userId, row.project_id)?.deletedAt &&
+            !(row.task_id && sql.includes("task_id is null")),
         ),
       };
     }
