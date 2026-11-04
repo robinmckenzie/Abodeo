@@ -85,17 +85,6 @@ describe("the people store", () => {
     });
   });
 
-  it("runs the preparation before reading, such as receiving the defaults", async () => {
-    const fake = createFakeDatabase();
-    const prepared: string[] = [];
-    const store = createPeopleStore(fake.database, {
-      prepare: async (userId) => void prepared.push(userId),
-    });
-    await store.read("ada");
-    await store.apply("ada", { op: "establish" });
-    expect(prepared).toEqual(["ada", "ada"]);
-  });
-
   it("establishes an empty list, once", async () => {
     const { fake, store } = setUp();
     expect(await store.apply("ada", { op: "establish" })).toEqual({

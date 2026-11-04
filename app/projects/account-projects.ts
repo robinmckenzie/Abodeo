@@ -125,7 +125,6 @@ export type AccountLoad =
       ok: true;
       projects: Project[];
       unreadableCount: number;
-      defaultIds: string[];
       latestImageIds: Record<string, string>;
       imageCounts: Record<string, number>;
     }
@@ -163,14 +162,12 @@ export async function loadAccountProjects(
   const body = answer.body as {
     projects?: unknown;
     unreadableCount?: unknown;
-    defaultIds?: unknown;
     latestImageIds?: unknown;
     imageCounts?: unknown;
   } | null;
   if (
     !Array.isArray(body?.projects) ||
-    typeof body.unreadableCount !== "number" ||
-    !Array.isArray(body.defaultIds)
+    typeof body.unreadableCount !== "number"
   ) {
     return { ok: false, reason: "unreachable" };
   }
@@ -185,9 +182,6 @@ export async function loadAccountProjects(
     ok: true,
     projects,
     unreadableCount,
-    defaultIds: body.defaultIds.filter(
-      (id): id is string => typeof id === "string",
-    ),
     latestImageIds: readLatestImageIds(body.latestImageIds),
     imageCounts: readImageCounts(body.imageCounts),
   };
