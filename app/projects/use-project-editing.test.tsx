@@ -52,7 +52,10 @@ function startServer() {
       server.calls.push(`${init.method ?? "GET"} ${path}`);
       if (server.gate) await server.gate;
       if (server.status !== null) {
-        return Response.json({ error: "unavailable" }, { status: server.status });
+        return Response.json(
+          { error: "unavailable" },
+          { status: server.status },
+        );
       }
       return handleProjectsRequest(
         new Request(`http://localhost${path}`, {
@@ -138,7 +141,11 @@ describe("useProjectEditing signed out", () => {
   const browserView: ProjectsView = { kind: "browser", result: null };
 
   async function openStored(fields = {}) {
-    const created = await createProject({ ...newProjectFields, title: "Kitchen", ...fields });
+    const created = await createProject({
+      ...newProjectFields,
+      title: "Kitchen",
+      ...fields,
+    });
     if (!created.ok) throw new Error("not created");
     const editing = renderEditing(browserView);
     act(() => editing.result.current.openProject(created.project, 40, 0));
@@ -204,7 +211,9 @@ describe("useProjectEditing signed out", () => {
     await act(() => editing.result.current.confirmDelete());
     expect(editing.result.current.open).toBeNull();
     expect(editing.result.current.deletion).toBeNull();
-    expect(listOwnProjects().find(({ id }) => id === project.id)).toBeUndefined();
+    expect(
+      listOwnProjects().find(({ id }) => id === project.id),
+    ).toBeUndefined();
     expect(editing.onClosed).toHaveBeenCalled();
     expect(editing.onDeleted).toHaveBeenCalledTimes(1);
   });
@@ -338,7 +347,9 @@ describe("useProjectEditing signed in", () => {
     act(() => editing.result.current.openNewProject());
     act(() => editing.result.current.changeFields({ title: "Garden" }));
     await act(() => editing.result.current.createProject());
-    const projects = [...(server.projects.accounts.get(accountId)?.values() ?? [])];
+    const projects = [
+      ...(server.projects.accounts.get(accountId)?.values() ?? []),
+    ];
     expect(projects.map(({ title }) => title)).toEqual(["Garden"]);
     expect(editing.onCreated).toHaveBeenCalledTimes(1);
     expect(editing.onCreated).toHaveBeenCalledWith(
@@ -394,29 +405,60 @@ describe("useProjectEditing signed in", () => {
     expect(editing.onDeleted).toHaveBeenCalledTimes(1);
   });
 
-  it("finishes a task title being edited before closing and binning", async () => {
+  it("waits for a task title being edited to be saved before closing and binning", async () => {
     const server = startServer();
-    const { editing } = await openAccount(server);
+    const task = makeTask("Buy tiles");
+    const { editing, project } = await openAccount(
+      server,
+      makeProject({ tasks: [task] }),
+    );
     const order: string[] = [];
     editing.onClosed.mockImplementation(() => order.push("closed"));
+    // The title save is still on its way when deleting is confirmed.
+    let finishTitleSave!: () => void;
+    const titleSaved = new Promise<void>((resolve) => {
+      finishTitleSave = resolve;
+    });
+    let isTitleBeingEdited = true;
     editing.result.current.finishTaskEditRef.current = async () => {
-      order.push("title finished");
-      return null;
+      // Closing asks again, as it does for any close.
+      if (!isTitleBeingEdited) return null;
+      isTitleBeingEdited = false;
+      await titleSaved;
+      const failure = await editing.result.current.changeTasks((tasks) =>
+        tasks.map((each) => ({ ...each, title: "Buy grout" })),
+      );
+      order.push("title saved");
+      return failure;
     };
-    server.calls.length = 0;
     act(() =>
       editing.result.current.startDelete({
         imageCount: null,
         appointmentCount: null,
       }),
     );
-    await act(async () => {
-      await editing.result.current.confirmDelete();
+    server.calls.length = 0;
+    let deleting!: Promise<void>;
+    act(() => {
+      deleting = editing.result.current.confirmDelete();
     });
-    // Closing asks again, as it does for any close.
-    expect(order[0]).toBe("title finished");
-    expect(order.at(-1)).toBe("closed");
+    await settle();
+    // Nothing closes or is binned while the title is unsaved.
+    expect(order).toEqual([]);
+    expect(editing.onClosed).not.toHaveBeenCalled();
+    expect(server.calls.some((call) => call.startsWith("DELETE"))).toBe(false);
+    expect(stored(server, project.id)).toBeDefined();
+    finishTitleSave();
+    await act(async () => {
+      await deleting;
+    });
+    expect(order).toEqual(["title saved", "closed"]);
     expect(server.calls.at(-1)?.startsWith("DELETE")).toBe(true);
+    expect(stored(server, project.id)).toBeUndefined();
+    expect(
+      server.projects.bins.get(accountId)?.get(project.id)?.project.tasks[0]
+        ?.title,
+    ).toBe("Buy grout");
   });
 
   it("leaves the project and shows why when deleting fails", async () => {
@@ -447,7 +489,10 @@ describe("useProjectEditing signed in", () => {
       const task = makeTask("Buy tiles");
       let pending!: Promise<string | null>;
       act(() => {
-        pending = editing.result.current.changeTasks((tasks) => [...tasks, task]);
+        pending = editing.result.current.changeTasks((tasks) => [
+          ...tasks,
+          task,
+        ]);
       });
       expect(editing.result.current.open?.values.tasks).toEqual([task]);
       let failure: string | null = "unset";
