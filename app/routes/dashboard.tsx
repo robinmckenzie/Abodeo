@@ -453,21 +453,31 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const form = open && (
+  // The project form for an opened project, or, with isClosing, for the same
+  // project squashing closed (AD #111 Extract Project Editing Lifecycle). Both
+  // come from here so that they cannot drift apart. While closing, the form
+  // keeps the same elements in the same places, so that its state stays, but
+  // does nothing: it has no images, appointments, message actions or add-
+  // person box, is not read-only, and its handlers do nothing. Appointments
+  // in particular must not be shown again, as they can redirect to Google.
+  const renderProjectForm = (entry: OpenProject, isClosing: boolean) => (
     <ProjectForm
-      values={open.values}
-      isNew={open.id === null}
-      isReadOnly={open.isLoading}
+      values={entry.values}
+      isNew={entry.id === null}
+      isReadOnly={isClosing ? undefined : entry.isLoading}
       people={readyPeople?.people ?? noPeople}
-      onAddPerson={readyPeople ? people.addPerson : undefined}
-      projectKey={open.key}
+      onAddPerson={
+        !isClosing && readyPeople ? people.addPerson : undefined
+      }
+      projectKey={isClosing ? undefined : entry.key}
       message={
-        import.meta.env.DEV && testMessageKey === open.key
+        !isClosing && import.meta.env.DEV && testMessageKey === entry.key
           ? describeFailure("unreachable")
-          : open.message
+          : entry.message
       }
       messageActions={
-        open.hasConflict && (
+        !isClosing &&
+        entry.hasConflict && (
           <>
             <button
               type="button"
@@ -486,21 +496,28 @@ export default function Dashboard() {
           </>
         )
       }
-      getFocusField={() => focusFieldRef.current}
-      onChange={editing.changeFields}
-      onFieldFocus={(name) => (focusFieldRef.current = name)}
-      getCalendarDate={() => calendarDateRef.current}
-      onCalendarDateChange={(date) => (calendarDateRef.current = date)}
-      onFieldBlur={editing.saveNow}
-      onCreate={editing.createProject}
-      onClose={closeOpenProject}
-      onDelete={open.id !== null ? startDelete : undefined}
-      hasCloseButton={!isInPlace}
+      getFocusField={() => (isClosing ? "start" : focusFieldRef.current)}
+      onChange={isClosing ? () => {} : editing.changeFields}
+      onFieldFocus={
+        isClosing ? () => {} : (name) => (focusFieldRef.current = name)
+      }
+      getCalendarDate={
+        isClosing ? undefined : () => calendarDateRef.current
+      }
+      onCalendarDateChange={
+        isClosing ? undefined : (date) => (calendarDateRef.current = date)
+      }
+      onFieldBlur={isClosing ? () => {} : editing.saveNow}
+      onCreate={isClosing ? () => {} : editing.createProject}
+      onClose={isClosing ? () => {} : closeOpenProject}
+      onDelete={!isClosing && entry.id !== null ? startDelete : undefined}
+      hasCloseButton={!isClosing && !isInPlace}
       images={
-        open.id !== null && (
+        !isClosing &&
+        entry.id !== null && (
           <ProjectImages
             accountId={view.kind === "account" ? view.accountId : null}
-            projectId={open.id}
+            projectId={entry.id}
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
@@ -508,24 +525,25 @@ export default function Dashboard() {
               imageCountRef.current = count;
             }}
             onLatestImageChange={(imageId) => {
-              if (view.kind === "account" && open.id !== null) {
-                source.showLatestImage(view.generation, open.id, imageId);
+              if (view.kind === "account" && entry.id !== null) {
+                source.showLatestImage(view.generation, entry.id, imageId);
               }
             }}
           />
         )
       }
       appointments={
-        open.id !== null && (
+        !isClosing &&
+        entry.id !== null && (
           <ProjectAppointments
             accountId={view.kind === "account" ? view.accountId : null}
-            projectId={open.id}
-            shouldOpenForm={() => formProjectIdRef.current === open.id}
+            projectId={entry.id}
+            shouldOpenForm={() => formProjectIdRef.current === entry.id}
             canReconnectAutomatically={
               !isReconnectBlockedBy(returnTarget?.result)
             }
             returnNote={
-              returnTarget?.projectId === open.id
+              returnTarget?.projectId === entry.id
                 ? describeReturnResult(returnTarget.result)
                 : null
             }
@@ -538,20 +556,25 @@ export default function Dashboard() {
         )
       }
       tasks={
-        open.id !== null && (
+        entry.id !== null && (
           <TaskList
-            className="arrives-in-turn"
-            style={{ "--arrival": 4 } as React.CSSProperties}
-            projectId={open.id}
-            tasks={open.values.tasks}
+            className={isClosing ? undefined : "arrives-in-turn"}
+            style={
+              isClosing
+                ? undefined
+                : ({ "--arrival": 4 } as React.CSSProperties)
+            }
+            projectId={entry.id}
+            tasks={entry.values.tasks}
             drafts={taskDrafts}
-            onChange={editing.changeTasks}
-            finishEditRef={editing.finishTaskEditRef}
+            onChange={isClosing ? async () => null : editing.changeTasks}
+            finishEditRef={isClosing ? undefined : editing.finishTaskEditRef}
           />
         )
       }
     />
   );
+  const form = open && renderProjectForm(open, false);
 
   // Keeps the same key as when the project was open, so that its bar and
   // form stay as they are, and only start squashing.
@@ -565,29 +588,7 @@ export default function Dashboard() {
         setClosing((bars) => bars.filter(({ key }) => key !== bar.key))
       }
     >
-      <ProjectForm
-        values={bar.values}
-        isNew={bar.id === null}
-        people={readyPeople?.people ?? noPeople}
-        message={bar.message}
-        getFocusField={() => "start"}
-        onChange={() => {}}
-        onFieldFocus={() => {}}
-        onFieldBlur={() => {}}
-        onCreate={() => {}}
-        onClose={() => {}}
-        hasCloseButton={false}
-        tasks={
-          bar.id !== null && (
-            <TaskList
-              projectId={bar.id}
-              tasks={bar.values.tasks}
-              drafts={taskDrafts}
-              onChange={async () => null}
-            />
-          )
-        }
-      />
+      {renderProjectForm(bar, true)}
     </ExpandedProjectBar>
   );
 
