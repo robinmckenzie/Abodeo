@@ -1,7 +1,9 @@
 // Who a task is assigned to, shown on its row, and a list to choose someone
 // else from, styled like the project's Assigned to (AD #66 Assign Tasks To
 // People). The list opens in the browser's top layer, so that the task list's
-// scrolling does not cut it off, even in the floating project window.
+// scrolling does not cut it off, even in the floating project window. Below
+// the people is the project's box for adding someone, who is then assigned to
+// the task (AD #128 Add Person From Task Assignee Picker).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -12,7 +14,7 @@ import {
   unassignedName,
   type Person,
 } from "./people";
-import { AssigneeIcon } from "./project-form";
+import { AddPersonBox, AssigneeIcon, type AddPerson } from "./project-form";
 import { unassignedId } from "./projects";
 
 // The gap between the button and the list, in pixels.
@@ -24,17 +26,34 @@ export function TaskAssigneePicker({
   assignee,
   people,
   onChoose,
+  onAddPerson,
 }: {
   taskId: string;
   taskTitle: string;
   assignee: string;
   people: readonly Person[];
   onChoose: (assignee: string) => void;
+  // Without it, there is no box to add someone.
+  onAddPerson?: AddPerson;
 }) {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  // The latest onChoose, as the tasks may have changed while a person was
+  // being added.
+  const onChooseRef = useRef(onChoose);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    onChooseRef.current = onChoose;
+  });
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   // Someone no longer in the list shows as Unassigned.
   const assigned = isKnownAssignee(people, assignee) ? assignee : unassignedId;
   const name = findAssigneeName(people, assigned);
@@ -53,13 +72,25 @@ export function TaskAssigneePicker({
     if (chosen !== assignee) onChoose(chosen);
   };
 
+  // Once added, the person is assigned to the task and the list closes. If
+  // adding fails, the box says why and the task keeps its person.
+  const addPerson = async (add: AddPerson, name: string) => {
+    const result = await add(name);
+    if (result.ok && isMountedRef.current) {
+      close(true);
+      onChooseRef.current(result.person.id);
+    }
+    return result;
+  };
+
   // Shown in the top layer, below the button with its right edges level, or
   // above it if there is no room below. The chosen person is focused, and
   // scrolled to if the list is long.
   useLayoutEffect(() => {
     const list = listRef.current;
+    const options = optionsRef.current;
     const button = buttonRef.current;
-    if (!isOpen || !list || !button) return;
+    if (!isOpen || !list || !options || !button) return;
     list.showPopover?.();
     const place = button.getBoundingClientRect();
     const height = list.offsetHeight;
@@ -70,7 +101,7 @@ export function TaskAssigneePicker({
     list.style.left = `${Math.max(listGap, place.right - list.offsetWidth)}px`;
     const chosen = list.querySelector<HTMLElement>('[aria-checked="true"]');
     if (chosen) {
-      list.scrollTop = chosen.offsetTop - list.clientHeight / 2;
+      options.scrollTop = chosen.offsetTop - options.clientHeight / 2;
       chosen.focus({ preventScroll: true });
     }
   }, [isOpen]);
@@ -102,20 +133,27 @@ export function TaskAssigneePicker({
     };
   }, [isOpen]);
 
-  // Up and Down, Home and End move between the people. Escape and Tab close
-  // the list, back to the button.
+  // Up and Down, Home and End move between the people, and Down from the
+  // last goes to the box for adding someone, where Home and End stay in the
+  // text. Escape and Tab close the list, back to the button.
   const moveFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const items = [
+    const entry = listRef.current?.querySelector<HTMLElement>(
+      'input[name="new-person"]',
+    );
+    const isInEntry = entry != null && event.target === entry;
+    if (isInEntry && (event.key === "Home" || event.key === "End")) return;
+    const people = [
       ...(listRef.current?.querySelectorAll<HTMLElement>(
         "[role=menuitemradio]",
       ) ?? []),
     ];
+    const items = entry ? [...people, entry] : people;
     const from = items.indexOf(document.activeElement as HTMLElement);
     const steps: Partial<Record<string, number>> = {
       ArrowDown: Math.min(from + 1, items.length - 1),
       ArrowUp: Math.max(from - 1, 0),
       Home: 0,
-      End: items.length - 1,
+      End: people.length - 1,
     };
     const to = steps[event.key];
     if (to !== undefined) {
@@ -164,27 +202,35 @@ export function TaskAssigneePicker({
           aria-label={`Assign ${taskTitle} to`}
           onKeyDown={moveFocus}
         >
-          {options.map((person) => (
-            <button
-              key={person.id}
-              type="button"
-              className="assignee-option"
-              role="menuitemradio"
-              aria-checked={assigned === person.id}
-              tabIndex={-1}
-              onClick={() => choose(person.id)}
-            >
-              <AssigneeIcon isSelected={assigned === person.id} />
-              <span>
-                {describePerson(person)}
-                {findSubtitle(person) && (
-                  <span className="assignee-job-title">
-                    {findSubtitle(person)}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))}
+          <div ref={optionsRef} className="task-assignee-options" role="none">
+            {options.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                className="assignee-option"
+                role="menuitemradio"
+                aria-checked={assigned === person.id}
+                tabIndex={-1}
+                onClick={() => choose(person.id)}
+              >
+                <AssigneeIcon isSelected={assigned === person.id} />
+                <span>
+                  {describePerson(person)}
+                  {findSubtitle(person) && (
+                    <span className="assignee-job-title">
+                      {findSubtitle(person)}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+          {onAddPerson && (
+            <AddPersonBox
+              label={`Add a person and assign ${taskTitle} to them`}
+              onAdd={(name) => addPerson(onAddPerson, name)}
+            />
+          )}
         </div>
       )}
     </>

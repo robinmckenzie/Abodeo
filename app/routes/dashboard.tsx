@@ -1114,6 +1114,7 @@ export default function Dashboard() {
             projectId={open.id}
             tasks={open.values.tasks}
             people={readyPeople?.people ?? noPeople}
+            onAddPerson={readyPeople ? people.addPerson : undefined}
             drafts={taskDrafts}
             onChange={changeOpenTasks}
             finishEditRef={finishTaskEditRef}

@@ -1407,6 +1407,127 @@ describe("tasks", () => {
         ["Tiles", "unassigned"],
       ]);
     });
+
+    describe("adding a person from the list (AD #128)", () => {
+      const addBox = (title: string) =>
+        within(screen.getByRole("menu")).getByRole("textbox", {
+          name: `Add a person and assign ${title} to them`,
+        });
+
+      async function addFromList(title: string, name: string) {
+        fireEvent.change(addBox(title), { target: { value: name } });
+        await act(async () => {
+          fireEvent.keyDown(addBox(title), { key: "Enter" });
+        });
+      }
+
+      it("adds them to the People list and assigns them to that task only, surviving reopening", async () => {
+        savePeople("Andy");
+        await openKitchen();
+        await enterTasks("Tiles\nGrout");
+        fireEvent.click(assigneeButton("Tiles"));
+        await addFromList("Tiles", "Dora");
+
+        expect(screen.queryByRole("menu")).toBeNull();
+        expect(document.activeElement).toBe(assigneeButton("Tiles"));
+        expect(assigneeButton("Tiles").textContent).toBe("Dora");
+        expect(assigneeButton("Grout").textContent).toBe("Unassigned");
+        const people = JSON.parse(localStorage.getItem(peopleKey)!).people;
+        const dora = people.find(
+          (person: { name: string }) => person.name === "Dora",
+        );
+        expect(people.map((person: { name: string }) => person.name)).toEqual([
+          "Andy",
+          "Dora",
+        ]);
+        expect(savedTasks().map((task) => task.assignee)).toEqual([
+          dora.id,
+          "unassigned",
+        ]);
+        // The project keeps its own assignee.
+        expect(savedProjects()[0].assignee).toBe("unassigned");
+        // The project's Assigned to offers them too.
+        expect(screen.getByRole("radio", { name: "Dora" })).toBeTruthy();
+
+        // Closing and reopening, and then loading the page again.
+        await closeForm();
+        fireEvent.click(bars()[0]);
+        expect(assigneeButton("Tiles").textContent).toBe("Dora");
+        cleanup();
+        refreshProjects();
+        refreshPeople();
+        await renderDashboard();
+        fireEvent.click(bars()[0]);
+        expect(assigneeButton("Tiles").textContent).toBe("Dora");
+      });
+
+      it("keeps the task's person and shows why when a name is refused", async () => {
+        savePeople("Andy", "Dora");
+        await openKitchen();
+        await enterTasks("Tiles");
+        fireEvent.click(assigneeButton("Tiles"));
+        await act(async () => {
+          fireEvent.click(screen.getByRole("menuitemradio", { name: "Andy" }));
+        });
+        fireEvent.click(assigneeButton("Tiles"));
+        await addFromList("Tiles", "dora");
+
+        expect(
+          within(screen.getByRole("menu")).getByText(
+            "Someone with that name is already in the list.",
+          ),
+        ).toBeTruthy();
+        expect(assigneeButton("Tiles").textContent).toBe("Andy");
+        expect(savedTasks()[0].assignee).toBe("andy");
+        expect(
+          JSON.parse(localStorage.getItem(peopleKey)!).people,
+        ).toHaveLength(2);
+      });
+
+      it("keeps the task's person when the list is closed without adding", async () => {
+        savePeople("Andy");
+        await openKitchen();
+        await enterTasks("Tiles");
+        fireEvent.click(assigneeButton("Tiles"));
+        await act(async () => {
+          fireEvent.click(screen.getByRole("menuitemradio", { name: "Andy" }));
+        });
+        fireEvent.click(assigneeButton("Tiles"));
+        fireEvent.change(addBox("Tiles"), { target: { value: "Dora" } });
+        fireEvent.keyDown(addBox("Tiles"), { key: "Escape" });
+
+        expect(screen.queryByRole("menu")).toBeNull();
+        expect(document.activeElement).toBe(assigneeButton("Tiles"));
+        // The project is still open.
+        expect(titleField()).toBeTruthy();
+        expect(assigneeButton("Tiles").textContent).toBe("Andy");
+        expect(savedTasks()[0].assignee).toBe("andy");
+        expect(
+          JSON.parse(localStorage.getItem(peopleKey)!).people,
+        ).toHaveLength(1);
+      });
+
+      it("is reached from the last person with Down, End staying on the people and Home and End in the text", async () => {
+        savePeople("Andy");
+        await openKitchen();
+        await enterTasks("Tiles");
+        assigneeButton("Tiles").focus();
+        fireEvent.keyDown(assigneeButton("Tiles"), { key: "ArrowDown" });
+        const menu = screen.getByRole("menu");
+        fireEvent.keyDown(menu, { key: "End" });
+        expect(document.activeElement).toBe(
+          screen.getByRole("menuitemradio", { name: "Andy" }),
+        );
+        fireEvent.keyDown(menu, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(addBox("Tiles"));
+        fireEvent.keyDown(addBox("Tiles"), { key: "Home" });
+        expect(document.activeElement).toBe(addBox("Tiles"));
+        fireEvent.keyDown(addBox("Tiles"), { key: "ArrowUp" });
+        expect(document.activeElement).toBe(
+          screen.getByRole("menuitemradio", { name: "Andy" }),
+        );
+      });
+    });
   });
 });
 
