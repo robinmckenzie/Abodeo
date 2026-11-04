@@ -624,6 +624,39 @@ describe("leaving to sign in or out", () => {
     expect(confirm.mock.calls[0][0]).toMatch(/tasks typed but not yet added/);
   });
 
+  it("does not ask about tasks typed as blank text", async () => {
+    fakeServer();
+    const confirm = vi.spyOn(window, "confirm");
+    await renderDashboard();
+    await addProject("Paint the fence");
+    await click(screen.getByRole("button", { name: /Paint the fence/ }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "  \n " } },
+    );
+
+    await click(signInButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("does not ask about tasks once they are added", async () => {
+    fakeServer();
+    const confirm = vi.spyOn(window, "confirm");
+    await renderDashboard();
+    await addProject("Paint the fence");
+    await click(screen.getByRole("button", { name: /Paint the fence/ }));
+    const box = screen.getByRole("textbox", { name: "Add tasks, one per line" });
+    fireEvent.change(box, { target: { value: "Buy paint" } });
+    await act(async () => {
+      fireEvent.keyDown(box, { key: "Enter" });
+    });
+
+    await click(signInButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("asks the same before signing out", async () => {
     const server = fakeServer({
       session: { name: "Ada Lovelace", email: "ada@example.com" },
@@ -660,9 +693,6 @@ describe("the Calendar test", () => {
 
   it("sends the browser's time zone, and says so when the test cannot start", async () => {
     const server = fakeServer({ session: ada });
-    // Earlier tests can leave typed tasks behind, which the check before
-    // leaving asks about.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await renderDashboard();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
 
@@ -943,9 +973,6 @@ describe("a signed-in account's projects (AD #41)", () => {
     // jsdom cannot leave the page, so the reload after signing out is stood
     // in for by rendering again, and its complaint is silenced.
     vi.spyOn(console, "error").mockImplementation(() => {});
-    // Earlier tests can leave typed tasks behind, which the check before
-    // leaving asks about.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await click(screen.getByRole("button", { name: /Signed in as/ }));
     await click(screen.getByRole("button", { name: "Sign out" }));
     await settle();
@@ -1611,7 +1638,6 @@ describe("task photos on the dashboard (AD #67)", () => {
 
     it("lets the project's images use what removing photos one by one gave back", async () => {
       const server = await serverWithTask(nearlyFull);
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       await click(screen.getByRole("button", { name: "2 photos of Paint" }));
       await settle();
       const dialog = screen.getByRole("dialog", { name: "Paint" });
@@ -1619,6 +1645,14 @@ describe("task photos on the dashboard (AD #67)", () => {
         name: "Remove photo",
       })) {
         await click(button);
+        const question = screen.getByRole("heading", {
+          name: "Remove this photo?",
+        });
+        await click(
+          within(question.closest("dialog")!).getByRole("button", {
+            name: "Remove",
+          }),
+        );
         await settle();
       }
       expect(photosOf(server)).toHaveLength(0);

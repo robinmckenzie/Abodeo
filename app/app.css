@@ -1812,14 +1812,27 @@ html:has(.app-layout) {
   width: max-content;
   min-width: 11rem;
   max-width: 16rem;
-  max-height: 15.4rem;
   padding: 0.375rem;
-  overflow-y: auto;
   border: 1px solid var(--card-border);
   border-radius: 10px;
   background: var(--card);
   box-shadow: 0 8px 28px rgb(26 26 26 / 0.12);
   color: var(--ink);
+}
+
+/* The people scroll, leaving the box for adding someone in view below them.
+   Positioned, so that the chosen person's offsetTop is measured from it. */
+.task-assignee-options {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+  max-height: 15.4rem;
+  overflow-y: auto;
+}
+
+.task-assignee-list .assignee-add {
+  margin-top: 0.375rem;
 }
 
 .task-assignee-list .assignee-option {
@@ -2710,8 +2723,6 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   margin-top: 0.375rem;
 }
 
-/* The window that asks "Are you sure?" before a project is deleted
-   (AD #62 Delete Projects). */
 /* A task's photos, over the open project (AD #67). Its body holds the
    padding, so that a click on the dialog itself is one on the backdrop. */
 .task-photos-dialog {
@@ -2754,7 +2765,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   max-height: min(28rem, 60vh);
 }
 
-.delete-dialog {
+/* The window that asks "Are you sure?" before a project is deleted
+   (AD #62 Delete Projects), and the one that asks before something else is
+   removed, such as an image (AD #55). */
+.delete-dialog,
+.confirm-dialog {
   width: min(30rem, calc(100vw - 3rem));
   padding: 1.25rem 1.75rem 1.5rem;
   border: 0;
@@ -2764,17 +2779,20 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
 }
 
-.delete-dialog::backdrop {
+.delete-dialog::backdrop,
+.confirm-dialog::backdrop {
   background: rgb(26 26 26 / 0.22);
 }
 
-.delete-dialog h2 {
+.delete-dialog h2,
+.confirm-dialog h2 {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
 }
 
 .delete-dialog p,
-.delete-dialog ul {
+.delete-dialog ul,
+.confirm-dialog p {
   margin: 0 0 0.75rem;
 }
 
@@ -2786,13 +2804,15 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   color: var(--red);
 }
 
-.delete-dialog-buttons {
+.delete-dialog-buttons,
+.confirm-dialog-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1rem;
 }
-.delete-dialog button:focus-visible {
+.delete-dialog button:focus-visible,
+.confirm-dialog button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }

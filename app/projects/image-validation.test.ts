@@ -24,6 +24,39 @@ describe("validateImage", () => {
     );
   });
 
+  it("accepts a JPEG followed by a second JPEG, as phones write (AD #53)", () => {
+    const jpeg = makeJpeg();
+    expect(validateImage(Uint8Array.from([...jpeg, ...makeJpeg(200)]))).toBe(
+      "image/jpeg",
+    );
+  });
+
+  it("accepts a JPEG followed by other bytes after its end (AD #53)", () => {
+    const jpeg = makeJpeg();
+    const trailers = [
+      [0x0d, 0x0a],
+      [0xff, 0xff],
+      [...new TextEncoder().encode("SEFHMotionPhoto_Data"), 1, 2, 3, 0xff],
+    ];
+    for (const trailer of trailers) {
+      expect(validateImage(Uint8Array.from([...jpeg, ...trailer]))).toBe(
+        "image/jpeg",
+      );
+    }
+  });
+
+  it("refuses a truncated JPEG, even with bytes added after the cut", () => {
+    const jpeg = makeJpeg(200);
+    // Cut inside the frame segment, and inside the scan.
+    expect(validateImage(jpeg.subarray(0, 10))).toBeNull();
+    expect(validateImage(jpeg.subarray(0, 100))).toBeNull();
+    // The end of a later JPEG is not taken for this one's end when this one's
+    // frame is cut short.
+    expect(
+      validateImage(Uint8Array.from([...jpeg.subarray(0, 10), ...makeJpeg()])),
+    ).toBeNull();
+  });
+
   it("refuses other formats and empty files, whatever they are called", () => {
     expect(validateImage(gifBytes)).toBeNull();
     expect(validateImage(new TextEncoder().encode("<svg></svg>"))).toBeNull();

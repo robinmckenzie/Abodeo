@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { areAllTypesUnsupported, describeFileSize } from "./image-messages";
+import {
+  areAllTypesUnsupported,
+  describeFileSize,
+  describeRefusals,
+} from "./image-messages";
 
 describe("describeFileSize", () => {
   it("uses bytes, KB or MB", () => {
@@ -22,5 +26,21 @@ describe("areAllTypesUnsupported", () => {
     expect(areAllTypesUnsupported([""])).toBe(false);
     expect(areAllTypesUnsupported(["application/octet-stream"])).toBe(false);
     expect(areAllTypesUnsupported([])).toBe(false);
+  });
+});
+
+describe("describeRefusals", () => {
+  it("names a recognised other format, and otherwise gives the reason", () => {
+    expect(
+      describeRefusals([
+        { name: "photo.jpg", reason: "unsupported-format", format: "WebP" },
+        { name: "notes.jpg", reason: "unsupported-format" },
+        { name: "big.jpg", reason: "too-large" },
+      ]),
+    ).toEqual([
+      "photo.jpg: This looks like a WebP file. Only JPEG and PNG can be added.",
+      "notes.jpg: Sorry, only JPEG and PNG images can be added.",
+      "big.jpg: Sorry, your image is too large.",
+    ]);
   });
 });

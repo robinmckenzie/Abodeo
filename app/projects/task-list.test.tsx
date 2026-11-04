@@ -10,8 +10,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TaskDrafts } from "./task-drafts";
 import { TaskList, undoDuration, type TaskPhotos } from "./task-list";
 import type { Task } from "./tasks";
+
+const drafts = new TaskDrafts();
 
 const shed: Task = {
   id: "t1",
@@ -45,6 +48,7 @@ function renderList({
         projectId="p1"
         tasks={current}
         people={[]}
+        drafts={drafts}
         photos={photos}
         onUndoEnd={props.onUndoEnd}
         onChange={async (change) => {
@@ -199,6 +203,7 @@ describe("a task's photo controls (AD #67)", () => {
         projectId="p1"
         tasks={[shed, fence]}
         people={[]}
+        drafts={drafts}
         photos={makePhotos({ isDropTarget: true })}
         onChange={async () => null}
       />,
@@ -211,6 +216,7 @@ describe("a task's photo controls (AD #67)", () => {
         projectId="p1"
         tasks={[shed, fence]}
         people={[]}
+        drafts={drafts}
         photos={makePhotos({ isDropTarget: false })}
         onChange={async () => null}
       />,

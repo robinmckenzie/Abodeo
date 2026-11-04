@@ -94,11 +94,8 @@ import {
   usePresentation,
   useSwitchPresentationKey,
 } from "../projects/presentation";
-import {
-  hasUnsubmittedTaskText,
-  TaskList,
-  type TaskChange,
-} from "../projects/task-list";
+import { TaskDrafts } from "../projects/task-drafts";
+import { TaskList, type TaskChange } from "../projects/task-list";
 import type { Task } from "../projects/tasks";
 import {
   refreshProjects,
@@ -240,6 +237,9 @@ export default function Dashboard() {
   const imageCountRef = useRef<number | null>(null);
   const appointmentCountRef = useRef<number | null>(null);
   const finishTaskEditRef = useRef<(() => Promise<string | null>) | null>(null);
+  // Text typed into projects' add-task boxes but not yet added. It lasts as
+  // long as this dashboard, so moving to another screen or reloading drops it.
+  const [taskDrafts] = useState(() => new TaskDrafts());
 
   useSwitchPresentationKey();
   // T and E do not work while typing in a field, so they are not listed
@@ -326,7 +326,7 @@ export default function Dashboard() {
         if (!isSaved) losses.push("changes to the project that were not saved");
       }
     }
-    if (hasUnsubmittedTaskText()) losses.push("tasks typed but not yet added");
+    if (taskDrafts.hasUnaddedText()) losses.push("tasks typed but not yet added");
     // Projects closed earlier whose changes are still on their way or
     // failed.
     if (pendingKeysRef.current.size > 0 || sendingRef.current > 0) {
@@ -1196,6 +1196,8 @@ export default function Dashboard() {
             projectId={open.id}
             tasks={open.values.tasks}
             people={readyPeople?.people ?? noPeople}
+            onAddPerson={readyPeople ? people.addPerson : undefined}
+            drafts={taskDrafts}
             onChange={changeOpenTasks}
             finishEditRef={finishTaskEditRef}
             photos={
@@ -1258,6 +1260,7 @@ export default function Dashboard() {
               projectId={bar.id}
               tasks={bar.values.tasks}
               people={readyPeople?.people ?? noPeople}
+              drafts={taskDrafts}
               onChange={async () => null}
             />
           )

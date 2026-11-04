@@ -19,6 +19,7 @@ import {
   parseProject,
   type Project,
 } from "./projects";
+import { readJsonBody } from "./json-body.server";
 import { readRequestAccount } from "./request-account.server";
 import {
   importBodyLimit,
@@ -103,24 +104,6 @@ function findRoute(request: Request): Route | Response {
   return notAllowed();
 }
 
-// The body as JSON, undefined if it is not JSON, or "too-large".
-async function readBody(request: Request, limit: number) {
-  const length = Number(request.headers.get("Content-Length"));
-  if (length > limit) return "too-large" as const;
-  let buffer: ArrayBuffer;
-  try {
-    buffer = await request.arrayBuffer();
-  } catch {
-    return undefined;
-  }
-  if (buffer.byteLength > limit) return "too-large" as const;
-  try {
-    return JSON.parse(new TextDecoder().decode(buffer)) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
 // The projects to move in from a browser, each a saved form with its id, or
 // undefined if any is not valid.
 function readImport(body: unknown): Project[] | undefined {
@@ -178,7 +161,7 @@ export async function handleProjectsRequest(
     }
     const userId = account.userId;
     const body = isWrite
-      ? await readBody(
+      ? await readJsonBody(
           request,
           route.kind === "import" ? importBodyLimit : projectBodyLimit,
         )

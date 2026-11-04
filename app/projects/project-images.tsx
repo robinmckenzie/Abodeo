@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { ConfirmDialog } from "../ui/confirm-dialog";
 import { raiseFloatingMessages } from "../ui/floating-messages";
 import { ArrowIcon, BinIcon, PlusIcon } from "../ui/icons";
 import {
@@ -45,7 +46,7 @@ export type TimelineWording = {
   empty: string;
   older: string;
   remove: string;
-  confirmRemove: string;
+  confirmQuestion: string;
 };
 
 export const projectImagesWording: TimelineWording = {
@@ -55,7 +56,7 @@ export const projectImagesWording: TimelineWording = {
   empty: "No images yet. Choose Add image, or drop pictures here.",
   older: "Show older images",
   remove: "Remove image",
-  confirmRemove: "Remove this image? It cannot be undone.",
+  confirmQuestion: "Remove this image?",
 };
 
 export const taskPhotosWording: TimelineWording = {
@@ -65,7 +66,7 @@ export const taskPhotosWording: TimelineWording = {
   empty: "No photos yet. Choose Add photos, or drop pictures here.",
   older: "Show older photos",
   remove: "Remove photo",
-  confirmRemove: "Remove this photo? It cannot be undone.",
+  confirmQuestion: "Remove this photo?",
 };
 
 export function formatAddedTime(createdAt: string) {
@@ -209,6 +210,8 @@ export function ImageTimeline({
     caption: string;
     createdAt: string;
   } | null>(null);
+  // The image whose removal is being asked about.
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const addFiles = images.addFiles;
   useEffect(() => {
@@ -368,11 +371,7 @@ export function ImageTimeline({
             onVisible={() => images.requestThumbnail(image.id)}
             onView={() => void view(image)}
             removeLabel={wording.remove}
-            onRemove={() => {
-              if (window.confirm(wording.confirmRemove)) {
-                void images.remove(image.id);
-              }
-            }}
+            onRemove={() => setRemovingId(image.id)}
             onCaption={images.changeCaption}
           />
         ))}
@@ -380,6 +379,20 @@ export function ImageTimeline({
           <PendingEntry key={entry.key} entry={entry} />
         ))}
       </div>
+      {removingId &&
+        createPortal(
+          <ConfirmDialog
+            question={wording.confirmQuestion}
+            detail="It cannot be undone."
+            confirmLabel="Remove"
+            onConfirm={() => {
+              setRemovingId(null);
+              void images.remove(removingId);
+            }}
+            onCancel={() => setRemovingId(null)}
+          />,
+          document.body,
+        )}
       {viewing &&
         createPortal(
           <ImageViewer

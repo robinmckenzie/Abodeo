@@ -468,12 +468,15 @@ function arriveAt(place: number) {
 }
 
 // A text box below the people, to add someone and choose them at once. Enter
-// adds them, and does not create or save the project.
-function AddPersonBox({
+// adds them, and does not create or save the project. Also shown in a task's
+// list of people (AD #128), where it does not arrive in turn.
+export function AddPersonBox({
   place,
+  label = "Add a person",
   onAdd,
 }: {
-  place: number;
+  place?: number;
+  label?: string;
   onAdd: (
     name: string,
   ) => Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
@@ -497,14 +500,19 @@ function AddPersonBox({
   };
 
   return (
-    <div className="assignee-add arrives-in-turn" style={arriveAt(place)}>
+    <div
+      className={
+        place === undefined ? "assignee-add" : "assignee-add arrives-in-turn"
+      }
+      style={place === undefined ? undefined : arriveAt(place)}
+    >
       <input
         id={id}
         name="new-person"
         className="field task-entry"
         value={name}
         placeholder="Add a person"
-        aria-label="Add a person"
+        aria-label={label}
         maxLength={personNameMaxLength + 10}
         autoComplete="off"
         aria-invalid={problem !== null}
