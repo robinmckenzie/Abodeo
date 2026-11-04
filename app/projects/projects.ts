@@ -129,7 +129,7 @@ export function parseProject(id: string, json: string | null): Project | null {
 }
 
 // Earliest due date first, then those without a due date by title. Equal ones
-// keep a stable order. This is the order the dashboard shows.
+// keep a stable order. This is the order the Projects screen shows.
 export function sortProjectsByDueDate(projects: Project[]) {
   return [...projects].sort((a, b) => {
     if (a.dueDate !== b.dueDate) {

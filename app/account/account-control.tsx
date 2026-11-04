@@ -1,6 +1,6 @@
-// The account area below the dashboard's logo: who is signed in, the
-// preferred name, the Calendar test, what is kept, and signing in and out. It is plain text with
-// no picture, so that it cannot be mistaken for an assignee or a project.
+// The account area below the logo: who is signed in, the preferred name, the
+// Calendar test, what is kept, and signing in and out. It is plain text with no
+// picture, so that it cannot be mistaken for an assignee or a project.
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -24,7 +24,7 @@ const saveMessages: Record<ProfileSaveResult, string> = {
 
 type SignedIn = Extract<AccountView, { kind: "signed-in" }>;
 
-// The account comes from the dashboard, whose projects depend on it.
+// The account comes from the Projects screen, whose projects depend on it.
 export function AccountControl({
   account,
   onBeforeLeave,

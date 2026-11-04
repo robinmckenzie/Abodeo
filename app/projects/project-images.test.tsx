@@ -306,7 +306,7 @@ describe("ProjectImages", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("adds files given by the dashboard, as when dropped", async () => {
+  it("adds files given by the Projects screen, as when dropped", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
     const addFilesRef: { current: AddFiles | null } = { current: null };
@@ -624,7 +624,7 @@ describe("ProjectImages", () => {
     expect(server.store.accounts.get("ada")).toHaveLength(1);
   });
 
-  it("tells the dashboard when the sign-in has changed", async () => {
+  it("tells the Projects screen when the sign-in has changed", async () => {
     const server = fakeServer();
     server.session = null;
     const onFailure = vi.fn();

@@ -1,7 +1,8 @@
 // The "Create test appointment" action (AD #10 Prove Calendar Access). It
 // leaves for Google, which asks for the Calendar permission, and the server
-// returns the browser to the dashboard with ?calendar=<result>. The result is
-// shown once and removed from the address, so a reload does not repeat it.
+// returns the browser to the Projects screen with ?calendar=<result>. The
+// result is shown once and removed from the address, so a reload does not
+// repeat it.
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 

@@ -36,10 +36,10 @@ Run these from the repository root.
 
 ## Sign-in
 
-Anyone with a Google account can sign in, from the dashboard, and set a preferred name that only
+Anyone with a Google account can sign in, from the Projects screen, and set a preferred name that only
 they see. A signed-in account can also create a test appointment in Google Calendar (see
 [Calendar test](#calendar-test)). Sign-in is optional. Signed out, projects and tasks stay in the
-browser. Signed in, the dashboard shows and saves the account's projects instead, kept on the
+browser. Signed in, the Projects screen shows and saves the account's projects instead, kept on the
 server, so they can be used on every device where the person signs in (see
 [Projects while signed in](#projects-while-signed-in)). Settings, such as the presentation and the
 tuning panels, stay in the browser either way.
@@ -61,12 +61,12 @@ tuning panels, stay in the browser either way.
   `AUTH_DATABASE_URL`, and never reads `DATABASE_URL`, so local accounts never reach production.
 - Starting sign-in always asks Google only for the account's identity, name and email, and the
   Calendar permission (see [Project appointments](#project-appointments)), never adding a wider
-  permission given earlier, and always returns to `/dashboard`, whatever the browser sends.
+  permission given earlier, and always returns to `/projects`, whatever the browser sends.
   Google always asks which account to use.
-  Sign-out ends Abodeo's session, not the Google one, and loads the dashboard afresh. Before
+  Sign-out ends Abodeo's session, not the Google one, and loads the Projects screen afresh. Before
   either leaves the page, anything open is saved, and the person is asked first if something
   cannot be saved.
-- The dashboard looks up the account after the page has loaded, with an 8-second limit, so a slow
+- The Projects screen looks up the account after the page has loaded, with an 8-second limit, so a slow
   or missing database never holds it up. It looks again when the window is next used, when the
   session is due to end, and when another tab signs out.
 - `public/privacy.html` is the public privacy page that Google's sign-in screen links to.
@@ -105,7 +105,7 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
   the saved tasks are shown.
 - Opening a project loads its latest copy first, and it cannot be changed until that arrives. The
   list is loaded again when the window comes back into use, at most every 10 seconds.
-- On signing in with projects of the browser's own, the dashboard offers to move them in. Moving
+- On signing in with projects of the browser's own, the Projects screen offers to move them in. Moving
   sends each one; the server adds a copy rather than replacing a different project with the same
   id, and sending the same projects again adds nothing. Each project is then removed from the
   browser only if it has not changed there since. "Not now" is remembered until the next sign-in
@@ -323,8 +323,8 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   calendar named Abodeo. The first test makes the calendar and saves its ID in `calendar_link`.
   Later tests reuse it, or make a new one if Google answers that it cannot be found. If two tests
   run at once, only one calendar is kept.
-- The callback returns to `/dashboard?calendar=` with `created`, `denied`, `wrong-account` or
-  `failed`, which the dashboard shows once and removes from the address.
+- The callback returns to `/projects?calendar=` with `created`, `denied`, `wrong-account` or
+  `failed`, which the Projects screen shows once and removes from the address.
 - The calendar cannot be found through the person's calendar list, as the permission does not
   cover it, which is why its ID is saved. Abodeo cannot tell whether the person has deleted or
   hidden it: in testing, a calendar permanently deleted in Google Calendar was still returned by
@@ -361,7 +361,7 @@ the account's Abodeo calendar in Google Calendar, and Abodeo keeps no copy. The 
   returns to the project, once per page load and not straight after a refusal or failure; any
   other sees a Connect Google Calendar button. Opening the form checks the token first and goes
   through Google if it is missing or near expiry. A save with an expired token creates nothing.
-- Google returns to `/dashboard?project=<id>&appointment=new&calendar=connected`, which opens the
+- Google returns to `/projects?project=<id>&appointment=new&calendar=connected`, which opens the
   project (and its form) once its projects have loaded, then cleans the address.
 - If Google cannot be reached, or the list cannot be read in full, the project says appointments
   cannot be shown rather than showing none.

@@ -17,7 +17,7 @@
 -- project (AD #41): an account's projects. data is the saved form;
 -- revision changes on every write.
 -- deleted_at (AD #62): when a project was put in the Bin, or null. Binned
--- projects are cleared for good by the dashboard's next load or save once
+-- projects are cleared for good by the Projects screen's next load or save once
 -- past the cooling-off period, or at once by Delete permanently.
 -- project_image, project_image_bytes (AD #48): images, details apart from
 -- bytes. Removing a project or account removes its images.

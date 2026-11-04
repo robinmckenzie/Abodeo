@@ -3,7 +3,7 @@
 //   address;
 // - GET calendarCallbackPath is where Google returns the browser. It checks
 //   the grant, adds the test appointment and returns the browser to the
-//   dashboard with the result.
+//   Projects screen with the result.
 // Google's token is used only inside one callback and is never saved or
 // logged. Logs carry short failure codes only.
 import { accountReturnPath } from "../account/account-api";
@@ -329,10 +329,10 @@ async function handleStart(
   }
 }
 
-// Returns the browser to the dashboard with the result, at the project if
+// Returns the browser to the Projects screen with the result, at the project if
 // the grant was for one (opening its new appointment form only after a
 // success). The cookies are set on the way.
-function returnToDashboard(
+function returnToProjects(
   request: Request,
   result: CalendarResult,
   cookies: string[] = [],
@@ -373,7 +373,7 @@ async function handleCallback(
   // Set once the grant is read and Google's answer is known to be for it.
   let target: AppointmentReturnTarget | undefined;
   const finish = (result: CalendarResult, ...cookies: string[]) =>
-    returnToDashboard(
+    returnToProjects(
       request,
       result,
       [clearCalendarGrantCookie(dependencies.isSecure), ...cookies],
@@ -508,6 +508,6 @@ export function isCalendarPath(pathname: string) {
 export function respondCalendarUnavailable(request: Request) {
   const { pathname } = new URL(request.url);
   return pathname === calendarCallbackPath
-    ? returnToDashboard(request, "failed")
+    ? returnToProjects(request, "failed")
     : respondWithError(503, "unavailable");
 }

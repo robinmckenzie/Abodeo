@@ -79,7 +79,8 @@ function callback(query: string, cookie?: string) {
   });
 }
 
-// Goes through Google and back, giving the result in the dashboard address.
+// Goes through Google and back, giving the result in the Projects screen's
+// address.
 async function runTest(test: TestSetUp, body?: unknown) {
   const { cookie, state } = await start(test, body);
   const response = await test.handle(
@@ -91,7 +92,7 @@ async function runTest(test: TestSetUp, body?: unknown) {
 function readResult(response: Response) {
   expect(response.status).toBe(302);
   const location = new URL(response.headers.get("Location") ?? "");
-  expect(location.pathname).toBe("/dashboard");
+  expect(location.pathname).toBe("/projects");
   return location.searchParams.get("calendar");
 }
 
@@ -571,7 +572,7 @@ describe("a grant for a project's appointments", () => {
     const { pathname, searchParams } = new URL(
       response.headers.get("Location") ?? "",
     );
-    expect(pathname).toBe("/dashboard");
+    expect(pathname).toBe("/projects");
     return Object.fromEntries(searchParams);
   }
 

@@ -208,7 +208,7 @@ describe("the appointments section", () => {
     expect(screen.queryByText("No appointments yet.")).toBeNull();
   });
 
-  it("tells the dashboard when the sign-in has changed", async () => {
+  it("tells the Projects screen when the sign-in has changed", async () => {
     const fakes = fakeEndpoints();
     fakes.fetchFn.mockImplementationOnce(async () =>
       Response.json({ error: "account_changed" }, { status: 409 }),

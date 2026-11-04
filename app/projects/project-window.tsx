@@ -1,5 +1,5 @@
 // The floating-window presentation: the form in a dialog centred over the
-// dashboard, which keeps focus inside it while it is open.
+// Projects screen, which keeps focus inside it while it is open.
 import { useLayoutEffect, useRef } from "react";
 
 import { raiseFloatingMessages } from "../ui/floating-messages";
@@ -26,7 +26,7 @@ export function ProjectWindow({
     <dialog
       ref={dialogRef}
       className="project-window"
-      // Esc closes the project through the dashboard, which then removes
+      // Esc closes the project through the Projects screen, which then removes
       // the dialog, rather than the browser closing it directly.
       onCancel={(event) => {
         event.preventDefault();

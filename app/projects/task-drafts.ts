@@ -1,7 +1,7 @@
-// Text typed into a project's add-task box but not yet added, by project.
-// One store belongs to one dashboard: it keeps the text while projects are
-// closed and reopened, and goes with the dashboard when the person moves to
-// another screen, signs in or out, or reloads the page.
+// Text typed into a project's add-task box but not yet added, by project. One
+// store belongs to one Projects screen: it keeps the text while projects are
+// closed and reopened, and goes with the Projects screen when the person moves
+// to another screen, signs in or out, or reloads the page.
 export class TaskDrafts {
   private readonly texts = new Map<string, string>();
 

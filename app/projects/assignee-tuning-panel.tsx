@@ -1,8 +1,8 @@
-// A panel for tuning how the project form's assignees, title field and
-// notes arrive as the form appears, shown and hidden with T on the
-// dashboard, and fixed to the left of the window. Tuned values are kept in
-// local storage and set as CSS properties on the page's root element, which
-// app.css uses in place of its defaults.
+// A panel for tuning how the project form's assignees, title field and notes
+// arrive as the form appears, shown and hidden with T on the Projects screen,
+// and fixed to the left of the window. Tuned values are kept in local storage
+// and set as CSS properties on the page's root element, which app.css uses in
+// place of its defaults.
 import { useEffect, useState } from "react";
 
 import { isTextField } from "../keyboard";

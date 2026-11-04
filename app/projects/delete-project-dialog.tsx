@@ -1,5 +1,5 @@
 // The "Are you sure?" window for deleting a project (AD #62 Delete Projects),
-// over the dashboard or the Bin page. It names the project and lists what
+// over the Projects screen or the Bin page. It names the project and lists what
 // it has that will be lost, and Cancel has the focus, so that a stray Enter does not
 // delete anything.
 import { useId, useLayoutEffect, useRef } from "react";

@@ -25,22 +25,22 @@ export default function Home() {
   const navigate = useNavigate();
 
   // With projects of their own saved, the page shows only the logo, which fades in and
-  // holds, then crossfades to the dashboard. The page is marked before it
+  // holds, then crossfades to the Projects screen. The page is marked before it
   // first appears by hasProjectsScript, and again here for a visit to this
   // screen from within the app, before the browser paints. The timing comes
   // from a clock animation that app.css runs on the logo from when it
   // appears, so that the wait for the app to load counts towards the hold.
   // The welcome screen is replaced in the browser history, so that Back from
-  // the dashboard does not return to it only to be moved on again.
+  // the Projects screen does not return to it only to be moved on again.
   useLayoutEffect(() => {
     const isReturning =
       hasOwnProjects() && !isWelcomeRequested(location.search);
     document.documentElement.toggleAttribute(hasProjectsAttribute, isReturning);
     if (!isReturning) return;
     let isCancelled = false;
-    const showDashboard = () => {
+    const showProjects = () => {
       if (!isCancelled) {
-        navigate("/dashboard", { replace: true, viewTransition: true });
+        navigate("/projects", { replace: true, viewTransition: true });
       }
     };
     const clock = headingRef.current
@@ -51,8 +51,8 @@ export default function Home() {
           animation.animationName === "returning-clock",
       );
     let timer: ReturnType<typeof setTimeout> | undefined;
-    if (clock) clock.finished.then(showDashboard, () => {});
-    else timer = setTimeout(showDashboard, returningHold);
+    if (clock) clock.finished.then(showProjects, () => {});
+    else timer = setTimeout(showProjects, returningHold);
     return () => {
       isCancelled = true;
       clearTimeout(timer);
@@ -70,14 +70,14 @@ export default function Home() {
           height={868}
         />
       </h1>
-      {/* Loads the dashboard's code straight away, so that the crossfade
+      {/* Loads the Projects screen's code straight away, so that the crossfade
           starts as soon as the button is released. On release the button is
           held at its pressed size until the fade's snapshot is taken, so that
           it springs back from that size as the screen fades. A click that
           opens a new tab or window does not leave this screen, so it is not
           held. */}
       <Link
-        to="/dashboard"
+        to="/projects"
         state={{ openAddProject: true }}
         className={isReleased ? "get-started is-released" : "get-started"}
         prefetch="render"

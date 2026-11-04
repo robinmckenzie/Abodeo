@@ -93,9 +93,9 @@ function saveValues(values: Values) {
   }
 }
 
-// Kept outside the component so that values survive going to the dashboard
-// and back, and read from local storage the first time they are needed in
-// the browser. The panel is only rendered once T is pressed, so this does
+// Kept outside the component so that values survive going to the Projects
+// screen and back, and read from local storage the first time they are needed
+// in the browser. The panel is only rendered once T is pressed, so this does
 // not change what the server renders.
 let saved: Values | null = null;
 let savedVisible = false;

@@ -72,7 +72,8 @@ export type ProjectAppointmentsOptions = {
   canReconnectAutomatically?: boolean;
   // Gets the page ready to be left, false if the person chose to stay.
   onBeforeLeave: () => Promise<boolean>;
-  // A failure that means the sign-in has changed, for the dashboard to check.
+  // A failure that means the sign-in has changed, for the Projects screen to
+  // check.
   onSignInChange?: (reason: "signed-out" | "account-changed") => void;
   fetchFn?: Fetch;
   // Where the page goes to reach Google.

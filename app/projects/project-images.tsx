@@ -29,7 +29,7 @@ import type { ImageFailure } from "./images-client";
 import { fitHeightToText } from "./task-list";
 import { useProjectImages, type PendingImage } from "./use-project-images";
 
-// What the dashboard calls to add files dropped on the page.
+// What the Projects screen calls to add files dropped on the page.
 export type AddFiles = (files: File[]) => void;
 
 export function formatAddedTime(createdAt: string) {

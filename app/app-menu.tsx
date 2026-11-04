@@ -9,7 +9,7 @@ import type { Account } from "./account/use-account";
 import { BinScreenIcon, PeopleIcon, ProjectsIcon } from "./ui/icons";
 
 const screens = [
-  { path: "/dashboard", name: "Projects", Icon: ProjectsIcon },
+  { path: "/projects", name: "Projects", Icon: ProjectsIcon },
   { path: "/people", name: "People", Icon: PeopleIcon },
   // Deleted projects (AD #62 Delete Projects), only for an account, as signed
   // out there is no Bin.

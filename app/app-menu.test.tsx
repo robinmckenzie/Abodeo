@@ -23,7 +23,7 @@ describe("AppMenu", () => {
     render(
       <MemoryRouter>
         <AppMenu
-          current="/dashboard"
+          current="/projects"
           account={account}
           onBeforeLeave={onBeforeLeave}
         />
@@ -41,7 +41,7 @@ describe("AppMenu", () => {
     render(
       <MemoryRouter>
         <AppMenu
-          current="/dashboard"
+          current="/projects"
           account={account}
           onBeforeLeave={vi.fn()}
         />
@@ -67,7 +67,7 @@ describe("AppMenu", () => {
     const show = (binCount: number) => (
       <MemoryRouter>
         <AppMenu
-          current="/dashboard"
+          current="/projects"
           account={signedIn}
           binCount={binCount}
           onBeforeLeave={vi.fn()}

@@ -17,7 +17,7 @@ import {
   vi,
 } from "vitest";
 
-import Dashboard from "./dashboard";
+import Projects from "./projects";
 import { forgetPresentation } from "../projects/presentation";
 import { serialisePeople } from "../projects/people";
 import { peopleKey } from "../projects/people-storage";
@@ -55,12 +55,12 @@ afterEach(() => {
 });
 
 // Waits for the sign-in check, which comes before projects are shown.
-async function renderDashboard(state?: unknown) {
+async function renderProjects(state?: unknown) {
   const Stub = createRoutesStub(
-    withAppLayout([{ path: "/dashboard", Component: Dashboard }]),
+    withAppLayout([{ path: "/projects", Component: Projects }]),
   );
   const rendered = render(
-    <Stub initialEntries={[{ pathname: "/dashboard", state }]} />,
+    <Stub initialEntries={[{ pathname: "/projects", state }]} />,
   );
   await act(async () => {});
   return rendered;
@@ -147,9 +147,9 @@ function pressKey(key: string, target: Element = document.body) {
   fireEvent.keyDown(target, { key });
 }
 
-describe("Dashboard", () => {
+describe("Projects screen", () => {
   it("shows the small logo as the main heading", async () => {
-    await renderDashboard();
+    await renderProjects();
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.querySelector("img")).toBe(
       screen.getByRole("img", { name: "Abodeo - Your home, sorted." }),
@@ -157,7 +157,7 @@ describe("Dashboard", () => {
   });
 
   it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
-    await renderDashboard();
+    await renderProjects();
     const panel = screen.getByRole("complementary", {
       name: "Keyboard shortcuts",
     });
@@ -178,7 +178,7 @@ describe("Dashboard", () => {
   it("does not list the tuning shortcut in the deployed app", async () => {
     vi.stubEnv("DEV", false);
     try {
-      await renderDashboard();
+      await renderProjects();
       const panel = screen.getByRole("complementary", {
         name: "Keyboard shortcuts",
       });
@@ -192,7 +192,7 @@ describe("Dashboard", () => {
   });
 
   it("switches presentation and closes a project from the keycaps", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(screen.getByRole("button", { name: "E" }));
     expect(localStorage.getItem("abodeo-project-presentation")).toBe(
@@ -207,7 +207,7 @@ describe("Dashboard", () => {
   });
 
   it("underlines the current presentation in E's shortcut", async () => {
-    await renderDashboard();
+    await renderProjects();
     const current = () =>
       screen
         .getByRole("complementary", { name: "Keyboard shortcuts" })
@@ -218,7 +218,7 @@ describe("Dashboard", () => {
   });
 
   it("does not list T or E while typing in a field, where they do not work", async () => {
-    await renderDashboard();
+    await renderProjects();
     const panel = screen.getByRole("complementary", {
       name: "Keyboard shortcuts",
     });
@@ -239,7 +239,7 @@ describe("Dashboard", () => {
   });
 
   it("shows and hides a failed-save message on the open project with M, in development", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     act(() => screen.getByRole("button", { name: "Close" }).focus());
     const note = "Not saved: Abodeo cannot reach your projects right now.";
@@ -251,13 +251,13 @@ describe("Dashboard", () => {
   });
 
   it("shows that there are no projects yet", async () => {
-    await renderDashboard();
+    await renderProjects();
     expect(screen.getByText("No projects added yet.")).toBeTruthy();
   });
 
   it("adds projects as bars, with their notes and assignee saved", async () => {
     savePeople("Andy", "Boris", "Clement");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen", "Tiles\nGrout", "Andy");
     await addProject("Kitchen");
     expect(bars().map((bar) => bar.textContent)).toEqual([
@@ -281,13 +281,13 @@ describe("Dashboard", () => {
   });
 
   it("shows no notes preview for notes of only spaces", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen", "  \n ");
     expect(bars()[0].querySelector(".project-bar-notes")).toBeNull();
   });
 
   it("opens the Add project form in a floating window, with Unassigned chosen", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     const dialog = screen.getByRole("dialog");
     expect(
@@ -297,7 +297,7 @@ describe("Dashboard", () => {
   });
 
   it("does not create a project without a title", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("   ", "Notes");
     expect(screen.getByRole("alert").textContent).toBe(
       "A project needs a title.",
@@ -306,7 +306,7 @@ describe("Dashboard", () => {
   });
 
   it("adds nothing when the form is closed without Create", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Unwanted" } });
     await closeForm();
@@ -318,7 +318,7 @@ describe("Dashboard", () => {
   });
 
   it("adds nothing when Cancel is pressed, in either presentation", async () => {
-    await renderDashboard();
+    await renderProjects();
     for (const presentation of ["window", "in place"]) {
       if (presentation === "in place") pressKey("e");
       fireEvent.click(screen.getByRole("button", { name: "Add project" }));
@@ -335,7 +335,7 @@ describe("Dashboard", () => {
   });
 
   it("lets only a new project's form be used while it is added in place", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
@@ -358,7 +358,7 @@ describe("Dashboard", () => {
   });
 
   it("tells the user when a new project cannot be saved", async () => {
-    await renderDashboard();
+    await renderProjects();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("Full", "QuotaExceededError");
     });
@@ -370,7 +370,7 @@ describe("Dashboard", () => {
 
   it("saves an opened project's changes without a button", async () => {
     savePeople("Andy", "Boris", "Clement");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     fireEvent.change(titleField(), { target: { value: "Bathroom" } });
@@ -386,7 +386,7 @@ describe("Dashboard", () => {
   });
 
   it("opens a project with focus just before the title, not in it", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     const start = document.activeElement as HTMLElement;
@@ -398,7 +398,7 @@ describe("Dashboard", () => {
   });
 
   it("keeps the last valid title when the title is cleared", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     fireEvent.change(titleField(), { target: { value: " " } });
@@ -408,7 +408,7 @@ describe("Dashboard", () => {
   });
 
   it("saves a change made just before the page is left", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     fireEvent.change(notesField(), { target: { value: "Last words" } });
@@ -416,8 +416,8 @@ describe("Dashboard", () => {
     expect(savedProjects()[0].notes).toBe("Last words");
   });
 
-  it("saves a change made just before the dashboard is left within the app", async () => {
-    const { unmount } = await renderDashboard();
+  it("saves a change made just before the Projects screen is left within the app", async () => {
+    const { unmount } = await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     fireEvent.change(notesField(), { target: { value: "Last words" } });
@@ -426,7 +426,7 @@ describe("Dashboard", () => {
   });
 
   it("marks a project whose last changes could not be saved", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
@@ -441,10 +441,10 @@ describe("Dashboard", () => {
     expect(bars()[0].textContent).toMatch(/Last changes not saved/);
   });
 
-  it("shows projects saved in another tab while the dashboard was closed", async () => {
-    const { unmount } = await renderDashboard();
+  it("shows projects saved in another tab while the Projects screen was closed", async () => {
+    const { unmount } = await renderProjects();
     unmount();
-    await renderDashboard();
+    await renderProjects();
     await addProject("Mine");
     const mine = Object.keys(localStorage)[0];
     cleanup();
@@ -452,7 +452,7 @@ describe("Dashboard", () => {
       `${projectKeyPrefix}theirs`,
       localStorage.getItem(mine)!.replace("Mine", "Theirs"),
     );
-    await renderDashboard();
+    await renderProjects();
     expect(bars().map((bar) => bar.textContent)).toEqual([
       "UnassignedMine",
       "UnassignedTheirs",
@@ -462,7 +462,7 @@ describe("Dashboard", () => {
   it("says when saved projects cannot be read, and leaves them alone", async () => {
     localStorage.setItem(`${projectKeyPrefix}bad`, "{damaged");
     refreshProjects();
-    await renderDashboard();
+    await renderProjects();
     expect(screen.getByRole("alert").textContent).toMatch(
       /1 saved project cannot be read/,
     );
@@ -471,7 +471,7 @@ describe("Dashboard", () => {
   });
 
   it("switches between the floating window and in place with E, and remembers it", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     expect(localStorage.getItem("abodeo-project-presentation")).toBe(
@@ -483,14 +483,14 @@ describe("Dashboard", () => {
 
     cleanup();
     forgetPresentation();
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(titleField().closest("li")).toBeTruthy();
   });
 
   it("keeps an unfinished new project open when E switches", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Draft" } });
     const isTyped = fireEvent.keyDown(
@@ -505,7 +505,7 @@ describe("Dashboard", () => {
   });
 
   it("closes a project in place with the arrow below it, without the X or autosave note", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     fireEvent.click(bars()[0]);
@@ -525,7 +525,7 @@ describe("Dashboard", () => {
   });
 
   it("closes a project in place with Esc, from a field or from the arrow", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     fireEvent.click(bars()[0]);
@@ -540,7 +540,7 @@ describe("Dashboard", () => {
   });
 
   it("closes a project in place with Esc when focus is outside the form", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     fireEvent.click(bars()[0]);
@@ -574,7 +574,7 @@ describe("Dashboard", () => {
   it("keeps a project opened while another is squashing open", async () => {
     const finishAnimations = holdAnimations();
     try {
-      await renderDashboard();
+      await renderProjects();
       await addProject("First");
       await addProject("Second");
       pressKey("e");
@@ -598,7 +598,7 @@ describe("Dashboard", () => {
   it("keeps a new project's form as it was while it squashes for another", async () => {
     const finishAnimations = holdAnimations();
     try {
-      await renderDashboard();
+      await renderProjects();
       pressKey("e");
       fireEvent.click(screen.getByRole("button", { name: "Add project" }));
       fireEvent.change(titleField(), { target: { value: "Draft" } });
@@ -621,7 +621,7 @@ describe("Dashboard", () => {
   it("squashes an open project closed, as it was, while the next one opens", async () => {
     const finishAnimations = holdAnimations();
     try {
-      await renderDashboard();
+      await renderProjects();
       await addProject("First");
       await addProject("Second");
       pressKey("e");
@@ -657,7 +657,7 @@ describe("Dashboard", () => {
     ["a new project to the page's end", true, 800, 600, 1500, 600],
     ["a long page's new project only to its top", true, 1000, 600, 3000, 984],
   ])("scrolls %s", async (_, isNew, barTop, height, pageHeight, scrolled) => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     const layout = fakeLayout({ barTop, height, pageHeight });
@@ -672,7 +672,7 @@ describe("Dashboard", () => {
   });
 
   it("scrolls back up to an opened project that moves up as another closes", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     pressKey("e");
     // Scrolled to 700, with the bar opening at 1000 and then moving up to
@@ -710,7 +710,7 @@ describe("Dashboard", () => {
     });
 
     it("keeps an opened project's top in sight as it moves up", async () => {
-      await renderDashboard();
+      await renderProjects();
       await addProject("Kitchen");
       pressKey("e");
       const layout = startExpanding({
@@ -733,7 +733,7 @@ describe("Dashboard", () => {
     });
 
     it("stops following when the page is scrolled by hand", async () => {
-      await renderDashboard();
+      await renderProjects();
       await addProject("Kitchen");
       pressKey("e");
       const layout = startExpanding({
@@ -755,7 +755,7 @@ describe("Dashboard", () => {
     });
 
     it("stops following when a key scrolls the page", async () => {
-      await renderDashboard();
+      await renderProjects();
       await addProject("Kitchen");
       pressKey("e");
       const layout = startExpanding({
@@ -776,7 +776,7 @@ describe("Dashboard", () => {
     });
 
     it("arrives at the centre as the bar finishes expanding", async () => {
-      await renderDashboard();
+      await renderProjects();
       await addProject("Kitchen");
       pressKey("e");
       const layout = startExpanding({
@@ -795,7 +795,7 @@ describe("Dashboard", () => {
   });
 
   it("keeps the X and autosave note in the floating window", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     const dialog = screen.getByRole("dialog");
@@ -804,7 +804,7 @@ describe("Dashboard", () => {
   });
 
   it("types E into a field without switching", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     pressKey("e", titleField());
     pressKey("E", notesField());
@@ -813,13 +813,13 @@ describe("Dashboard", () => {
   });
 
   it("opens the Add project form when arriving from Get Started", async () => {
-    await renderDashboard({ openAddProject: true });
+    await renderProjects({ openAddProject: true });
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(document.activeElement).toBe(titleField());
   });
 });
 
-describe("Dashboard due dates", () => {
+describe("Projects screen: due dates", () => {
   // Today is Saturday 10 October 2026, so the calendar opens at October.
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -836,7 +836,7 @@ describe("Dashboard due dates", () => {
   async function reopenApp() {
     cleanup();
     refreshProjects();
-    await renderDashboard();
+    await renderProjects();
   }
 
   it.each([
@@ -845,7 +845,7 @@ describe("Dashboard due dates", () => {
   ])(
     "adds, changes and clears a due date in %s, keeping it after reopening",
     async (_, isInPlace) => {
-      await renderDashboard();
+      await renderProjects();
       if (isInPlace) pressKey("e");
       fireEvent.click(screen.getByRole("button", { name: "Add project" }));
       fireEvent.change(titleField(), { target: { value: "Kitchen" } });
@@ -896,7 +896,7 @@ describe("Dashboard due dates", () => {
   );
 
   it("keeps the calendar's month and day when E switches presentation", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     const nextMonth = screen.getByRole("button", { name: "Next month" });
@@ -917,7 +917,7 @@ describe("Dashboard due dates", () => {
   });
 
   it("keeps the calendar's day when E follows clearing the due date", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
     fireEvent.click(screen.getByRole("button", { name: "Next month" }));
@@ -939,7 +939,7 @@ describe("Dashboard due dates", () => {
   });
 
   it("creates a project without a due date, showing no icon", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     expect(savedProjects()[0].dueDate).toBeNull();
     expect(icon()).toBeNull();
@@ -956,7 +956,7 @@ describe("Dashboard due dates", () => {
     };
     localStorage.setItem(`${projectKeyPrefix}old`, JSON.stringify(older));
     refreshProjects();
-    await renderDashboard();
+    await renderProjects();
     expect(bars().map((bar) => bar.textContent)).toEqual(["AndyKitchenTiles"]);
     expect(icon()).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -974,7 +974,7 @@ describe("tasks", () => {
     savedProjects()[0].tasks;
 
   async function openKitchen() {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
   }
@@ -996,7 +996,7 @@ describe("tasks", () => {
     screen.getByRole("textbox", { name: "Add tasks, one per line" });
 
   it("typed in the Add project form become the new project's tasks", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Shed" } });
     fireEvent.change(newTasksBox(), {
@@ -1011,13 +1011,13 @@ describe("tasks", () => {
   });
 
   it("create a project with no tasks when the Add project form's box is empty", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Shed");
     expect(savedProjects()[0].tasks).toEqual([]);
   });
 
   it("typed in the Add project form are discarded by Cancel", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(newTasksBox(), { target: { value: "Paint" } });
     await act(async () => {
@@ -1052,7 +1052,7 @@ describe("tasks", () => {
       ["**Grout**", true],
       ["Seal", false],
     ]);
-    // Counted on the dashboard's bar.
+    // Counted on the Projects screen's bar.
     await closeForm();
     expect(bars()[0].textContent).toBe("UnassignedKitchen3 tasks, 1 completed");
     expect(bars()[0].getAttribute("aria-label")).toBe(
@@ -1060,7 +1060,7 @@ describe("tasks", () => {
     );
     cleanup();
     refreshProjects();
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(bars()[0]);
     expect(taskTitles()).toEqual(["Tiles", "**Grout**", "Seal"]);
   });
@@ -1114,14 +1114,14 @@ describe("tasks", () => {
     expect(savedTasks()).toEqual([]);
   });
 
-  it("drops unsubmitted text when the dashboard is left for another screen", async () => {
+  it("drops unsubmitted text when the Projects screen is left for another screen", async () => {
     const Stub = createRoutesStub(
       withAppLayout([
-        { path: "/dashboard", Component: Dashboard },
+        { path: "/projects", Component: Projects },
         { path: "/people", Component: () => <p>People screen</p> },
       ]),
     );
-    render(<Stub initialEntries={["/dashboard"]} />);
+    render(<Stub initialEntries={["/projects"]} />);
     await act(async () => {});
     await addProject("Kitchen");
     fireEvent.click(bars()[0]);
@@ -1304,7 +1304,7 @@ describe("tasks", () => {
   });
 });
 
-describe("Dashboard people (AD #61)", () => {
+describe("Projects screen: people (AD #61)", () => {
   const assigneeLabels = () =>
     [
       ...screen
@@ -1313,14 +1313,14 @@ describe("Dashboard people (AD #61)", () => {
     ].map((label) => label.textContent);
 
   it("offers only Unassigned, and a box to add someone, in a new browser", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     expect(assigneeLabels()).toEqual(["Unassigned"]);
   });
 
   it("offers the people in the list", async () => {
     savePeople("Dora", "Eli");
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     expect(assigneeLabels()).toEqual(["Unassigned", "Dora", "Eli"]);
   });
@@ -1340,14 +1340,14 @@ describe("Dashboard people (AD #61)", () => {
       }),
     );
     refreshProjects();
-    await renderDashboard();
+    await renderProjects();
     expect(bars().map((bar) => bar.textContent)).toEqual(["BorisOld shed"]);
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     expect(assigneeLabels()).toEqual(["Unassigned", "Boris"]);
   });
 
   it("adds a person from a new project's form and creates the project assigned to them", async () => {
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(titleField(), { target: { value: "Shed" } });
     fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
@@ -1373,7 +1373,7 @@ describe("Dashboard people (AD #61)", () => {
   });
 
   it("adds a person from an open project's form, saving the assignment", async () => {
-    await renderDashboard();
+    await renderProjects();
     await addProject("Shed");
     fireEvent.click(bars()[0]);
     fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
@@ -1390,7 +1390,7 @@ describe("Dashboard people (AD #61)", () => {
 
   it("shows why a name is refused, and adds no one", async () => {
     savePeople("Dora");
-    await renderDashboard();
+    await renderProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Add a person" }), {
       target: { value: "dora" },
@@ -1408,7 +1408,7 @@ describe("Dashboard people (AD #61)", () => {
 
   it("shows a renamed person's new name on the project", async () => {
     savePeople("Dora");
-    await renderDashboard();
+    await renderProjects();
     await addProject("Shed", "", "Dora");
     expect(bars().map((bar) => bar.textContent)).toEqual(["DoraShed"]);
     savePeople("Dorothy");
@@ -1425,11 +1425,11 @@ describe("Dashboard people (AD #61)", () => {
   it("goes to the People screen from the application menu, saving the open project first", async () => {
     const Stub = createRoutesStub(
       withAppLayout([
-        { path: "/dashboard", Component: Dashboard },
+        { path: "/projects", Component: Projects },
         { path: "/people", Component: () => <p>People screen</p> },
       ]),
     );
-    render(<Stub initialEntries={["/dashboard"]} />);
+    render(<Stub initialEntries={["/projects"]} />);
     await act(async () => {});
     await addProject("Shed");
     fireEvent.click(bars()[0]);
@@ -1443,7 +1443,7 @@ describe("Dashboard people (AD #61)", () => {
   });
 
   it("always shows the application menu links, with Projects as the current screen", async () => {
-    await renderDashboard();
+    await renderProjects();
     expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
     expect(
       screen
@@ -1454,7 +1454,7 @@ describe("Dashboard people (AD #61)", () => {
   });
 });
 
-describe("Dashboard deleting (AD #62)", () => {
+describe("Projects screen: deleting (AD #62)", () => {
   async function openDeleteWindow(title: string) {
     await addProject(title);
     await act(async () => {
@@ -1467,7 +1467,7 @@ describe("Dashboard deleting (AD #62)", () => {
   }
 
   it("asks first, saying there is no Bin when signed out, and leaves the project if cancelled", async () => {
-    await renderDashboard();
+    await renderProjects();
     const dialog = await openDeleteWindow("Kitchen");
     expect(within(dialog).getByText(/there is no Bin/)).toBeTruthy();
     expect(document.activeElement).toBe(
@@ -1484,7 +1484,7 @@ describe("Dashboard deleting (AD #62)", () => {
   });
 
   it("removes the project for good on confirming, and closes it", async () => {
-    await renderDashboard();
+    await renderProjects();
     const dialog = await openDeleteWindow("Kitchen");
     await act(async () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
@@ -1497,7 +1497,7 @@ describe("Dashboard deleting (AD #62)", () => {
   });
 
   it("has no link to the Bin while signed out", async () => {
-    await renderDashboard();
+    await renderProjects();
     expect(screen.queryByRole("link", { name: "Bin" })).toBeNull();
   });
 });

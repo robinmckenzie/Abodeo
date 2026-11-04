@@ -1,4 +1,4 @@
-// A project's due date on the dashboard, as a spiral-bound calendar page,
+// A project's due date on the Projects screen, as a spiral-bound calendar page,
 // after Robin's reference: the full weekday above a large date number, and a
 // strip in the month's own colour with its name. Screen readers hear the date
 // in the bar's name instead.

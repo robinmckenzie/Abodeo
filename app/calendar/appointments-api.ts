@@ -18,7 +18,7 @@ export const appointmentProjectProperty = "abodeoProject";
 export const maxTitleLength = 200;
 export const maxNotesLength = 5000;
 
-// The dashboard's address when Google returns the browser to a project:
+// The Projects screen's address when Google returns the browser to a project:
 // ?project=<id>, and &appointment=new to open the new appointment form.
 export const returnProjectParameter = "project";
 export const returnAppointmentParameter = "appointment";
@@ -181,7 +181,7 @@ export function describeAppointmentProblem(problem: AppointmentProblem) {
   }
 }
 
-// Where Google returns the browser: the dashboard, at the project.
+// Where Google returns the browser: the Projects screen, at the project.
 export function buildProjectReturnSearch(target: AppointmentReturnTarget) {
   const parameters = new URLSearchParams({
     [returnProjectParameter]: target.projectId,
@@ -199,7 +199,7 @@ export type ProjectReturn = {
   result: CalendarResult | undefined;
 };
 
-// Where Google returned the browser to, from the dashboard's address, or
+// Where Google returned the browser to, from the Projects screen's address, or
 // undefined if it did not return to a project.
 export function readProjectReturn(search: string): ProjectReturn | undefined {
   const parameters = new URLSearchParams(search);

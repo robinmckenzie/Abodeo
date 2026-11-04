@@ -5,7 +5,7 @@ export const calendarBasePath = "/api/calendar";
 export const calendarTestAppointmentPath = `${calendarBasePath}/test-appointment`;
 export const calendarCallbackPath = `${calendarBasePath}/callback`;
 
-// Google returns the browser to the dashboard with ?calendar=<result>.
+// Google returns the browser to the Projects screen with ?calendar=<result>.
 export const calendarResultParameter = "calendar";
 
 export const calendarResults = [

@@ -8,7 +8,7 @@ import {
 import { createRoutesStub, useNavigationType } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import Dashboard from "./dashboard";
+import Projects from "./projects";
 import Home from "./home";
 import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshProjects } from "../projects/use-projects";
@@ -24,15 +24,15 @@ beforeAll(() => {
   };
 });
 
-function renderHome(path = "/", DashboardScreen = Dashboard) {
+function renderHome(path = "/", ProjectsScreen = Projects) {
   const Stub = createRoutesStub([
     { path: "/", Component: Home },
-    ...withAppLayout([{ path: "/dashboard", Component: DashboardScreen }]),
+    ...withAppLayout([{ path: "/projects", Component: ProjectsScreen }]),
   ]);
   render(<Stub initialEntries={[path]} />);
 }
 
-// Shows how the dashboard was reached.
+// Shows how the Projects screen was reached.
 function NavigationProbe() {
   return <p>Arrived by {useNavigationType()}</p>;
 }
@@ -86,10 +86,10 @@ describe("Home", () => {
     expect(document.querySelector(".fade-tuning-panel")).toBeNull();
   });
 
-  it("shows a Get Started button that goes to the dashboard", () => {
+  it("shows a Get Started button that goes to the Projects screen", () => {
     renderHome();
     const button = screen.getByRole("link", { name: "Get Started" });
-    expect(button.getAttribute("href")).toBe("/dashboard");
+    expect(button.getAttribute("href")).toBe("/projects");
   });
 
   it("opens the Add project form on Get Started, without saving anything", async () => {
@@ -108,7 +108,7 @@ describe("Home", () => {
     );
   });
 
-  it("moves a returning visitor on to the dashboard after the logo's hold", async () => {
+  it("moves a returning visitor on to the Projects screen after the logo's hold", async () => {
     vi.useFakeTimers();
     saveProject();
     renderHome("/", NavigationProbe);

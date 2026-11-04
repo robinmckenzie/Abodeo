@@ -9,7 +9,7 @@ export function chooseDisplayName(
   return preferredName ?? (googleName.trim() || "your Google account");
 }
 
-// Better Auth returns to the dashboard with ?error= when sign-in did not
+// Better Auth returns to the Projects screen with ?error= when sign-in did not
 // complete, such as when it was cancelled at Google.
 export function hasSignInError(search: string) {
   return new URLSearchParams(search).has("error");

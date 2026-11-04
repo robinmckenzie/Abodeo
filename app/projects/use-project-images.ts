@@ -79,7 +79,8 @@ type Session = {
 export type ImagesOptions = {
   accountId: string;
   projectId: string;
-  // A failure that means the sign-in has changed, for the dashboard to check.
+  // A failure that means the sign-in has changed, for the Projects screen to
+  // check.
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, for the floating messages.
   onMessage?: (text: string) => void;
