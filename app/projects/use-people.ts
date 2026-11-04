@@ -130,9 +130,9 @@ type AccountState = {
 
 const loadingView: PeopleView = { status: "loading" };
 
-// isEstablishDue is true once the offer to move the browser's projects into
-// the account is settled, so that an account's list can be saved without
-// getting in the way of the move.
+// isEstablishDue is true once the browser has no projects left to move into
+// the account, so that an account's list can be saved without getting in the
+// way of the move.
 export function usePeople(
   account: AccountView,
   {

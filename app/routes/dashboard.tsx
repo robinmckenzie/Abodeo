@@ -66,10 +66,7 @@ import { isReconnectBlockedBy } from "../calendar/use-project-appointments";
 import { ProjectWindow } from "../projects/project-window";
 import {
   createProject,
-  declineMove,
   deleteStoredProject,
-  forgetDeclinedMove,
-  isMoveDeclined,
   listOwnProjects,
   removeAccountHint,
   removeProjectsIfUnchanged,
@@ -345,9 +342,7 @@ export default function Dashboard() {
     onBeforeLeave: prepareToLeave,
     onLeaving: () => {
       isLeavingRef.current = true;
-      // The offer to move projects returns at the next sign-in, and the
-      // account's hint no longer applies.
-      forgetDeclinedMove();
+      // The account's hint no longer applies.
       removeAccountHint();
     },
   });
@@ -890,35 +885,40 @@ export default function Dashboard() {
     open.id !== null &&
     !list.some((project) => project.id === open.id);
 
-  // Signed in, the browser's own projects, if any, are offered to be moved
-  // into the account once its projects have loaded, unless declined.
-  const offerKey =
+  // Signed in, the browser's own projects, if any, move into the account by
+  // themselves once its projects have loaded (AD #68). A failed move leaves
+  // them in the browser, to be tried again on asking or at the next sign-in.
+  const moveKey =
     view.kind === "account" && view.state === "ready"
       ? `${view.accountId}:${view.generation}`
       : null;
-  const [moveOffer, setMoveOffer] = useState<{
+  const [move, setMove] = useState<{
     key: string;
     projects: Project[];
-    status: "offered" | "moving" | "failed";
+    status: "none" | "moving" | "moved" | "failed" | "dismissed";
+    movedCount: number;
   } | null>(null);
-  if (offerKey && moveOffer?.key !== offerKey && view.kind === "account") {
-    setMoveOffer({
-      key: offerKey,
-      projects: isMoveDeclined(view.accountId) ? [] : listOwnProjects(),
-      status: "offered",
+  if (moveKey && move?.key !== moveKey) {
+    const projects = listOwnProjects();
+    setMove({
+      key: moveKey,
+      projects,
+      status: projects.length > 0 ? "moving" : "none",
+      movedCount: 0,
     });
   }
-  const offeredCount =
-    offerKey && moveOffer?.key === offerKey ? moveOffer.projects.length : 0;
+  const currentMove = moveKey && move?.key === moveKey ? move : null;
 
   // The people the projects can be assigned to. An account's list is saved
-  // once the offer to move the browser's projects and people in is settled.
+  // once the browser has no projects left to move in with its people.
   const people = usePeople(account.view, {
+    // Not while the browser still has projects to move in, even once a failed
+    // move's notice is dismissed: their people would no longer match.
     isEstablishDue:
-      offerKey !== null &&
-      moveOffer?.key === offerKey &&
-      moveOffer.projects.length === 0 &&
-      moveOffer.status !== "moving",
+      currentMove !== null &&
+      currentMove.status !== "moving" &&
+      currentMove.status !== "failed" &&
+      listOwnProjects().length === 0,
     onAccountFailure: noteAccountFailure,
   });
   useEffect(() => {
@@ -926,18 +926,18 @@ export default function Dashboard() {
   });
   const readyPeople = people.view.status === "ready" ? people.view : null;
 
-  const moveProjects = async () => {
-    if (view.kind !== "account" || !moveOffer) return;
-    const { key, projects } = moveOffer;
-    setMoveOffer({ ...moveOffer, status: "moving" });
+  const moveProjects = async (key: string, projects: Project[]) => {
+    if (view.kind !== "account") return;
+    const settleMove = (status: "moved" | "failed", movedCount = 0) =>
+      setMove((current) =>
+        current?.key === key ? { ...current, status, movedCount } : current,
+      );
     // The browser's people go with its projects.
     const stored = readStoredPeople();
     // A damaged list stops the move, so that no one loses who they were
     // assigned to and the browser's copies are kept.
     if (stored.state === "unreadable" || stored.state === "unavailable") {
-      setMoveOffer((current) =>
-        current?.key === key ? { ...current, status: "failed" } : current,
-      );
+      settleMove("failed");
       return;
     }
     const result = await whileSending(
@@ -949,30 +949,47 @@ export default function Dashboard() {
     );
     if (!result.ok) {
       noteAccountFailure(result.reason);
-      setMoveOffer((current) =>
-        current?.key === key ? { ...current, status: "failed" } : current,
-      );
+      settleMove("failed");
       return;
     }
     // Only those the account now has, each only if not changed here since.
-    removeProjectsIfUnchanged(
-      projects.filter(({ id }) => result.outcomes[id] !== undefined),
+    const moved = projects.filter(
+      ({ id }) => result.outcomes[id] !== undefined,
     );
+    removeProjectsIfUnchanged(moved);
     // With none of its own projects left, the browser's list has gone too.
     if (listOwnProjects().length === 0) removeStoredPeople();
     refreshProjects();
-    setMoveOffer((current) =>
-      current?.key === key ? { ...current, projects: [] } : current,
-    );
+    settleMove("moved", moved.length);
     source.reload();
     people.reload();
   };
 
-  const declineMoveOffer = () => {
-    if (view.kind !== "account" || !moveOffer) return;
-    declineMove(view.accountId);
-    setMoveOffer({ ...moveOffer, projects: [] });
+  // Starts each move once, even where development runs effects twice.
+  const startedMoveRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentMove?.status !== "moving") return;
+    if (startedMoveRef.current === currentMove.key) return;
+    startedMoveRef.current = currentMove.key;
+    void moveProjects(currentMove.key, currentMove.projects);
+  });
+
+  const retryMove = () => {
+    if (!currentMove || currentMove.status !== "failed") return;
+    // What is in the browser now, in case it changed since.
+    const projects = listOwnProjects();
+    startedMoveRef.current = null;
+    setMove({
+      ...currentMove,
+      projects,
+      status: projects.length > 0 ? "moving" : "none",
+    });
   };
+
+  const dismissMoveNotice = () =>
+    setMove((current) =>
+      current?.key === moveKey ? { ...current, status: "dismissed" } : current,
+    );
 
   // In place, the expanded bar closes the form its own way, squashing. Esc
   // and its keycap in the shortcuts panel both close it this way.
@@ -1190,30 +1207,49 @@ export default function Dashboard() {
             Your projects cannot be loaded right now. Please try again later.
           </p>
         )}
-        {offeredCount > 0 && moveOffer && (
-          <div className="dashboard-notice dashboard-move-offer" role="status">
+        {currentMove?.status === "moving" && (
+          <p className="dashboard-notice dashboard-move-notice" role="status">
+            {currentMove.projects.length === 1
+              ? "Moving the project saved in this browser into your account…"
+              : `Moving the ${currentMove.projects.length} projects saved in this browser into your account…`}
+          </p>
+        )}
+        {currentMove?.status === "moved" && (
+          <div className="dashboard-notice dashboard-move-notice" role="status">
             <p>
-              {offeredCount === 1
-                ? "This browser has 1 project saved while signed out. Move it into your account?"
-                : `This browser has ${offeredCount} projects saved while signed out. Move them into your account?`}
-              {moveOffer.status === "failed" &&
-                " They could not be moved just now. Please try again."}
+              {currentMove.movedCount === 1
+                ? "1 project from this browser was moved into your account."
+                : `${currentMove.movedCount} projects from this browser were moved into your account.`}
             </p>
             <button
               type="button"
               className="button-secondary button-small"
-              disabled={moveOffer.status === "moving"}
-              onClick={moveProjects}
+              onClick={dismissMoveNotice}
             >
-              Move
+              Dismiss
+            </button>
+          </div>
+        )}
+        {currentMove?.status === "failed" && (
+          <div className="dashboard-notice dashboard-move-notice" role="alert">
+            <p>
+              {currentMove.projects.length === 1
+                ? "The project saved in this browser could not be moved into your account just now. It is kept here, and will be moved when you try again or next come back."
+                : `The ${currentMove.projects.length} projects saved in this browser could not be moved into your account just now. They are kept here, and will be moved when you try again or next come back.`}
+            </p>
+            <button
+              type="button"
+              className="button-secondary button-small"
+              onClick={retryMove}
+            >
+              Try again
             </button>
             <button
               type="button"
               className="button-secondary button-small"
-              disabled={moveOffer.status === "moving"}
-              onClick={declineMoveOffer}
+              onClick={dismissMoveNotice}
             >
-              Not now
+              Dismiss
             </button>
           </div>
         )}
@@ -1280,9 +1316,14 @@ export default function Dashboard() {
             ),
           ]}
         </ul>
-        {isShowingList && list.length === 0 && unreadableCount === 0 && (
-          <p className="dashboard-empty">No projects added yet.</p>
-        )}
+        {isShowingList &&
+          list.length === 0 &&
+          unreadableCount === 0 &&
+          // Not while moved projects are on their way into the list.
+          currentMove?.status !== "moving" &&
+          currentMove?.status !== "moved" && (
+            <p className="dashboard-empty">No projects added yet.</p>
+          )}
         {!isInPlace && open && (
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
