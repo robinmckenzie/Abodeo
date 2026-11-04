@@ -137,9 +137,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
       alerts: readVisitAlertSettings(process.env),
     },
     projects,
-    people: createPeopleStore(pool, {
-      prepare: (userId) => projects.receiveDefaults(userId),
-    }),
+    people: createPeopleStore(pool),
     images: createImageStore(pool),
     calendar: {
       secret: config.secret,

@@ -35,7 +35,7 @@ export function buildPermanentDeletePath(id: string) {
   return `${buildProjectPath(id)}/permanent`;
 }
 
-// A project id made by the browser, or a default project's.
+// A project id made by the browser.
 export function isProjectId(value: unknown): value is string {
   return typeof value === "string" && /^[\w-]{1,100}$/.test(value);
 }
@@ -43,8 +43,6 @@ export function isProjectId(value: unknown): value is string {
 export type ProjectListResponse = {
   projects: Project[];
   unreadableCount: number;
-  // The account's default projects, so that the browser can tell its own.
-  defaultIds: string[];
   // The newest image of each project that has any, by project id, for its
   // bar's thumbnail (AD #48 Add Images To Projects).
   latestImageIds: Record<string, string>;

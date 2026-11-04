@@ -160,24 +160,6 @@ describe("Dashboard", () => {
     );
   });
 
-  it("hides the Development panel unless VITE_SHOW_DEVELOPMENT_PANEL is true", async () => {
-    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "false");
-    await renderDashboard();
-    expect(
-      screen.queryByRole("region", { name: "Default projects" }),
-    ).toBeNull();
-    cleanup();
-    vi.stubEnv("VITE_SHOW_DEVELOPMENT_PANEL", "true");
-    try {
-      await renderDashboard();
-      expect(
-        screen.getByRole("region", { name: "Default projects" }),
-      ).toBeTruthy();
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
   it("lists its keyboard shortcuts, with Esc only while a project is open", async () => {
     await renderDashboard();
     const panel = screen.getByRole("complementary", {
@@ -1139,6 +1121,34 @@ describe("tasks", () => {
     expect(savedTasks()).toEqual([]);
   });
 
+  it("drops unsubmitted text when the dashboard is left for another screen", async () => {
+    const Stub = createRoutesStub(
+      withAppLayout([
+        { path: "/dashboard", Component: Dashboard },
+        { path: "/people", Component: () => <p>People screen</p> },
+      ]),
+    );
+    render(<Stub initialEntries={["/dashboard"]} />);
+    await act(async () => {});
+    await addProject("Kitchen");
+    fireEvent.click(bars()[0]);
+    fireEvent.change(entryBox(), { target: { value: "Half typed" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("link", { name: "People" }));
+    });
+    await act(async () => {});
+    expect(confirm.mock.calls[0][0]).toMatch(/tasks typed but not yet added/);
+    expect(screen.getByText("People screen")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("link", { name: "Projects" }));
+    });
+    await act(async () => {});
+    fireEvent.click(bars()[0]);
+    expect(entryBox()).toHaveProperty("value", "");
+  });
+
   it("edits a title with Enter, trimmed, and cancels with Escape without closing", async () => {
     await openKitchen();
     await enterTasks("Tiles");
@@ -1530,9 +1540,6 @@ describe("Dashboard people (AD #61)", () => {
     await addProject("Shed");
     fireEvent.click(bars()[0]);
     fireEvent.change(titleField(), { target: { value: "Shed, painted" } });
-    // Earlier tests can leave typed tasks behind, which the check before
-    // leaving asks about.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await act(async () => {
       fireEvent.click(screen.getByRole("link", { name: "People" }));
     });

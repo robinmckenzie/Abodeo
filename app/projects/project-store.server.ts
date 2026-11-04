@@ -1,17 +1,10 @@
-// A signed-in account's projects, in the project and
-// project_defaults_received tables of db/account-tables.sql (AD #41 Access
-// Projects Across Devices). Every query is limited to the account it is
-// given, which only the handler decides, from the sign-in. Each row holds a
-// project's saved form, as the browser keeps it, so the same rules apply: a
-// project this version cannot read is never overwritten or removed.
+// A signed-in account's projects, in the project table of
+// db/account-tables.sql (AD #41 Access Projects Across Devices). Every query
+// is limited to the account it is given, which only the handler decides, from
+// the sign-in. Each row holds a project's saved form, as the browser keeps
+// it, so the same rules apply: a project this version cannot read is never
+// overwritten or removed.
 import type { Queryable } from "../account/account-profile.server";
-import {
-  bundledDefaultProjects,
-  hashText,
-  planDefaultsReceipt,
-  type DefaultProjects,
-  type DefaultsRecord,
-} from "./default-projects";
 import {
   findUnassignChanges,
   isKnownAssignee,
@@ -44,11 +37,7 @@ import {
   type ImportOutcome,
   type ProjectListResponse,
 } from "./projects-api";
-import {
-  inTransaction,
-  transactionTimeout,
-  type TransactionalDatabase,
-} from "./transaction.server";
+import { inTransaction, type TransactionalDatabase } from "./transaction.server";
 
 export type { TransactionalDatabase };
 
@@ -73,9 +62,6 @@ export type SaveOutcome =
 export type RemoveOutcome = { kind: "done" } | { kind: "not-found" };
 
 export type ProjectStore = {
-  // Brings the account's default projects up to date, if they have changed.
-  receiveDefaults(userId: string): Promise<unknown>;
-  // Receives the default projects first, if they have changed.
   list(userId: string): Promise<ProjectListResponse>;
   read(userId: string, id: string): Promise<ReadOutcome>;
   // A retry with the same id gives the project already made.
@@ -124,18 +110,28 @@ function toStoredData(project: Project) {
   return JSON.parse(serialiseProject(project));
 }
 
-function readRecord(row: Record<string, unknown> | undefined) {
-  if (!row || typeof row.hash !== "string" || !Array.isArray(row.ids)) {
-    return null;
-  }
-  const ids = row.ids.filter((id): id is string => typeof id === "string");
-  return { hash: row.hash, ids } satisfies DefaultsRecord;
-}
-
 // A copy's id comes from the original's and the copy sent, so that sending
 // the same copy again finds the copy already made.
 export function buildCopyId(project: Project) {
   return `${project.id.slice(0, 60)}-copy-${hashText(serialiseProject(project))}`;
+}
+
+// cyrb53, a fast 53-bit string hash. It only needs to tell one copy of a
+// project from another, not to be secure. Copies already made carry it in
+// their ids, so it must not change.
+function hashText(text: string) {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 // Whether two copies of a project differ only in who the project and its
@@ -168,19 +164,14 @@ function listChosenPeople(fields: Partial<ProjectFields>) {
 
 export function createProjectStore(
   database: TransactionalDatabase,
-  {
-    defaults = bundledDefaultProjects,
-    now = () => new Date().toISOString(),
-  }: {
-    defaults?: DefaultProjects | null;
-    now?: () => string;
-  } = {},
+  { now = () => new Date().toISOString() }: { now?: () => string } = {},
 ): ProjectStore {
+  // Leaves any project already under the same id as it is, and gives the ids
+  // of those inserted.
   const insertMany = async (
     query: Queryable,
     userId: string,
     projects: Project[],
-    { overwrite }: { overwrite: boolean },
   ) => {
     if (projects.length === 0) return new Set<string>();
     const entries = projects.map((project) => ({
@@ -191,33 +182,11 @@ export function createProjectStore(
       `insert into project (user_id, id, data)
        select $1, entry->>'id', entry->'data'
        from jsonb_array_elements($2::jsonb) as entry
-       on conflict (user_id, id) do ${
-         overwrite
-           ? "update set data = excluded.data, revision = project.revision + 1 where project.deleted_at is null"
-           : "nothing"
-       }
+       on conflict (user_id, id) do nothing
        returning id`,
       [userId, JSON.stringify(entries)],
     );
     return new Set(rows.map((row) => String(row.id)));
-  };
-
-  // A project already saved with someone who is not in the list is kept as
-  // it is, but a write never newly names them: that is dropped to Unassigned.
-  const dropUnknownAssignees = async (
-    query: Queryable,
-    userId: string,
-    projects: Project[],
-  ) => {
-    if (projects.every(({ assignee }) => assignee === unassignedId)) {
-      return projects;
-    }
-    const people = await readAccountPeople(query, userId);
-    return projects.map((project) =>
-      isKnownAssignee(people, project.assignee)
-        ? project
-        : { ...project, assignee: unassignedId },
-    );
   };
 
   const readRows = async (query: Queryable, userId: string, ids: string[]) => {
@@ -228,81 +197,6 @@ export function createProjectStore(
       [userId, JSON.stringify(ids)],
     );
     return new Map(rows.map((row) => [String(row.id), row.data]));
-  };
-
-  // Brings the account's default projects up to date, as each browser does
-  // for itself. Two devices loading at once cannot both apply them, as the
-  // record's row is locked until the transaction ends.
-  const receiveDefaults = async (userId: string) => {
-    const { rows } = await database.query(
-      "select hash, ids from project_defaults_received where user_id = $1",
-      [userId],
-    );
-    if (!planDefaultsReceipt(readRecord(rows[0]), defaults, () => false)) {
-      return readRecord(rows[0]);
-    }
-    const client = await database.connect();
-    try {
-      await client.query("begin", []);
-      await client.query(
-        `set local statement_timeout = '${transactionTimeout}'`,
-        [],
-      );
-      await client.query(
-        `set local lock_timeout = '${transactionTimeout}'`,
-        [],
-      );
-      await client.query(
-        `insert into project_defaults_received (user_id, hash, ids)
-         values ($1, '', '[]'::jsonb) on conflict (user_id) do nothing`,
-        [userId],
-      );
-      const locked = await client.query(
-        `select hash, ids from project_defaults_received
-         where user_id = $1 for update`,
-        [userId],
-      );
-      const lockedRecord = readRecord(locked.rows[0]);
-      // An empty hash is the row just made, standing for none received.
-      const record = lockedRecord?.hash === "" ? null : lockedRecord;
-      const candidates = [
-        ...(defaults?.projects.map(({ id }) => id) ?? []),
-        ...(record?.ids ?? []),
-      ];
-      const stored = await readRows(client, userId, candidates);
-      const receipt = planDefaultsReceipt(
-        record,
-        defaults,
-        (id) => stored.has(id) && !readStoredProject(id, stored.get(id)),
-      );
-      if (receipt) {
-        await insertMany(
-          client,
-          userId,
-          await dropUnknownAssignees(client, userId, receipt.write),
-          { overwrite: true },
-        );
-        if (receipt.remove.length > 0) {
-          await client.query(
-            `delete from project where user_id = $1
-             and id in (select jsonb_array_elements_text($2::jsonb))`,
-            [userId, JSON.stringify(receipt.remove)],
-          );
-        }
-        await client.query(
-          `update project_defaults_received set hash = $2, ids = $3::jsonb
-           where user_id = $1`,
-          [userId, receipt.record.hash, JSON.stringify(receipt.record.ids)],
-        );
-      }
-      await client.query("commit", []);
-      return receipt?.record ?? record;
-    } catch (error) {
-      await client.query("rollback", []).catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
   };
 
   const read = async (
@@ -320,11 +214,8 @@ export function createProjectStore(
   };
 
   return {
-    receiveDefaults,
-
     async list(userId) {
       await purgeExpired(userId);
-      const record = await receiveDefaults(userId);
       const { rows } = await database.query(
         "select id, data from project where user_id = $1 and deleted_at is null",
         [userId],
@@ -358,7 +249,6 @@ export function createProjectStore(
       return {
         projects: sortProjectsByDueDate(projects),
         unreadableCount,
-        defaultIds: record?.ids ?? [],
         latestImageIds,
         imageCounts: await readImageCounts(userId, false),
       };
@@ -376,9 +266,7 @@ export function createProjectStore(
         updatedAt: time,
       };
       const insert = async (query: Queryable): Promise<ReadOutcome> => {
-        const inserted = await insertMany(query, userId, [project], {
-          overwrite: false,
-        });
+        const inserted = await insertMany(query, userId, [project]);
         return inserted.has(id)
           ? { kind: "found", project }
           : read(userId, id, query);
@@ -460,7 +348,6 @@ export function createProjectStore(
           client,
           userId,
           projects.map(withAssignee),
-          { overwrite: false },
         );
         const rest = projects.filter(({ id }) => !moved.has(id));
         moved.forEach((id) => (outcomes[id] = "moved"));
@@ -484,9 +371,7 @@ export function createProjectStore(
             });
           }
         }
-        const copied = await insertMany(client, userId, copies, {
-          overwrite: false,
-        });
+        const copied = await insertMany(client, userId, copies);
         for (const copy of copies) {
           const originalId = rest.find(
             (project) => buildCopyId(project) === copy.id,

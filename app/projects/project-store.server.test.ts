@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { readDefaultProjects, type DefaultProjects } from "./default-projects";
 import { buildCopyId, createProjectStore } from "./project-store.server";
 import { binPeriodMs } from "./projects-api";
 import { createFakeDatabase } from "./test-database.server";
@@ -29,18 +28,12 @@ const task = (id: string, assignee = "unassigned") => ({
   assignee,
 });
 
-function makeDefaults(projects: Project[]): DefaultProjects {
-  return readDefaultProjects({
-    projects: projects.map((value) => ({ id: value.id, ...savedForm(value) })),
-  })!;
-}
-
 const now = () => "2026-10-22T00:00:00.000Z";
 
 describe("the project store", () => {
   it("only ever reads and changes rows of the account it is given", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     await store.create("ada", "p1", project("p1", "Ada's"));
     await store.create("bob", "p1", project("p1", "Bob's"));
 
@@ -60,9 +53,36 @@ describe("the project store", () => {
     }
   });
 
+  it("creates, edits and lists an account's projects, reading no other table", async () => {
+    const fake = createFakeDatabase();
+    const store = createProjectStore(fake.database, { now });
+    await store.create("ada", "p1", project("p1", "Shed"));
+    expect(
+      await store.saveChanges("ada", "p1", { notes: "" }, { notes: "Paint" }),
+    ).toMatchObject({ kind: "saved" });
+
+    const count = fake.statements.length;
+    const listed = await store.list("ada");
+
+    expect(listed.projects.map((p) => [p.id, p.title, p.notes])).toEqual([
+      ["p1", "Shed", "Paint"],
+    ]);
+    expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
+      "delete from project where user_id = $1 and deleted_at <= $2::timestamptz",
+      "select id, data from project where user_id = $1 and deleted_at is null",
+      "select distinct on (project_id) project_id, id from project_image where user_id = $1 and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
+      "select i.project_id, count(*) as count from project_image i join project p on p.user_id = i.user_id and p.id = i.project_id where i.user_id = $1 and (p.deleted_at is not null) = $2 group by i.project_id",
+    ]);
+    expect(fake.released()).toBe(0);
+  });
+
+  it("keeps the ids given to copies, so that a copy sent again is found", () => {
+    expect(buildCopyId(project("p1", "Shed"))).toBe("p1-copy-tgj7n3jayt");
+  });
+
   it("gives the project already made when a create is sent again", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     await store.create("ada", "p1", project("p1", "First"));
     const again = await store.create("ada", "p1", project("p1", "Second"));
     expect(again).toMatchObject({ kind: "found", project: { title: "First" } });
@@ -71,7 +91,7 @@ describe("the project store", () => {
 
   it("refuses a field changed since the save's base, giving the saved project", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     await store.create("ada", "p1", project("p1", "Paint"));
     await store.saveChanges(
       "ada",
@@ -96,7 +116,7 @@ describe("the project store", () => {
 
   it("keeps a field changed elsewhere when saving another", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     await store.create("ada", "p1", project("p1", "Paint"));
     await store.saveChanges(
       "ada",
@@ -120,7 +140,7 @@ describe("the project store", () => {
 
   it("reads again when another save lands between its read and its write", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     await store.create("ada", "p1", project("p1", "Paint"));
     fake.setBeforeUpdate(() => {
       const row = fake.projects[0];
@@ -142,7 +162,7 @@ describe("the project store", () => {
 
   it("never overwrites a project this version cannot read", async () => {
     const fake = createFakeDatabase();
-    const store = createProjectStore(fake.database, { defaults: null, now });
+    const store = createProjectStore(fake.database, { now });
     fake.projects.push({
       user_id: "ada",
       id: "p1",
@@ -163,7 +183,7 @@ describe("the project store", () => {
   describe("moving a browser's projects in", () => {
     it("moves each project once, however often it is sent", async () => {
       const fake = createFakeDatabase();
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       const sent = [project("p1", "Shed"), project("p2", "Fence")];
 
       expect(await store.importProjects("ada", sent)).toEqual({
@@ -179,7 +199,7 @@ describe("the project store", () => {
 
     it("adds a copy when the account's project differs, and only one copy", async () => {
       const fake = createFakeDatabase();
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       await store.importProjects("ada", [project("p1", "Shed")]);
       const changed = project("p1", "Shed, painted");
 
@@ -224,98 +244,6 @@ describe("the project store", () => {
     });
   });
 
-  describe("default projects", () => {
-    it("are received once, and not again while they are unchanged", async () => {
-      const fake = createFakeDatabase();
-      const defaults = makeDefaults([project("d1", "Welcome")]);
-      const store = createProjectStore(fake.database, { defaults, now });
-
-      const first = await store.list("ada");
-      expect(first.projects.map((p) => p.id)).toEqual(["d1"]);
-      expect(first.defaultIds).toEqual(["d1"]);
-      expect(fake.released()).toBe(1);
-
-      const count = fake.statements.length;
-      await store.list("ada");
-      expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
-        "delete from project where user_id = $1 and deleted_at <= $2::timestamptz",
-        "select hash, ids from project_defaults_received where user_id = $1",
-        "select id, data from project where user_id = $1 and deleted_at is null",
-        "select distinct on (project_id) project_id, id from project_image where user_id = $1 and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
-        "select i.project_id, count(*) as count from project_image i join project p on p.user_id = i.user_id and p.id = i.project_id where i.user_id = $1 and (p.deleted_at is not null) = $2 group by i.project_id",
-      ]);
-      expect(fake.released()).toBe(1);
-    });
-
-    it("replace edits and remove defaults the app no longer has, leaving the account's own", async () => {
-      const fake = createFakeDatabase();
-      const old = makeDefaults([
-        project("d1", "Welcome"),
-        project("d2", "Old"),
-      ]);
-      await createProjectStore(fake.database, { defaults: old, now }).list(
-        "ada",
-      );
-      const store = createProjectStore(fake.database, {
-        defaults: makeDefaults([project("d1", "Welcome back")]),
-        now,
-      });
-      await store.saveChanges("ada", "d1", { notes: "" }, { notes: "Edited" });
-      await store.create("ada", "mine", project("mine", "Mine"));
-      // Received by another version of the app, so the record's hash differs.
-      fake.records.set("ada", { hash: "other", ids: ["d1", "d2"] });
-
-      const listed = await store.list("ada");
-
-      expect(listed.projects.map((p) => [p.id, p.title, p.notes])).toEqual([
-        ["mine", "Mine", ""],
-        ["d1", "Welcome back", ""],
-      ]);
-    });
-
-    it("never touch a default this version cannot read", async () => {
-      const fake = createFakeDatabase();
-      fake.projects.push({
-        user_id: "ada",
-        id: "d1",
-        data: { version: 99 },
-        revision: 1,
-      });
-      const store = createProjectStore(fake.database, {
-        defaults: makeDefaults([project("d1", "Welcome")]),
-        now,
-      });
-
-      const listed = await store.list("ada");
-
-      expect(fake.projects[0].data).toEqual({ version: 99 });
-      expect(listed.defaultIds).toEqual(["d1"]);
-    });
-
-    it("roll back and let the connection go when the database fails", async () => {
-      const fake = createFakeDatabase();
-      const store = createProjectStore(fake.database, {
-        defaults: makeDefaults([project("d1", "Welcome")]),
-        now,
-      });
-      const { query } = fake.database;
-      const sent: string[] = [];
-      let released = false;
-      fake.database.connect = async () => ({
-        query: async (text, values) => {
-          sent.push(text);
-          if (text.includes("for update")) throw new Error("lock timeout");
-          return query(text, values);
-        },
-        release: () => (released = true),
-      });
-
-      await expect(store.list("ada")).rejects.toThrow("lock timeout");
-      expect(sent.at(-1)).toBe("rollback");
-      expect(released).toBe(true);
-    });
-  });
-
   describe("who a project is assigned to (AD #61 Manage People)", () => {
     const saveList = (
       fake: ReturnType<typeof createFakeDatabase>,
@@ -330,7 +258,7 @@ describe("the project store", () => {
     it("creates a project for someone in the account's list, holding the list", async () => {
       const fake = createFakeDatabase();
       saveList(fake, [andy]);
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       expect(
         await store.create(
           "ada",
@@ -355,7 +283,7 @@ describe("the project store", () => {
     it("refuses a create naming someone not in the list", async () => {
       const fake = createFakeDatabase();
       saveList(fake, [andy]);
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       expect(
         await store.create(
           "ada",
@@ -368,7 +296,7 @@ describe("the project store", () => {
 
     it("counts the people an account's projects are assigned to while it has no list", async () => {
       const fake = createFakeDatabase();
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       fake.projects.push({
         user_id: "ada",
         id: "old",
@@ -394,7 +322,7 @@ describe("the project store", () => {
     it("refuses a save choosing someone removed, but not other saves", async () => {
       const fake = createFakeDatabase();
       saveList(fake, [andy]);
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       await store.create("ada", "p1", project("p1", "Shed"));
       expect(
         await store.saveChanges(
@@ -422,7 +350,7 @@ describe("the project store", () => {
     it("refuses a save assigning a task to someone not in the list (AD #66)", async () => {
       const fake = createFakeDatabase();
       saveList(fake, [andy]);
-      const store = createProjectStore(fake.database, { defaults: null, now });
+      const store = createProjectStore(fake.database, { now });
       await store.create("ada", "p1", project("p1", "Shed"));
       expect(
         await store.saveChanges(
@@ -445,16 +373,6 @@ describe("the project store", () => {
       });
     });
 
-    it("drops a default project's person who is not in the list to Unassigned", async () => {
-      const fake = createFakeDatabase();
-      const defaults = makeDefaults([
-        project("d1", "Default", { assignee: "andy" }),
-      ]);
-      const store = createProjectStore(fake.database, { defaults, now });
-      const { projects } = await store.list("ada");
-      expect(projects.map((p) => p.assignee)).toEqual(["unassigned"]);
-    });
-
     describe("moving a browser's people in", () => {
       const sent = [
         project("p1", "Shed", { assignee: "x1" }),
@@ -468,7 +386,6 @@ describe("the project store", () => {
       it("stops the move when the account's list is damaged", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         await store.importProjects("ada", [], browser);
@@ -482,7 +399,6 @@ describe("the project store", () => {
       it("makes the browser's list the account's, carrying people by id", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         await store.importProjects("ada", sent, browser);
@@ -498,7 +414,6 @@ describe("the project store", () => {
       it("keeps the people the account's projects already use", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         fake.projects.push({
@@ -516,7 +431,6 @@ describe("the project store", () => {
       it("keeps an account project's person who has the browser person's name", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         fake.projects.push({
@@ -544,7 +458,6 @@ describe("the project store", () => {
       it("follows swapped names once and leaves unreadable projects alone", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         for (const [id, assignee] of [
@@ -583,7 +496,6 @@ describe("the project store", () => {
           { id: "c9", name: "Cora" },
         ]);
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         await store.importProjects("ada", sent, browser);
@@ -602,10 +514,7 @@ describe("the project store", () => {
       it("matches the people tasks are assigned to as it does the project's (AD #66)", async () => {
         const fake = createFakeDatabase();
         saveList(fake, [{ id: "b9", name: "boris" }]);
-        const store = createProjectStore(fake.database, {
-          defaults: null,
-          now,
-        });
+        const store = createProjectStore(fake.database, { now });
         await store.importProjects(
           "ada",
           [project("p1", "Shed", { tasks: [task("a", "x1"), task("b", "x2")] })],
@@ -628,7 +537,6 @@ describe("the project store", () => {
         const fake = createFakeDatabase();
         saveList(fake, [{ id: "b9", name: "Boris" }]);
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         await store.importProjects("ada", sent, browser);
@@ -643,7 +551,6 @@ describe("the project store", () => {
       it("assigns no one where no list was sent and the account has none", async () => {
         const fake = createFakeDatabase();
         const store = createProjectStore(fake.database, {
-          defaults: null,
           now,
         });
         await store.importProjects("ada", sent);
@@ -663,7 +570,6 @@ describe("the project store", () => {
       clock = Date.parse("2026-10-22T00:00:00.000Z");
       const fake = createFakeDatabase();
       const store = createProjectStore(fake.database, {
-        defaults: null,
         now: binNow,
       });
       return { fake, store };
@@ -847,23 +753,6 @@ describe("the project store", () => {
         kind: "done",
       });
       expect(fake.projects).toHaveLength(0);
-    });
-
-    it("leaves a binned default project in the Bin when the defaults change", async () => {
-      const fake = createFakeDatabase();
-      const first = makeDefaults([project("d1", "Welcome")]);
-      const store = createProjectStore(fake.database, {
-        defaults: first,
-        now: binNow,
-      });
-      await store.list("ada");
-      await store.remove("ada", "d1");
-      const later = createProjectStore(fake.database, {
-        defaults: makeDefaults([project("d1", "Welcome again")]),
-        now: binNow,
-      });
-      expect((await later.list("ada")).projects).toEqual([]);
-      expect((await later.listBin("ada")).projects).toHaveLength(1);
     });
   });
 });
