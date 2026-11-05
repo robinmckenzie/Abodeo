@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { ConfirmDialog } from "../ui/confirm-dialog";
+import { fitHeightToText } from "../ui/fit-height-to-text";
 import { raiseFloatingMessages } from "../ui/floating-messages";
 import { ArrowIcon, BinIcon, PlusIcon } from "../ui/icons";
 import {
@@ -28,7 +29,6 @@ import {
   type ImageInfo,
 } from "./images-api";
 import type { ImageFailure } from "./images-client";
-import { fitHeightToText } from "./task-list";
 import {
   useProjectImages,
   type PendingImage,
