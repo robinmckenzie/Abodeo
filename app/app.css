@@ -783,9 +783,9 @@ html:has(.app-layout) {
   color: var(--red);
 }
 
-/* The offer to move a browser's projects into the account: a question,
-   not an error. */
-.dashboard-move-offer {
+/* The notice of moving a browser's projects into the account (AD #68):
+   under way, done, or failed and to be tried again. */
+.dashboard-move-notice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -794,11 +794,11 @@ html:has(.app-layout) {
   color: var(--ink);
 }
 
-.dashboard-move-offer .button-secondary:hover:not(:disabled) {
+.dashboard-move-notice .button-secondary:hover:not(:disabled) {
   background: var(--paper);
 }
 
-.dashboard-move-offer p {
+.dashboard-move-notice p {
   flex: 1 1 20rem;
   margin: 0;
 }
@@ -1721,6 +1721,50 @@ html:has(.app-layout) {
 
 .task:not(:hover, :has(:focus-visible)) :is(.task-drag, .task-controls) {
   opacity: 0;
+}
+
+/* A task's photos (AD #67 Add Photos To Tasks): the newest's thumbnail and
+   how many, after its title and level with its first line. Opens them. */
+.task-photos {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin-top: 2px;
+  padding: 0.125rem 0.375rem 0.125rem 0.125rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.task-photos:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.app-layout .task-photos:focus-visible {
+  outline-offset: 0;
+}
+
+.task-photos img,
+.task-photos-placeholder {
+  display: block;
+  width: 2.25rem;
+  height: 1.6875rem;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #f6f3ec;
+}
+
+/* Where picture files dragged over the page would go. */
+.task.is-file-drop-target {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  background: var(--row-tint);
 }
 
 /* Who a task is assigned to, after its title and level with its first line
@@ -2677,6 +2721,48 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.375rem;
+}
+
+/* A task's photos, over the open project (AD #67). Its body holds the
+   padding, so that a click on the dialog itself is one on the backdrop. */
+.task-photos-dialog {
+  width: min(34rem, calc(100vw - 3rem));
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgb(26 26 26 / 0.18);
+}
+
+.task-photos-dialog::backdrop {
+  background: rgb(26 26 26 / 0.22);
+}
+
+.task-photos-dialog-body {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.task-photos-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.task-photos-dialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.task-photos-dialog .project-images {
+  margin: 0;
+}
+
+.task-photos-dialog .image-timeline {
+  max-height: min(28rem, 60vh);
 }
 
 /* The window that asks "Are you sure?" before a project is deleted

@@ -27,10 +27,6 @@ const keyPrefix = "abodeo-project:";
 // or no, with the account it is for, never any project data.
 const accountHintKey = "abodeo-account-has-projects";
 
-// The account for which the person chose not to move this browser's
-// projects in, until they next sign in or out.
-const moveDeclinedKey = "abodeo-move-declined";
-
 export type SaveFailure =
   | "unavailable"
   | "full"
@@ -179,7 +175,7 @@ function writeProject(project: Project): SaveResult {
   }
 }
 
-// The visitor's projects that can be read, to offer to move into an account.
+// The visitor's projects that can be read, to move into an account.
 export function listOwnProjects(): Project[] {
   const loaded = loadProjects();
   return loaded.ok ? loaded.projects : [];
@@ -198,7 +194,7 @@ export function deleteStoredProject(id: string): SaveResult {
 
 // Removes each project that is still exactly as given, such as once it has
 // been moved into an account. One changed since, such as in another tab, is
-// kept, to be offered again.
+// kept, to be moved at the next try.
 export function removeProjectsIfUnchanged(projects: Project[]) {
   try {
     for (const project of projects) {
@@ -209,7 +205,7 @@ export function removeProjectsIfUnchanged(projects: Project[]) {
       }
     }
   } catch {
-    // What is left is offered again.
+    // What is left is moved at the next try.
   }
 }
 
@@ -238,30 +234,6 @@ function readAccountHint(): boolean | null {
     return typeof hint?.hasProjects === "boolean" ? hint.hasProjects : null;
   } catch {
     return null;
-  }
-}
-
-export function isMoveDeclined(accountId: string) {
-  try {
-    return localStorage.getItem(moveDeclinedKey) === accountId;
-  } catch {
-    return false;
-  }
-}
-
-export function declineMove(accountId: string) {
-  try {
-    localStorage.setItem(moveDeclinedKey, accountId);
-  } catch {
-    // The offer is made again on the next load.
-  }
-}
-
-export function forgetDeclinedMove() {
-  try {
-    localStorage.removeItem(moveDeclinedKey);
-  } catch {
-    // Nothing to forget.
   }
 }
 

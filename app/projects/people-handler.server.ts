@@ -18,6 +18,7 @@ import {
   type PeopleOperation,
 } from "./people-api";
 import type { PeopleStore } from "./people-store.server";
+import { readJsonBody } from "./json-body.server";
 import { readRequestAccount } from "./request-account.server";
 
 export function isPeoplePath(pathname: string) {
@@ -104,24 +105,6 @@ function readOperation(body: unknown): PeopleOperation | undefined {
   return undefined;
 }
 
-// The body as JSON, undefined if it is not JSON, or "too-large".
-async function readBody(request: Request) {
-  const length = Number(request.headers.get("Content-Length"));
-  if (length > peopleBodyLimit) return "too-large" as const;
-  let buffer: ArrayBuffer;
-  try {
-    buffer = await request.arrayBuffer();
-  } catch {
-    return undefined;
-  }
-  if (buffer.byteLength > peopleBodyLimit) return "too-large" as const;
-  try {
-    return JSON.parse(new TextDecoder().decode(buffer)) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
 export async function handlePeopleRequest(
   request: Request,
   {
@@ -162,7 +145,7 @@ export async function handlePeopleRequest(
         : respondWithJson(200, read);
     }
 
-    const body = await readBody(request);
+    const body = await readJsonBody(request, peopleBodyLimit);
     if (body === "too-large") return respondWithPeopleError(413, "too_large");
     const operation = readOperation(body);
     if (!operation) return respondWithPeopleError(400, "invalid_request");

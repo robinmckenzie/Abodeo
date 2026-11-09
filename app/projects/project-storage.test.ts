@@ -2,11 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createProject,
-  declineMove,
   deleteStoredProject,
-  forgetDeclinedMove,
   hasProjectsScript,
-  isMoveDeclined,
   listOwnProjects,
   removeAccountHint,
   removeProjectsIfUnchanged,
@@ -303,14 +300,6 @@ describe("a browser's own projects, for moving into an account", () => {
     expect(loadProjects()).toMatchObject({
       projects: [{ id: kept.project.id, notes: "Changed in a tab" }],
     });
-  });
-
-  it("remembers a declined move for one account until forgotten", () => {
-    declineMove("ada");
-    expect(isMoveDeclined("ada")).toBe(true);
-    expect(isMoveDeclined("grace")).toBe(false);
-    forgetDeclinedMove();
-    expect(isMoveDeclined("ada")).toBe(false);
   });
 });
 

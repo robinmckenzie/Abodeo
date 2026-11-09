@@ -1,13 +1,16 @@
 // A signed-in account's images, fetched from the images endpoints (AD #48 Add
 // Images To Projects). Every request names the account the page is working
 // for, and gives up after requestTimeout, or uploadTimeout for an upload.
-// What comes back is only ever held in memory.
+// What comes back is only ever held in memory. A task's photos (AD #67 Add
+// Photos To Tasks) use the same functions with the task's id.
 import { requestTimeout } from "../account/account-client";
 import {
   buildCursor,
   buildImageBytesPath,
   buildImagePath,
   buildImagesPath,
+  buildTaskImageSummaryPath,
+  buildTaskImagesPath,
   buildUploadFrame,
   imageIdHeader,
   uploadContentType,
@@ -15,6 +18,7 @@ import {
   type ImageInfo,
   type ImageKind,
   type ImageListResponse,
+  type TaskImageSummary,
 } from "./images-api";
 import { accountHeader } from "./projects-api";
 
@@ -119,12 +123,21 @@ function isImageInfo(value: unknown): value is ImageInfo {
 export type Outcome<Value> =
   ({ ok: true } & Value) | { ok: false; reason: ImageFailure };
 
-// The newest page of a project's images, or the page before one.
+// The images of a project, or the photos of one of its tasks.
+function buildListPath(projectId: string, taskId: string | null) {
+  return taskId === null
+    ? buildImagesPath(projectId)
+    : buildTaskImagesPath(projectId, taskId);
+}
+
+// The newest page of a project's images, or of a task's photos if a task id
+// is given, or the page before one.
 export async function loadImages(
   accountId: string,
   projectId: string,
   before: ImageInfo | null = null,
   fetchFn: Fetch = fetch,
+  taskId: string | null = null,
 ): Promise<Outcome<{ page: ImageListResponse }>> {
   const query = before
     ? `?before=${encodeURIComponent(buildCursor(before))}`
@@ -132,7 +145,7 @@ export async function loadImages(
   const answer = await send(
     fetchFn,
     accountId,
-    buildImagesPath(projectId) + query,
+    buildListPath(projectId, taskId) + query,
   );
   if (answer === "unreachable" || answer.status !== 200) {
     return { ok: false, reason: await readFailure(answer) };
@@ -152,7 +165,8 @@ export async function loadImages(
 
 // Sends one image with its thumbnail, in one binary request. The id is made
 // by the caller, so that sending the same upload again, after a lost answer,
-// gives the image already added.
+// gives the image already added. With a task id, it is a photo of that
+// task, which must already be saved.
 export async function uploadImage(
   accountId: string,
   projectId: string,
@@ -160,8 +174,10 @@ export async function uploadImage(
   thumbnail: Uint8Array,
   original: Uint8Array,
   fetchFn: Fetch = fetch,
+  taskId: string | null = null,
 ): Promise<Outcome<{ image: ImageInfo; usedBytes: number }>> {
-  const answer = await send(fetchFn, accountId, buildImagesPath(projectId), {
+  const path = buildListPath(projectId, taskId);
+  const answer = await send(fetchFn, accountId, path, {
     method: "POST",
     headers: {
       "Content-Type": uploadContentType,
@@ -269,6 +285,72 @@ export async function removeImage(
     {
       method: "DELETE",
     },
+  );
+  if (answer === "unreachable" || answer.status !== 200) {
+    return { ok: false, reason: await readFailure(answer) };
+  }
+  const body = (await readJson(answer)) as { usedBytes?: unknown } | null;
+  return typeof body?.usedBytes === "number"
+    ? { ok: true, usedBytes: body.usedBytes }
+    : { ok: false, reason: "unreachable" };
+}
+
+function isTaskImageSummary(value: unknown): value is TaskImageSummary {
+  const summary = value as Partial<TaskImageSummary> | null;
+  return (
+    typeof summary?.count === "number" &&
+    typeof summary.latestImageId === "string"
+  );
+}
+
+// For each task of a project with photos, how many it has and its newest.
+export async function loadTaskImageSummaries(
+  accountId: string,
+  projectId: string,
+  fetchFn: Fetch = fetch,
+): Promise<Outcome<{ tasks: Record<string, TaskImageSummary> }>> {
+  const answer = await send(
+    fetchFn,
+    accountId,
+    buildTaskImageSummaryPath(projectId),
+  );
+  if (answer === "unreachable" || answer.status !== 200) {
+    return { ok: false, reason: await readFailure(answer) };
+  }
+  const body = (await readJson(answer)) as { tasks?: unknown } | null;
+  const tasks = body?.tasks;
+  if (
+    typeof tasks !== "object" ||
+    tasks === null ||
+    Array.isArray(tasks) ||
+    !Object.values(tasks).every(isTaskImageSummary)
+  ) {
+    return { ok: false, reason: "unreachable" };
+  }
+  // Object.fromEntries defines each key, even one named like a prototype's.
+  return {
+    ok: true,
+    tasks: Object.fromEntries(Object.entries(tasks)) as Record<
+      string,
+      TaskImageSummary
+    >,
+  };
+}
+
+// Removes the photos of a deleted task, once its Undo has ended. A task that
+// is saved again, as after Undo on another device, keeps its photos and
+// gives "conflict".
+export async function removeTaskImages(
+  accountId: string,
+  projectId: string,
+  taskId: string,
+  fetchFn: Fetch = fetch,
+): Promise<Outcome<{ usedBytes: number }>> {
+  const answer = await send(
+    fetchFn,
+    accountId,
+    buildTaskImagesPath(projectId, taskId),
+    { method: "DELETE" },
   );
   if (answer === "unreachable" || answer.status !== 200) {
     return { ok: false, reason: await readFailure(answer) };

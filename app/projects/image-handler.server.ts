@@ -4,6 +4,8 @@
 // image has no public address: every file is fetched through these routes,
 // by the account that owns it. The page also names the account it is working
 // for, and a request naming another is refused without changing anything.
+// A task's photos (AD #67 Add Photos To Tasks) have routes of their own for
+// listing, adding, counting and removing, all under the task's project.
 import {
   accountStoreTimeout,
   readErrorCode,
@@ -17,6 +19,7 @@ import {
   countCharacters,
   imageIdHeader,
   isImageId,
+  isTaskId,
   maxCaptionLength,
   maxUploadBytes,
   readCursor,
@@ -36,7 +39,8 @@ const captionBodyLimit = 16 * 1024;
 // plan.
 export const imageUploadTimeout = 45_000;
 
-const imagesPathPattern = /^\/api\/projects\/[^/]+\/images(\/|$)/;
+const imagesPathPattern =
+  /^\/api\/projects\/[^/]+\/(images|tasks\/[^/]+\/images|task-images)(\/|$)/;
 
 export function isImagesPath(pathname: string) {
   return (
@@ -61,8 +65,10 @@ function reportImageFailure(code: string | undefined) {
 }
 
 type Route =
-  | { kind: "list"; projectId: string }
-  | { kind: "upload"; projectId: string }
+  | { kind: "list"; projectId: string; taskId: string | null }
+  | { kind: "upload"; projectId: string; taskId: string | null }
+  | { kind: "summarize-tasks"; projectId: string }
+  | { kind: "remove-task-images"; projectId: string; taskId: string }
   | { kind: "read"; projectId: string; imageId: string; file: ImageKind }
   | { kind: "caption"; projectId: string; imageId: string }
   | { kind: "remove"; projectId: string; imageId: string };
@@ -82,12 +88,29 @@ function findRoute(request: Request): Route | Response {
     return notFound();
   }
   const [projectId, images, imageId, file, extra] = parts;
-  if (images !== "images" || extra !== undefined || !isProjectId(projectId)) {
-    return notFound();
+  if (!isProjectId(projectId)) return notFound();
+  if (images === "task-images" && imageId === undefined) {
+    return method === "GET"
+      ? { kind: "summarize-tasks", projectId }
+      : notAllowed();
   }
+  if (images === "tasks") {
+    // /api/projects/:projectId/tasks/:taskId/images
+    const taskId = imageId;
+    if (!isTaskId(taskId) || file !== "images" || extra !== undefined) {
+      return notFound();
+    }
+    if (method === "GET") return { kind: "list", projectId, taskId };
+    if (method === "POST") return { kind: "upload", projectId, taskId };
+    if (method === "DELETE") {
+      return { kind: "remove-task-images", projectId, taskId };
+    }
+    return notAllowed();
+  }
+  if (images !== "images" || extra !== undefined) return notFound();
   if (imageId === undefined) {
-    if (method === "GET") return { kind: "list", projectId };
-    if (method === "POST") return { kind: "upload", projectId };
+    if (method === "GET") return { kind: "list", projectId, taskId: null };
+    if (method === "POST") return { kind: "upload", projectId, taskId: null };
     return notAllowed();
   }
   if (!isImageId(imageId)) return notFound();
@@ -211,7 +234,9 @@ export async function handleImagesRequest(
         if (parameter !== null && !before) {
           return respondWithImageError(400, "invalid_request");
         }
-        const page = await run(store.list(userId, route.projectId, before));
+        const page = await run(
+          store.list(userId, route.projectId, before, route.taskId),
+        );
         return page
           ? respondWithJson(200, page)
           : respondWithImageError(404, "not_found");
@@ -257,6 +282,7 @@ export async function handleImagesRequest(
             contentType,
             Buffer.from(frame.original),
             Buffer.from(frame.thumbnail),
+            route.taskId,
           ),
           uploadTimeout,
         );
@@ -308,6 +334,30 @@ export async function handleImagesRequest(
               error: "conflict",
               image: outcome.image,
             });
+        }
+        break;
+      }
+
+      case "summarize-tasks": {
+        const summary = await run(
+          store.summarizeTasks(userId, route.projectId),
+        );
+        return summary
+          ? respondWithJson(200, summary)
+          : respondWithImageError(404, "not_found");
+      }
+
+      case "remove-task-images": {
+        const outcome = await run(
+          store.removeTaskImages(userId, route.projectId, route.taskId),
+        );
+        switch (outcome.kind) {
+          case "removed":
+            return respondWithJson(200, { usedBytes: outcome.usedBytes });
+          case "not-found":
+            return respondWithImageError(404, "not_found");
+          case "task-present":
+            return respondWithImageError(409, "conflict");
         }
         break;
       }

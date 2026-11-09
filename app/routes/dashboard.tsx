@@ -39,6 +39,13 @@ import { describeFailure, type OpenProject } from "../projects/project-editing";
 import { ProjectForm } from "../projects/project-form";
 import { useFileDrag } from "../projects/use-file-drag";
 import { ProjectImages, type AddFiles } from "../projects/project-images";
+import { removeTaskImages } from "../projects/images-client";
+import { TaskPhotosDialog } from "../projects/task-photos-dialog";
+import { useTaskImageSummaries } from "../projects/use-task-image-summaries";
+import {
+  noteStorageUsage,
+  type StorageUsage,
+} from "../projects/use-project-images";
 import {
   describeReturnResult,
   ProjectAppointments,
@@ -50,15 +57,13 @@ import {
 import { isReconnectBlockedBy } from "../calendar/use-project-appointments";
 import { ProjectWindow } from "../projects/project-window";
 import {
-  declineMove,
-  forgetDeclinedMove,
-  isMoveDeclined,
   listOwnProjects,
   removeAccountHint,
   removeProjectsIfUnchanged,
 } from "../projects/project-storage";
 import type { Person } from "../projects/people";
 import type { Project } from "../projects/projects";
+import type { Task } from "../projects/tasks";
 import {
   usePresentation,
   useSwitchPresentationKey,
@@ -152,9 +157,7 @@ export default function Dashboard() {
     onBeforeLeave: editing.prepareToLeave,
     onLeaving: () => {
       editing.markLeaving();
-      // The offer to move projects returns at the next sign-in, and the
-      // account's hint no longer applies.
-      forgetDeclinedMove();
+      // The account's hint no longer applies.
       removeAccountHint();
     },
   });
@@ -165,8 +168,63 @@ export default function Dashboard() {
     focusAfterCloseRef.current = null;
   }, [open]);
 
-  // Pictures dropped on the page go to the open account project's images.
+  // Pictures dropped on the page go to the open account project's images,
+  // or, dropped on one of its tasks, to that task's photos (AD #67).
   const addFilesRef = useRef<AddFiles | null>(null);
+  const addTaskFilesRef = useRef<AddFiles | null>(null);
+  // The account's storage use as last given by the server, shared by the
+  // project's images, its tasks' photos and their removal (AD #67).
+  const storageUsageRef = useRef<StorageUsage | null>(null);
+  // The task whose photos are shown in their dialog, over the open project,
+  // and files to add to them once it opens.
+  const [taskPhotos, setTaskPhotos] = useState<{
+    accountId: string;
+    projectId: string;
+    taskId: string;
+    title: string;
+    filesToAdd: File[] | null;
+  } | null>(null);
+  const photosAccountId = view.kind === "account" ? view.accountId : null;
+  const photosProjectId = photosAccountId && open?.id ? open.id : null;
+  if (
+    taskPhotos &&
+    (taskPhotos.accountId !== photosAccountId ||
+      taskPhotos.projectId !== photosProjectId)
+  ) {
+    setTaskPhotos(null);
+  }
+  const taskSummaries = useTaskImageSummaries(
+    photosAccountId,
+    photosProjectId,
+    noteAccountFailure,
+  );
+  const openTaskPhotos = (task: Task, filesToAdd: File[] | null) => {
+    if (!photosAccountId || !photosProjectId) return;
+    setTaskPhotos({
+      accountId: photosAccountId,
+      projectId: photosProjectId,
+      taskId: task.id,
+      title: task.title,
+      filesToAdd,
+    });
+  };
+  // Once a deleted task's Undo has ended, its photos are removed and their
+  // allowance given back. The server keeps them if the task is saved again.
+  // If removing them fails, they stay hidden, as the ticket accepts.
+  const removeDeletedTaskPhotos = (
+    accountId: string,
+    projectId: string,
+    taskId: string,
+  ) => {
+    void removeTaskImages(accountId, projectId, taskId).then((result) => {
+      if (result.ok) {
+        noteStorageUsage(storageUsageRef, accountId, result.usedBytes);
+        taskSummaries.forget(taskId);
+      } else if (result.reason !== "conflict") {
+        noteAccountFailure(result.reason);
+      }
+    });
+  };
   const { boxes: messageBoxes, showMessage } = useFloatingMessages();
   const dropRefusal =
     view.kind !== "account"
@@ -182,8 +240,23 @@ export default function Dashboard() {
       (areAllTypesUnsupported(fileTypes) ? unsupportedFilesMessage : null),
     onRefusal: (message) =>
       showMessage(message, message === unsupportedFilesMessage),
-    onDrop: (files) => {
-      if (addFilesRef.current) addFilesRef.current(files);
+    onDrop: (files, target) => {
+      // While a task's photos are open, anything dropped goes to them.
+      if (taskPhotos && addTaskFilesRef.current) {
+        addTaskFilesRef.current(files);
+        return;
+      }
+      // Only the open project's rows are marked, not those of a project
+      // squashing closed.
+      const row =
+        target instanceof Element
+          ? target.closest<HTMLElement>("[data-photo-task-id]")
+          : null;
+      const task = row
+        ? open?.values.tasks.find(({ id }) => id === row.dataset.photoTaskId)
+        : undefined;
+      if (task) openTaskPhotos(task, files);
+      else if (addFilesRef.current) addFilesRef.current(files);
       else showMessage(noProjectOpenMessage);
     },
   });
@@ -212,7 +285,13 @@ export default function Dashboard() {
 
   const startDelete = () =>
     editing.startDelete({
-      imageCount: imageCountRef.current,
+      // With its tasks' photos, which go with it (AD #67). Until both are
+      // shown, null, for the count the server gave with the list, which has
+      // both.
+      imageCount:
+        imageCountRef.current !== null && taskSummaries.total !== null
+          ? imageCountRef.current + taskSummaries.total
+          : null,
       appointmentCount: appointmentCountRef.current,
     });
 
@@ -321,35 +400,40 @@ export default function Dashboard() {
     open.id !== null &&
     !list.some((project) => project.id === open.id);
 
-  // Signed in, the browser's own projects, if any, are offered to be moved
-  // into the account once its projects have loaded, unless declined.
-  const offerKey =
+  // Signed in, the browser's own projects, if any, move into the account by
+  // themselves once its projects have loaded (AD #68). A failed move leaves
+  // them in the browser, to be tried again on asking or at the next sign-in.
+  const moveKey =
     view.kind === "account" && view.state === "ready"
       ? `${view.accountId}:${view.generation}`
       : null;
-  const [moveOffer, setMoveOffer] = useState<{
+  const [move, setMove] = useState<{
     key: string;
     projects: Project[];
-    status: "offered" | "moving" | "failed";
+    status: "none" | "moving" | "moved" | "failed" | "dismissed";
+    movedCount: number;
   } | null>(null);
-  if (offerKey && moveOffer?.key !== offerKey && view.kind === "account") {
-    setMoveOffer({
-      key: offerKey,
-      projects: isMoveDeclined(view.accountId) ? [] : listOwnProjects(),
-      status: "offered",
+  if (moveKey && move?.key !== moveKey) {
+    const projects = listOwnProjects();
+    setMove({
+      key: moveKey,
+      projects,
+      status: projects.length > 0 ? "moving" : "none",
+      movedCount: 0,
     });
   }
-  const offeredCount =
-    offerKey && moveOffer?.key === offerKey ? moveOffer.projects.length : 0;
+  const currentMove = moveKey && move?.key === moveKey ? move : null;
 
   // The people the projects can be assigned to. An account's list is saved
-  // once the offer to move the browser's projects and people in is settled.
+  // once the browser has no projects left to move in with its people.
   const people = usePeople(account.view, {
+    // Not while the browser still has projects to move in, even once a failed
+    // move's notice is dismissed: their people would no longer match.
     isEstablishDue:
-      offerKey !== null &&
-      moveOffer?.key === offerKey &&
-      moveOffer.projects.length === 0 &&
-      moveOffer.status !== "moving",
+      currentMove !== null &&
+      currentMove.status !== "moving" &&
+      currentMove.status !== "failed" &&
+      listOwnProjects().length === 0,
     onAccountFailure: noteAccountFailure,
   });
   useEffect(() => {
@@ -357,18 +441,18 @@ export default function Dashboard() {
   });
   const readyPeople = people.view.status === "ready" ? people.view : null;
 
-  const moveProjects = async () => {
-    if (view.kind !== "account" || !moveOffer) return;
-    const { key, projects } = moveOffer;
-    setMoveOffer({ ...moveOffer, status: "moving" });
+  const moveProjects = async (key: string, projects: Project[]) => {
+    if (view.kind !== "account") return;
+    const settleMove = (status: "moved" | "failed", movedCount = 0) =>
+      setMove((current) =>
+        current?.key === key ? { ...current, status, movedCount } : current,
+      );
     // The browser's people go with its projects.
     const stored = readStoredPeople();
     // A damaged list stops the move, so that no one loses who they were
     // assigned to and the browser's copies are kept.
     if (stored.state === "unreadable" || stored.state === "unavailable") {
-      setMoveOffer((current) =>
-        current?.key === key ? { ...current, status: "failed" } : current,
-      );
+      settleMove("failed");
       return;
     }
     const result = await editing.trackSending(
@@ -380,30 +464,47 @@ export default function Dashboard() {
     );
     if (!result.ok) {
       noteAccountFailure(result.reason);
-      setMoveOffer((current) =>
-        current?.key === key ? { ...current, status: "failed" } : current,
-      );
+      settleMove("failed");
       return;
     }
     // Only those the account now has, each only if not changed here since.
-    removeProjectsIfUnchanged(
-      projects.filter(({ id }) => result.outcomes[id] !== undefined),
+    const moved = projects.filter(
+      ({ id }) => result.outcomes[id] !== undefined,
     );
+    removeProjectsIfUnchanged(moved);
     // With none of its own projects left, the browser's list has gone too.
     if (listOwnProjects().length === 0) removeStoredPeople();
     refreshProjects();
-    setMoveOffer((current) =>
-      current?.key === key ? { ...current, projects: [] } : current,
-    );
+    settleMove("moved", moved.length);
     source.reload();
     people.reload();
   };
 
-  const declineMoveOffer = () => {
-    if (view.kind !== "account" || !moveOffer) return;
-    declineMove(view.accountId);
-    setMoveOffer({ ...moveOffer, projects: [] });
+  // Starts each move once, even where development runs effects twice.
+  const startedMoveRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentMove?.status !== "moving") return;
+    if (startedMoveRef.current === currentMove.key) return;
+    startedMoveRef.current = currentMove.key;
+    void moveProjects(currentMove.key, currentMove.projects);
+  });
+
+  const retryMove = () => {
+    if (!currentMove || currentMove.status !== "failed") return;
+    // What is in the browser now, in case it changed since.
+    const projects = listOwnProjects();
+    startedMoveRef.current = null;
+    setMove({
+      ...currentMove,
+      projects,
+      status: projects.length > 0 ? "moving" : "none",
+    });
   };
+
+  const dismissMoveNotice = () =>
+    setMove((current) =>
+      current?.key === moveKey ? { ...current, status: "dismissed" } : current,
+    );
 
   // In place, the expanded bar closes the form its own way, squashing. Esc
   // and its keycap in the shortcuts panel both close it this way.
@@ -518,6 +619,7 @@ export default function Dashboard() {
           <ProjectImages
             accountId={view.kind === "account" ? view.accountId : null}
             projectId={entry.id}
+            usageRef={storageUsageRef}
             onFailure={noteAccountFailure}
             onMessage={showMessage}
             addFilesRef={addFilesRef}
@@ -573,6 +675,30 @@ export default function Dashboard() {
             drafts={taskDrafts}
             onChange={isClosing ? async () => null : editing.changeTasks}
             finishEditRef={isClosing ? undefined : editing.finishTaskEditRef}
+            photos={
+              photosProjectId
+                ? {
+                    summaries: taskSummaries.summaries,
+                    thumbnails: taskSummaries.thumbnails,
+                    isDropTarget,
+                    onAdd: openTaskPhotos,
+                    onOpen: (task) => openTaskPhotos(task, null),
+                  }
+                : null
+            }
+            onUndoEnd={(task) => {
+              if (
+                photosAccountId &&
+                photosProjectId &&
+                taskSummaries.summaries[task.id]
+              ) {
+                removeDeletedTaskPhotos(
+                  photosAccountId,
+                  photosProjectId,
+                  task.id,
+                );
+              }
+            }}
           />
         )
       }
@@ -628,30 +754,49 @@ export default function Dashboard() {
             Your projects cannot be loaded right now. Please try again later.
           </p>
         )}
-        {offeredCount > 0 && moveOffer && (
-          <div className="dashboard-notice dashboard-move-offer" role="status">
+        {currentMove?.status === "moving" && (
+          <p className="dashboard-notice dashboard-move-notice" role="status">
+            {currentMove.projects.length === 1
+              ? "Moving the project saved in this browser into your account…"
+              : `Moving the ${currentMove.projects.length} projects saved in this browser into your account…`}
+          </p>
+        )}
+        {currentMove?.status === "moved" && (
+          <div className="dashboard-notice dashboard-move-notice" role="status">
             <p>
-              {offeredCount === 1
-                ? "This browser has 1 project saved while signed out. Move it into your account?"
-                : `This browser has ${offeredCount} projects saved while signed out. Move them into your account?`}
-              {moveOffer.status === "failed" &&
-                " They could not be moved just now. Please try again."}
+              {currentMove.movedCount === 1
+                ? "1 project from this browser was moved into your account."
+                : `${currentMove.movedCount} projects from this browser were moved into your account.`}
             </p>
             <button
               type="button"
               className="button-secondary button-small"
-              disabled={moveOffer.status === "moving"}
-              onClick={moveProjects}
+              onClick={dismissMoveNotice}
             >
-              Move
+              Dismiss
+            </button>
+          </div>
+        )}
+        {currentMove?.status === "failed" && (
+          <div className="dashboard-notice dashboard-move-notice" role="alert">
+            <p>
+              {currentMove.projects.length === 1
+                ? "The project saved in this browser could not be moved into your account just now. It is kept here, and will be moved when you try again or next come back."
+                : `The ${currentMove.projects.length} projects saved in this browser could not be moved into your account just now. They are kept here, and will be moved when you try again or next come back.`}
+            </p>
+            <button
+              type="button"
+              className="button-secondary button-small"
+              onClick={retryMove}
+            >
+              Try again
             </button>
             <button
               type="button"
               className="button-secondary button-small"
-              disabled={moveOffer.status === "moving"}
-              onClick={declineMoveOffer}
+              onClick={dismissMoveNotice}
             >
-              Not now
+              Dismiss
             </button>
           </div>
         )}
@@ -718,13 +863,44 @@ export default function Dashboard() {
             ),
           ]}
         </ul>
-        {isShowingList && list.length === 0 && unreadableCount === 0 && (
-          <p className="dashboard-empty">No projects added yet.</p>
-        )}
+        {isShowingList &&
+          list.length === 0 &&
+          unreadableCount === 0 &&
+          // Not while moved projects are on their way into the list.
+          currentMove?.status !== "moving" &&
+          currentMove?.status !== "moved" && (
+            <p className="dashboard-empty">No projects added yet.</p>
+          )}
         {!isInPlace && open && (
           <ProjectWindow onClose={closeProject}>{form}</ProjectWindow>
         )}
       </ScreenPanel>
+      {taskPhotos && (
+        <TaskPhotosDialog
+          key={`${taskPhotos.accountId}/${taskPhotos.projectId}/${taskPhotos.taskId}`}
+          accountId={taskPhotos.accountId}
+          projectId={taskPhotos.projectId}
+          taskId={taskPhotos.taskId}
+          taskTitle={
+            open?.values.tasks.find(({ id }) => id === taskPhotos.taskId)
+              ?.title ?? taskPhotos.title
+          }
+          filesToAdd={taskPhotos.filesToAdd}
+          onFilesTaken={() =>
+            setTaskPhotos(
+              (current) => current && { ...current, filesToAdd: null },
+            )
+          }
+          addFilesRef={addTaskFilesRef}
+          usageRef={storageUsageRef}
+          onSummaryChange={(count, latestImageId) =>
+            taskSummaries.report(taskPhotos.taskId, count, latestImageId)
+          }
+          onFailure={noteAccountFailure}
+          onMessage={showMessage}
+          onClose={() => setTaskPhotos(null)}
+        />
+      )}
       {deletion && (
         <DeleteProjectDialog
           project={deletion}

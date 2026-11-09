@@ -1,5 +1,7 @@
 // A signed-in account's images, in the project_image and project_image_bytes
-// tables of db/account-tables.sql (AD #48 Add Images To Projects). Every
+// tables of db/account-tables.sql (AD #48 Add Images To Projects). A task's
+// photos (AD #67 Add Photos To Tasks) are images with a task_id; a project's
+// own images have none. Every
 // query is limited to the account it is given, which only the handler
 // decides, from the sign-in. Sizes are the ones measured here, never the
 // browser's.
@@ -17,6 +19,7 @@ import {
   type ImageInfo,
   type ImageKind,
   type ImageListResponse,
+  type TaskImageSummaryResponse,
 } from "./images-api";
 import type { TransactionalDatabase } from "./project-store.server";
 
@@ -34,15 +37,25 @@ export type CaptionOutcome =
   | { kind: "not-found" }
   | { kind: "conflict"; image: ImageInfo };
 
+export type TaskImagesRemoveOutcome =
+  | { kind: "removed"; usedBytes: number }
+  | { kind: "not-found" }
+  // The task is in the project's saved tasks, as after Undo or on another
+  // device, so its photos are kept.
+  | { kind: "task-present" };
+
 export type ImageStore = {
   // The newest listPageSize images, or the page before a cursor, oldest
-  // first. Null if the account has no such project.
+  // first: the project's own images, or a task's photos if a task id is
+  // given. Null if the account has no such project.
   list(
     userId: string,
     projectId: string,
     before?: { createdAt: string; id: string },
+    taskId?: string | null,
   ): Promise<ImageListResponse | null>;
-  // A retry with the same id gives the image already added.
+  // A retry with the same id gives the image already added. With a task id,
+  // the task must be in the project's saved tasks.
   upload(
     userId: string,
     projectId: string,
@@ -50,7 +63,21 @@ export type ImageStore = {
     contentType: ImageContentType,
     original: Buffer,
     thumbnail: Buffer,
+    taskId?: string | null,
   ): Promise<UploadOutcome>;
+  // How many photos each task has, and its newest. Null if the account has
+  // no such project.
+  summarizeTasks(
+    userId: string,
+    projectId: string,
+  ): Promise<TaskImageSummaryResponse | null>;
+  // Removes the photos of a task that is no longer in the project's saved
+  // tasks, as when Undo of its deletion ends.
+  removeTaskImages(
+    userId: string,
+    projectId: string,
+    taskId: string,
+  ): Promise<TaskImagesRemoveOutcome>;
   read(
     userId: string,
     projectId: string,
@@ -88,6 +115,15 @@ const imageColumns = `id, content_type, original_size, caption,
 const isShown = `exists (select 1 from project
   where project.user_id = project_image.user_id
   and project.id = project_image.project_id and project.deleted_at is null)`;
+
+// Whether a project's saved tasks include the task given as $3.
+const hasTaskInData = `project.data->'tasks' @>
+  jsonb_build_array(jsonb_build_object('id', $3::text))`;
+
+// Limits a query on project_image to a project's own images, or a task's.
+function filterByTask(taskId: string | null, parameter: number) {
+  return taskId === null ? "task_id is null" : `task_id = $${parameter}`;
+}
 
 const usedBytesQuery = `select coalesce(sum(original_size + thumbnail_size), 0)
   as used from project_image where user_id = $1`;
@@ -133,6 +169,20 @@ export function createImageStore(
     return rows.length > 0;
   };
 
+  const hasTask = async (
+    query: Queryable,
+    userId: string,
+    projectId: string,
+    taskId: string,
+  ) => {
+    const { rows } = await query.query(
+      `select 1 as found from project where user_id = $1 and id = $2
+       and deleted_at is null and ${hasTaskInData}`,
+      [userId, projectId, taskId],
+    );
+    return rows.length > 0;
+  };
+
   const findImage = async (
     query: Queryable,
     userId: string,
@@ -140,7 +190,7 @@ export function createImageStore(
     imageId: string,
   ) => {
     const { rows } = await query.query(
-      `select ${imageColumns}, content_hash from project_image
+      `select ${imageColumns}, content_hash, task_id from project_image
        where user_id = $1 and project_id = $2 and id = $3`,
       [userId, projectId, imageId],
     );
@@ -148,21 +198,31 @@ export function createImageStore(
   };
 
   return {
-    async list(userId, projectId, before) {
+    async list(userId, projectId, before, taskId = null) {
       if (!(await hasProject(database, userId, projectId))) return null;
+      const task = taskId === null ? [] : [taskId];
       const { rows } = before
         ? await database.query(
             `select ${imageColumns} from project_image
              where user_id = $1 and project_id = $2
              and (created_at, id) < ($3::timestamptz, $4)
+             and ${filterByTask(taskId, 6)}
              order by created_at desc, id desc limit $5`,
-            [userId, projectId, before.createdAt, before.id, listPageSize + 1],
+            [
+              userId,
+              projectId,
+              before.createdAt,
+              before.id,
+              listPageSize + 1,
+              ...task,
+            ],
           )
         : await database.query(
             `select ${imageColumns} from project_image
              where user_id = $1 and project_id = $2
+             and ${filterByTask(taskId, 4)}
              order by created_at desc, id desc limit $3`,
-            [userId, projectId, listPageSize + 1],
+            [userId, projectId, listPageSize + 1, ...task],
           );
       const images = rows.slice(0, listPageSize).map(readImage).reverse();
       return {
@@ -173,7 +233,15 @@ export function createImageStore(
       };
     },
 
-    async upload(userId, projectId, imageId, contentType, original, thumbnail) {
+    async upload(
+      userId,
+      projectId,
+      imageId,
+      contentType,
+      original,
+      thumbnail,
+      taskId = null,
+    ) {
       const hash = hashImage(original, thumbnail);
       const client = await database.connect();
       try {
@@ -190,7 +258,11 @@ export function createImageStore(
           "select id from auth_user where id = $1 for no key update",
           [userId],
         );
-        if (!(await hasProject(client, userId, projectId))) {
+        const isFound =
+          taskId === null
+            ? await hasProject(client, userId, projectId)
+            : await hasTask(client, userId, projectId, taskId);
+        if (!isFound) {
           await client.query("rollback", []);
           return { kind: "not-found" };
         }
@@ -198,7 +270,8 @@ export function createImageStore(
         if (existing) {
           const usedBytes = await readUsedBytes(client, userId);
           await client.query("rollback", []);
-          return existing.content_hash === hash
+          return existing.content_hash === hash &&
+            (existing.task_id ?? null) === taskId
             ? { kind: "existing", image: readImage(existing), usedBytes }
             : { kind: "conflict" };
         }
@@ -210,8 +283,8 @@ export function createImageStore(
         const inserted = await client.query(
           `insert into project_image
              (user_id, project_id, id, content_type, original_size,
-              thumbnail_size, content_hash)
-           values ($1, $2, $3, $4, $5, $6, $7)
+              thumbnail_size, content_hash, task_id)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
            returning ${imageColumns}`,
           [
             userId,
@@ -221,6 +294,7 @@ export function createImageStore(
             original.length,
             thumbnail.length,
             hash,
+            taskId,
           ],
         );
         await bytes.put(
@@ -295,6 +369,55 @@ export function createImageStore(
       );
       if (rows.length === 0) return null;
       return { usedBytes: await readUsedBytes(database, userId) };
+    },
+
+    async summarizeTasks(userId, projectId) {
+      if (!(await hasProject(database, userId, projectId))) return null;
+      // The count is worked out before distinct keeps each task's newest.
+      const { rows } = await database.query(
+        `select distinct on (task_id) task_id, id,
+           count(*) over (partition by task_id) as count
+         from project_image
+         where user_id = $1 and project_id = $2 and task_id is not null
+         order by task_id, created_at desc, id desc`,
+        [userId, projectId],
+      );
+      return {
+        tasks: Object.fromEntries(
+          rows.map((row) => [
+            String(row.task_id),
+            { count: Number(row.count), latestImageId: String(row.id) },
+          ]),
+        ),
+      };
+    },
+
+    async removeTaskImages(userId, projectId, taskId) {
+      if (!(await hasProject(database, userId, projectId))) {
+        return { kind: "not-found" };
+      }
+      // Checked in the same statement, so that a task brought back just
+      // before keeps its photos. The bytes follow by the foreign key.
+      const { rows } = await database.query(
+        `delete from project_image
+         where user_id = $1 and project_id = $2 and task_id = $3
+         and exists (select 1 from project
+           where project.user_id = project_image.user_id
+           and project.id = project_image.project_id
+           and project.deleted_at is null and not ${hasTaskInData})
+         returning id`,
+        [userId, projectId, taskId],
+      );
+      if (
+        rows.length === 0 &&
+        (await hasTask(database, userId, projectId, taskId))
+      ) {
+        return { kind: "task-present" };
+      }
+      return {
+        kind: "removed",
+        usedBytes: await readUsedBytes(database, userId),
+      };
     },
   };
 }

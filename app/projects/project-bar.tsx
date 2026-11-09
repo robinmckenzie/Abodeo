@@ -2,6 +2,7 @@
 // an opened project's bar expands to show the form instead.
 import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
+import { canAnimate } from "../ui/can-animate";
 import { ArrowIcon } from "../ui/icons";
 import { calculateBarScrollEnd, calculateBarTopLimit } from "./bar-scroll";
 import { describeDueDate } from "./due-date";
@@ -376,11 +377,4 @@ export function ExpandedProjectBar({
 export function findListWidth(bar: HTMLElement, barWidth: number) {
   const list = bar.parentElement;
   return list ? Math.min(list.clientWidth, barWidth) : barWidth;
-}
-
-export function canAnimate(element: HTMLElement) {
-  return (
-    typeof element.animate === "function" &&
-    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-  );
 }

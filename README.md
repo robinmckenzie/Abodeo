@@ -82,7 +82,8 @@ their columns exist because Better Auth expects them, and are always empty. Test
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
 projects and their tasks are in `project`. The images added to its projects are in
-`project_image` (details, caption and sizes) and `project_image_bytes` (the files). The people its
+`project_image` (details, caption and sizes) and `project_image_bytes` (the files), with a task's
+photos marked by `task_id`. The people its
 projects can be assigned to are in `account_people`.
 
 ### Projects while signed in
@@ -105,11 +106,12 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
   the saved tasks are shown.
 - Opening a project loads its latest copy first, and it cannot be changed until that arrives. The
   list is loaded again when the window comes back into use, at most every 10 seconds.
-- On signing in with projects of the browser's own, the dashboard offers to move them in. Moving
-  sends each one; the server adds a copy rather than replacing a different project with the same
-  id, and sending the same projects again adds nothing. Each project is then removed from the
-  browser only if it has not changed there since. "Not now" is remembered until the next sign-in
-  or sign-out.
+- On signing in with projects of the browser's own, the dashboard moves them in by itself once the
+  account's projects have loaded (AD #68), and says how many moved. Moving sends each one; the
+  server adds a copy rather than replacing a different project with the same id, and sending the
+  same projects again adds nothing. Each project is then removed from the browser only if it has
+  not changed there since. A failed move leaves them in the browser, and is tried again from the
+  notice's Try again or at the next page load while signed in.
 - The welcome screen is chosen before the page loads, so while signed in the browser keeps a yes
   or no hint, `abodeo-account-has-projects`, of whether the account has projects of its own. It
   holds no project data and is removed on signing out.
@@ -154,7 +156,7 @@ AD #61 Manage People and AD #90 People Page Rework. The code is in `app/projects
   or Clement starts with those people, saved the first time it is read.
 - Reading an account's list never writes. With no list saved yet, the people its projects are
   assigned to are shown, and the list is saved by the first change to it, by moving the browser's
-  projects in, or once the offer to move them has been settled.
+  projects in, or once the browser has none left to move or its failed-move notice is dismissed.
 - A text box below the people in Assigned To adds a person and assigns them to the open project.
 - Each task in an opened project has its own person (AD #66 Assign Tasks To People), shown after
   its title and chosen from a list styled like Assigned To, with the mouse or the keyboard (Enter
@@ -208,6 +210,27 @@ AD #48 Add Images To Projects. The code is in `app/projects/image-*.ts`, `images
   (`image-bytes-store.server.ts`), so they can move to another store later, such as Vercel Blob,
   without touching the details. They are read as base64, as the driver would give bytea as hex,
   twice the size.
+- A task's photo (AD #67) is an image whose `task_id` names the task; a project's own images have
+  none, so images saved before stay project images. The project's list and the bar's newest image
+  leave task photos out; the allowance and the server's image counts (`imageCounts`) include them.
+  A task's photos are listed and added at `/api/projects/:projectId/tasks/:taskId/images` (only
+  for a task in the project's saved tasks), counted with their newest at
+  `/api/projects/:projectId/task-images`, and read, captioned and removed through the project's
+  image paths. `DELETE` on the task's path removes the photos of a task no longer in the saved
+  tasks, and refuses with `conflict` while it is there, as after Undo. Run
+  `db/account-tables.sql` v1.67.0 before deploying this: without the column, the signed-in
+  dashboard's project list fails.
+- Signed in, a saved task's row has an Add photos button (shown with its other buttons), and once
+  the task has photos, their count and the newest's thumbnail (`use-task-image-summaries.ts`, one
+  request when the project opens). Choosing either, or dropping pictures on the row, opens the
+  task's photos in a dialog over the project (`task-photos-dialog.tsx`), with the same timeline,
+  captions and viewer as the project's images; the viewer steps only through that task's photos.
+  While the dialog is open, a drop anywhere adds to that task. A drop elsewhere on the page still
+  adds to the project.
+- A deleted task's photos are hidden with its row. When its Undo ends unused (its time runs out,
+  another task is deleted, or the project closes), `TaskList` calls `onUndoEnd` and the dashboard
+  removes them, if it has any. If the browser closes first, or removing fails, they stay hidden and
+  keep using allowance. The project's delete dialog counts task photos in its images.
 - The browser decodes each file, draws a thumbnail (at most 100 KB, usually 20 to 40 KB) and sends
   both in one binary request, with an id it made, so that sending it again after a lost answer
   gives the same image. The server decides the type from the file's content, and checks the

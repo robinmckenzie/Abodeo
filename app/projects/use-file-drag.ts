@@ -15,7 +15,8 @@ export type FileDragOptions = {
   // Said once for a drag that would be refused, and for a drop that arrives
   // without one.
   onRefusal: (message: string) => void;
-  onDrop: (files: File[]) => void;
+  // Given what the files were dropped on, such as a task's row (AD #67).
+  onDrop: (files: File[], target: EventTarget | null) => void;
 };
 
 export function useFileDrag(options: FileDragOptions) {
@@ -105,7 +106,7 @@ export function useFileDrag(options: FileDragOptions) {
         if (!hadSaidRefusal) optionsRef.current.onRefusal(refusal);
         return;
       }
-      optionsRef.current.onDrop(files);
+      optionsRef.current.onDrop(files, event.target);
     };
 
     window.addEventListener("dragenter", onDragEnter);

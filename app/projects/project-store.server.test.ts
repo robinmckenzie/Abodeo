@@ -70,7 +70,7 @@ describe("the project store", () => {
     expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
       "delete from project where user_id = $1 and deleted_at <= $2::timestamptz",
       "select id, data from project where user_id = $1 and deleted_at is null",
-      "select distinct on (project_id) project_id, id from project_image where user_id = $1 and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
+      "select distinct on (project_id) project_id, id from project_image where user_id = $1 and task_id is null and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
       "select i.project_id, count(*) as count from project_image i join project p on p.user_id = i.user_id and p.id = i.project_id where i.user_id = $1 and (p.deleted_at is not null) = $2 group by i.project_id",
     ]);
     expect(fake.released()).toBe(0);
@@ -233,6 +233,17 @@ describe("the project store", () => {
 
       expect((await store.list("ada")).latestImageIds).toEqual({ p1: "i2" });
       expect((await store.list("cy")).latestImageIds).toEqual({});
+    });
+
+    it("leave out a task's photos (AD #67)", async () => {
+      const fake = createFakeDatabase();
+      fake.latestImages.push(
+        { user_id: "ada", project_id: "p1", id: "i1" },
+        { user_id: "ada", project_id: "p2", id: "t1", task_id: "task" },
+      );
+      const store = createProjectStore(fake.database, { now });
+
+      expect((await store.list("ada")).latestImageIds).toEqual({ p1: "i1" });
     });
 
     it("are left out, not fatal, when the image tables are not installed", async () => {
