@@ -106,11 +106,12 @@ AD #41 Access Projects Across Devices. The code is in `app/projects/project-*.se
   the saved tasks are shown.
 - Opening a project loads its latest copy first, and it cannot be changed until that arrives. The
   list is loaded again when the window comes back into use, at most every 10 seconds.
-- On signing in with projects of the browser's own, the dashboard offers to move them in. Moving
-  sends each one; the server adds a copy rather than replacing a different project with the same
-  id, and sending the same projects again adds nothing. Each project is then removed from the
-  browser only if it has not changed there since. "Not now" is remembered until the next sign-in
-  or sign-out.
+- On signing in with projects of the browser's own, the dashboard moves them in by itself once the
+  account's projects have loaded (AD #68), and says how many moved. Moving sends each one; the
+  server adds a copy rather than replacing a different project with the same id, and sending the
+  same projects again adds nothing. Each project is then removed from the browser only if it has
+  not changed there since. A failed move leaves them in the browser, and is tried again from the
+  notice's Try again or at the next page load while signed in.
 - The welcome screen is chosen before the page loads, so while signed in the browser keeps a yes
   or no hint, `abodeo-account-has-projects`, of whether the account has projects of its own. It
   holds no project data and is removed on signing out.
@@ -155,7 +156,7 @@ AD #61 Manage People and AD #90 People Page Rework. The code is in `app/projects
   or Clement starts with those people, saved the first time it is read.
 - Reading an account's list never writes. With no list saved yet, the people its projects are
   assigned to are shown, and the list is saved by the first change to it, by moving the browser's
-  projects in, or once the offer to move them has been settled.
+  projects in, or once the browser has none left to move or its failed-move notice is dismissed.
 - A text box below the people in Assigned To adds a person and assigns them to the open project.
 - Each task in an opened project has its own person (AD #66 Assign Tasks To People), shown after
   its title and chosen from a list styled like Assigned To, with the mouse or the keyboard (Enter

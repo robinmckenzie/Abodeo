@@ -783,9 +783,9 @@ html:has(.app-layout) {
   color: var(--red);
 }
 
-/* The offer to move a browser's projects into the account: a question,
-   not an error. */
-.dashboard-move-offer {
+/* The notice of moving a browser's projects into the account (AD #68):
+   under way, done, or failed and to be tried again. */
+.dashboard-move-notice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -794,11 +794,11 @@ html:has(.app-layout) {
   color: var(--ink);
 }
 
-.dashboard-move-offer .button-secondary:hover:not(:disabled) {
+.dashboard-move-notice .button-secondary:hover:not(:disabled) {
   background: var(--paper);
 }
 
-.dashboard-move-offer p {
+.dashboard-move-notice p {
   flex: 1 1 20rem;
   margin: 0;
 }
