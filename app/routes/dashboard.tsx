@@ -14,10 +14,7 @@ import {
 import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import { importProjects } from "../projects/account-projects";
 import { DeleteProjectDialog } from "../projects/delete-project-dialog";
-import {
-  FloatingMessages,
-  useFloatingMessages,
-} from "../ui/floating-messages";
+import { FloatingMessages, useFloatingMessages } from "../ui/floating-messages";
 import {
   areAllTypesUnsupported,
   noProjectOpenMessage,
@@ -567,9 +564,7 @@ export default function Dashboard() {
       isNew={entry.id === null}
       isReadOnly={isClosing ? undefined : entry.isLoading}
       people={readyPeople?.people ?? noPeople}
-      onAddPerson={
-        !isClosing && readyPeople ? people.addPerson : undefined
-      }
+      onAddPerson={!isClosing && readyPeople ? people.addPerson : undefined}
       projectKey={isClosing ? undefined : entry.key}
       message={
         !isClosing && import.meta.env.DEV && testMessageKey === entry.key
@@ -602,9 +597,7 @@ export default function Dashboard() {
       onFieldFocus={
         isClosing ? () => {} : (name) => (focusFieldRef.current = name)
       }
-      getCalendarDate={
-        isClosing ? undefined : () => calendarDateRef.current
-      }
+      getCalendarDate={isClosing ? undefined : () => calendarDateRef.current}
       onCalendarDateChange={
         isClosing ? undefined : (date) => (calendarDateRef.current = date)
       }
@@ -675,8 +668,10 @@ export default function Dashboard() {
             drafts={taskDrafts}
             onChange={isClosing ? async () => null : editing.changeTasks}
             finishEditRef={isClosing ? undefined : editing.finishTaskEditRef}
+            // A closing bar's tasks have no photos and end their Undo with the
+            // callback they had while open, not the next project's.
             photos={
-              photosProjectId
+              !isClosing && photosProjectId
                 ? {
                     summaries: taskSummaries.summaries,
                     thumbnails: taskSummaries.thumbnails,
@@ -686,19 +681,23 @@ export default function Dashboard() {
                   }
                 : null
             }
-            onUndoEnd={(task) => {
-              if (
-                photosAccountId &&
-                photosProjectId &&
-                taskSummaries.summaries[task.id]
-              ) {
-                removeDeletedTaskPhotos(
-                  photosAccountId,
-                  photosProjectId,
-                  task.id,
-                );
-              }
-            }}
+            onUndoEnd={
+              isClosing
+                ? undefined
+                : (task) => {
+                    if (
+                      photosAccountId &&
+                      photosProjectId &&
+                      taskSummaries.summaries[task.id]
+                    ) {
+                      removeDeletedTaskPhotos(
+                        photosAccountId,
+                        photosProjectId,
+                        task.id,
+                      );
+                    }
+                  }
+            }
           />
         )
       }
@@ -728,7 +727,9 @@ export default function Dashboard() {
       <ScreenPanel
         title="Projects"
         icon={<ProjectsIcon />}
-        className={isDropTarget ? "projects-screen is-drop-target" : "projects-screen"}
+        className={
+          isDropTarget ? "projects-screen is-drop-target" : "projects-screen"
+        }
         ref={mainRef}
         tabIndex={-1}
         isTitleInert={isAddingInPlace}
