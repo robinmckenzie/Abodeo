@@ -27,7 +27,12 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 }
 
 function makeTask(title: string): Task {
-  return { id: crypto.randomUUID(), title, isDone: false, assignee: unassignedId };
+  return {
+    id: crypto.randomUUID(),
+    title,
+    isDone: false,
+    assignee: unassignedId,
+  };
 }
 
 type Server = {
@@ -482,6 +487,33 @@ describe("useProjectEditing signed in", () => {
     expect(editing.onDeleted).not.toHaveBeenCalled();
   });
 
+  it("does not alter another project when a field save finishes after that one opened", async () => {
+    const server = startServer();
+    const first = makeProject({ title: "Kitchen" });
+    const second = makeProject({ title: "Garden", notes: "Mow" });
+    seed(server, first, second);
+    const editing = renderEditing(accountView);
+    act(() => editing.result.current.openProject(first, 40, 0));
+    await settle();
+
+    // The save is on its way when the second project opens.
+    let release!: () => void;
+    server.gate = new Promise<void>((resolve) => (release = resolve));
+    act(() => editing.result.current.changeFields({ notes: "Tiles" }));
+    await settle(pause);
+    act(() => editing.result.current.openProject(second, 40, 1));
+    await settle();
+    expect(editing.result.current.open?.id).toBe(second.id);
+
+    server.gate = null;
+    release();
+    await settle(pause);
+    expect(stored(server, first.id)?.notes).toBe("Tiles");
+    expect(editing.result.current.open?.id).toBe(second.id);
+    expect(editing.result.current.open?.values.notes).toBe("Mow");
+    expect(stored(server, second.id)?.notes).toBe("Mow");
+  });
+
   describe("changing tasks", () => {
     it("shows a task at once and keeps the saved tasks", async () => {
       const server = startServer();
@@ -568,6 +600,21 @@ describe("useProjectEditing signed in", () => {
   });
 
   describe("leaving", () => {
+    it("keeps task text typed but not added when leaving is cancelled", async () => {
+      const server = startServer();
+      const { editing, project } = await openAccount(server);
+      editing.taskDrafts.keepText(project.id, "Buy tiles");
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      let leave = true;
+      await act(async () => {
+        leave = await editing.result.current.prepareToLeave();
+      });
+      expect(leave).toBe(false);
+      expect(editing.taskDrafts.readText(project.id)).toBe("Buy tiles");
+      expect(editing.taskDrafts.hasUnaddedText()).toBe(true);
+      expect(editing.result.current.open?.id).toBe(project.id);
+    });
+
     it("asks about nothing and returns true when there is nothing to lose", async () => {
       const server = startServer();
       const { editing } = await openAccount(server);
