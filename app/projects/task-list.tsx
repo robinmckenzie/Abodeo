@@ -1,13 +1,21 @@
 // An opened project's tasks: a checklist below its notes, with a box below
 // it for adding tasks, several at once, one per line. Each change is saved
 // straight away by the dashboard, which shows it at once and puts it back if
-// saving fails.
+// saving fails. Each task shows who it is assigned to, which can be changed
+// on its row (AD #66 Assign Tasks To People). Signed in, a task can have
+// photos (AD #67 Add Photos To Tasks): its row has a button to add them, and
+// once it has some, their count and the newest's thumbnail.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { calculateDragScroll } from "./drag-scroll";
-import { ArrowIcon, BinIcon, DragHandleIcon } from "../ui/icons";
-import { canAnimate } from "./project-bar";
+import type { TaskImageSummary } from "./images-api";
+import type { Person } from "./people";
+import type { AddPerson } from "./project-form";
+import { canAnimate } from "../ui/can-animate";
+import { fitHeightToText } from "../ui/fit-height-to-text";
+import { ArrowIcon, BinIcon, DragHandleIcon, PhotoIcon } from "../ui/icons";
 import { calculateSlideStagger, slideTiming } from "./slide-timing";
+import { TaskAssigneePicker } from "./task-assignee-picker";
 import {
   addTasks,
   createTasks,
@@ -17,24 +25,31 @@ import {
   readTaskEntries,
   renameTask,
   restoreTask,
+  setTaskAssignee,
   setTaskDone,
   type Task,
 } from "./tasks";
+import type { TaskDrafts } from "./task-drafts";
 
 export type TaskChange = (tasks: Task[]) => Task[];
+
+// A signed-in project's task photos, for the rows.
+export type TaskPhotos = {
+  summaries: Record<string, TaskImageSummary>;
+  thumbnails: Record<string, string>;
+  // Whether files dragged over the page would be accepted, so that the row
+  // under them shows they would go to its task.
+  isDropTarget: boolean;
+  onAdd: (task: Task, files: File[]) => void;
+  onOpen: (task: Task) => void;
+};
+
+// A drag of files that goes quiet this long has left the row.
+const fileDragDelay = 300;
 
 // How long Undo is offered after a task is deleted. Closing the project also
 // ends it.
 export const undoDuration = 8000;
-
-// Text typed into a project's box but not yet added, kept until the page
-// reloads, so that closing the project does not lose it.
-const unsubmittedText = new Map<string, string>();
-
-// Whether any project has such text, which leaving the page would lose.
-export function hasUnsubmittedTaskText() {
-  return [...unsubmittedText.values()].some((text) => text.trim() !== "");
-}
 
 // Identifies a task being dragged, so that only tasks can be dropped here,
 // and a task dropped into a text field does not type its title there.
@@ -55,18 +70,38 @@ const titleSteps: Partial<Record<string, -1 | 1>> = {
 export function TaskList({
   projectId,
   tasks,
+  people,
+  onAddPerson,
+  drafts,
   onChange,
   finishEditRef,
+  photos = null,
+  onUndoEnd,
   className,
   style,
 }: {
   projectId: string;
   tasks: Task[];
+  // Who a task can be assigned to, besides Unassigned.
+  people: readonly Person[];
+  // Adds someone from a task's list of people, who is then assigned to it
+  // (AD #128). Without it, there is no box to add someone.
+  onAddPerson?: AddPerson;
+  // Keeps text typed into the box but not yet added, so that closing the
+  // project does not lose it.
+  drafts: TaskDrafts;
   // Saves a change, giving the reason it failed, or null once saved.
   onChange: (change: TaskChange) => Promise<string | null>;
   // Set while a title is being edited, so that closing the project can save
   // the edit. Gives the reason saving failed, or null once saved.
   finishEditRef?: React.RefObject<(() => Promise<string | null>) | null>;
+  // Null signed out, and in the copy shown while a project closes.
+  photos?: TaskPhotos | null;
+  // Called with a deleted task once its Undo ends without being used: its
+  // time runs out, another deletion replaces it, or the project closes,
+  // which is when this is no longer given or the list goes. Not called when
+  // Undo is used, or when the deletion could not be saved.
+  onUndoEnd?: (task: Task) => void;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -78,7 +113,7 @@ export function TaskList({
   // Each task's place in the list as last shown, from which a reordered
   // task slides to its new place.
   const rowTopsRef = useRef(new Map<string, number>());
-  const [text, setText] = useState(() => unsubmittedText.get(projectId) ?? "");
+  const [text, setText] = useState(() => drafts.readText(projectId));
   const [failure, setFailure] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(
     null,
@@ -102,6 +137,35 @@ export function TaskList({
   // A control to focus once the list has rendered, such as a task's title
   // after its edit ends.
   const focusAfterRenderRef = useRef<string | null>(null);
+
+  // The deletion whose Undo is offered and has not yet ended, and who to
+  // tell when it does.
+  const offeredRef = useRef<Task | null>(null);
+  const onUndoEndRef = useRef(onUndoEnd);
+  useEffect(() => {
+    if (onUndoEnd) onUndoEndRef.current = onUndoEnd;
+  });
+  const endUndoOffer = () => {
+    const task = offeredRef.current;
+    offeredRef.current = null;
+    if (task) onUndoEndRef.current?.(task);
+  };
+  // The project has closed, and this is the copy shown while it squashes.
+  const hasUndoEnd = onUndoEnd !== undefined;
+  useEffect(() => {
+    if (!hasUndoEnd) endUndoOffer();
+  }, [hasUndoEnd]);
+  // At mount nothing is offered, so React's second run of effects in
+  // development has nothing to end.
+  useEffect(() => () => endUndoOffer(), []);
+
+  // The task whose row files are dragged over, and the task photos are being
+  // chosen for.
+  const [fileDropTaskId, setFileDropTaskId] = useState<string | null>(null);
+  const fileDragTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(fileDragTimerRef.current), []);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTaskRef = useRef<Task | null>(null);
 
   const save = async (change: TaskChange) => {
     const reason = await onChange(change);
@@ -212,8 +276,7 @@ export function TaskList({
 
   const changeText = (value: string) => {
     setText(value);
-    if (value) unsubmittedText.set(projectId, value);
-    else unsubmittedText.delete(projectId);
+    drafts.keepText(projectId, value);
   };
 
   const isAddingRef = useRef(false);
@@ -226,7 +289,8 @@ export function TaskList({
     isAddingRef.current = false;
     if (reason) return;
     isShowingAddedRef.current = true;
-    changeText("");
+    setText("");
+    drafts.clearText(projectId);
   };
 
   // The list scrolls to show the tasks added at its end.
@@ -277,11 +341,14 @@ export function TaskList({
   });
 
   const removeTask = async (task: Task, index: number) => {
+    endUndoOffer();
+    offeredRef.current = task;
     setDeleted({ task, index });
     focusAfterRenderRef.current = `#${CSS.escape(id)}-undo`;
     const reason = await save((current) => deleteTask(current, task.id));
     // The task is back, so focus returns to its Delete button.
     if (reason) {
+      if (offeredRef.current === task) offeredRef.current = null;
       setDeleted(null);
       focusAfterRenderRef.current = buttonSelector(`${task.id}-delete`);
     }
@@ -290,11 +357,13 @@ export function TaskList({
   // If putting the task back cannot be saved, Undo is offered again.
   const undoDelete = async () => {
     if (!deleted) return;
+    offeredRef.current = null;
     setDeleted(null);
     focusAfterRenderRef.current = titleSelector(deleted.task.id);
     const { task, index } = deleted;
     const reason = await save((current) => restoreTask(current, task, index));
     if (reason) {
+      offeredRef.current = task;
       setDeleted({ task, index });
       focusAfterRenderRef.current = `#${CSS.escape(id)}-undo`;
     }
@@ -305,6 +374,7 @@ export function TaskList({
     if (!deleted) return;
     const timer = setTimeout(() => {
       const hadFocus = document.activeElement === undoRef.current;
+      endUndoOffer();
       setDeleted(null);
       if (hadFocus) entryRef.current?.focus();
     }, undoDuration);
@@ -404,12 +474,28 @@ export function TaskList({
             if (dropIndex === tasks.length && index === tasks.length - 1) {
               classes.push("drops-after");
             }
+            if (photos?.isDropTarget && fileDropTaskId === task.id) {
+              classes.push("is-file-drop-target");
+            }
+            const summary = photos?.summaries[task.id];
             return (
               <li
                 key={task.id}
                 className={classes.join(" ")}
                 data-task-id={task.id}
+                // Where dropped picture files go to this task's photos. The
+                // dashboard adds them.
+                data-photo-task-id={photos ? task.id : undefined}
                 onDragOver={(event) => {
+                  if (photos && event.dataTransfer.types.includes("Files")) {
+                    setFileDropTaskId(task.id);
+                    clearTimeout(fileDragTimerRef.current);
+                    fileDragTimerRef.current = setTimeout(
+                      () => setFileDropTaskId(null),
+                      fileDragDelay,
+                    );
+                    return;
+                  }
                   if (!draggedId) return;
                   const box = event.currentTarget.getBoundingClientRect();
                   const isLowerHalf = event.clientY > box.top + box.height / 2;
@@ -501,7 +587,52 @@ export function TaskList({
                     {task.title}
                   </button>
                 )}
+                {photos && summary && (
+                  <button
+                    type="button"
+                    className="task-photos"
+                    aria-label={`${describePhotoCount(summary.count)} of ${task.title}`}
+                    title={describePhotoCount(summary.count)}
+                    onClick={() => photos.onOpen(task)}
+                  >
+                    {photos.thumbnails[task.id] ? (
+                      <img src={photos.thumbnails[task.id]} alt="" />
+                    ) : (
+                      <span
+                        className="task-photos-placeholder"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="task-photos-count">{summary.count}</span>
+                  </button>
+                )}
+                <TaskAssigneePicker
+                  taskId={task.id}
+                  taskTitle={task.title}
+                  assignee={task.assignee}
+                  people={people}
+                  onAddPerson={onAddPerson}
+                  onChoose={(assignee) =>
+                    void save((current) =>
+                      setTaskAssignee(current, task.id, assignee),
+                    )
+                  }
+                />
                 <span className="task-controls">
+                  {photos && (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`Add photos to ${task.title}`}
+                      title="Add photos"
+                      onClick={() => {
+                        photoTaskRef.current = task;
+                        photoInputRef.current?.click();
+                      }}
+                    >
+                      <PhotoIcon />
+                    </button>
+                  )}
                   <TaskButton
                     label={`Move ${task.title} up`}
                     focusKey={`${task.id}-1`}
@@ -527,6 +658,23 @@ export function TaskList({
             );
           })}
         </ul>
+      )}
+      {photos && (
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          multiple
+          hidden
+          aria-label="Photos to add"
+          onChange={(event) => {
+            const files = [...(event.target.files ?? [])];
+            event.target.value = "";
+            const task = photoTaskRef.current;
+            photoTaskRef.current = null;
+            if (task && files.length > 0) photos.onAdd(task, files);
+          }}
+        />
       )}
       <p className="task-undo" role="status">
         {deleted && (
@@ -568,6 +716,10 @@ export function TaskList({
   );
 }
 
+export function describePhotoCount(count: number) {
+  return count === 1 ? "1 photo" : `${count} photos`;
+}
+
 // The position in an element's text that a click landed on, or null when
 // it came from the keyboard or the browser cannot tell.
 function findClickedCharacter(event: React.MouseEvent<HTMLElement>) {
@@ -589,12 +741,6 @@ function findClickedCharacter(event: React.MouseEvent<HTMLElement>) {
 function findShift(row: HTMLElement) {
   const transform = getComputedStyle(row).transform;
   return !transform || transform === "none" ? 0 : new DOMMatrix(transform).m42;
-}
-
-export function fitHeightToText(box: HTMLTextAreaElement) {
-  box.style.height = "auto";
-  const borders = box.offsetHeight - box.clientHeight;
-  box.style.height = `${box.scrollHeight + borders}px`;
 }
 
 function buttonSelector(focusKey: string) {

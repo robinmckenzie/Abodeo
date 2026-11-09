@@ -21,6 +21,13 @@ const project = (id: string, title: string, overrides: Partial<Project> = {}) =>
 
 const savedForm = (value: Project) => JSON.parse(serialiseProject(value));
 
+const task = (id: string, assignee = "unassigned") => ({
+  id,
+  title: id,
+  isDone: false,
+  assignee,
+});
+
 const now = () => "2026-10-22T00:00:00.000Z";
 
 describe("the project store", () => {
@@ -63,14 +70,14 @@ describe("the project store", () => {
     expect(fake.statements.slice(count).map(({ text }) => text)).toEqual([
       "delete from project where user_id = $1 and deleted_at <= $2::timestamptz",
       "select id, data from project where user_id = $1 and deleted_at is null",
-      "select distinct on (project_id) project_id, id from project_image where user_id = $1 and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
+      "select distinct on (project_id) project_id, id from project_image where user_id = $1 and task_id is null and project_id in ( select id from project where user_id = $1 and deleted_at is null) order by project_id, created_at desc, id desc",
       "select i.project_id, count(*) as count from project_image i join project p on p.user_id = i.user_id and p.id = i.project_id where i.user_id = $1 and (p.deleted_at is not null) = $2 group by i.project_id",
     ]);
     expect(fake.released()).toBe(0);
   });
 
   it("keeps the ids given to copies, so that a copy sent again is found", () => {
-    expect(buildCopyId(project("p1", "Shed"))).toBe("p1-copy-23fa5aemffr");
+    expect(buildCopyId(project("p1", "Shed"))).toBe("p1-copy-tgj7n3jayt");
   });
 
   it("gives the project already made when a create is sent again", async () => {
@@ -228,6 +235,17 @@ describe("the project store", () => {
       expect((await store.list("cy")).latestImageIds).toEqual({});
     });
 
+    it("leave out a task's photos (AD #67)", async () => {
+      const fake = createFakeDatabase();
+      fake.latestImages.push(
+        { user_id: "ada", project_id: "p1", id: "i1" },
+        { user_id: "ada", project_id: "p2", id: "t1", task_id: "task" },
+      );
+      const store = createProjectStore(fake.database, { now });
+
+      expect((await store.list("ada")).latestImageIds).toEqual({ p1: "i1" });
+    });
+
     it("are left out, not fatal, when the image tables are not installed", async () => {
       const fake = createFakeDatabase();
       fake.removeImageTable();
@@ -338,6 +356,32 @@ describe("the project store", () => {
       expect(
         await store.saveChanges("ada", "p1", { notes: "" }, { notes: "x" }),
       ).toMatchObject({ kind: "saved", project: { assignee: "andy" } });
+    });
+
+    it("refuses a save assigning a task to someone not in the list (AD #66)", async () => {
+      const fake = createFakeDatabase();
+      saveList(fake, [andy]);
+      const store = createProjectStore(fake.database, { now });
+      await store.create("ada", "p1", project("p1", "Shed"));
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { tasks: [] },
+          { tasks: [task("t1", "boris")] },
+        ),
+      ).toEqual({ kind: "unknown-assignee" });
+      expect(
+        await store.saveChanges(
+          "ada",
+          "p1",
+          { tasks: [] },
+          { tasks: [task("t1", "andy")] },
+        ),
+      ).toMatchObject({
+        kind: "saved",
+        project: { assignee: "unassigned", tasks: [{ assignee: "andy" }] },
+      });
     });
 
     describe("moving a browser's people in", () => {
@@ -478,6 +522,28 @@ describe("the project store", () => {
         ).toHaveLength(2);
       });
 
+      it("matches the people tasks are assigned to as it does the project's (AD #66)", async () => {
+        const fake = createFakeDatabase();
+        saveList(fake, [{ id: "b9", name: "boris" }]);
+        const store = createProjectStore(fake.database, { now });
+        await store.importProjects(
+          "ada",
+          [project("p1", "Shed", { tasks: [task("a", "x1"), task("b", "x2")] })],
+          browser,
+        );
+        expect(
+          (fake.projects[0].data as Project).tasks.map((t) => t.assignee),
+        ).toEqual(["unassigned", "b9"]);
+        // Sent again, it is found as already moved, not copied.
+        expect(
+          await store.importProjects(
+            "ada",
+            [project("p1", "Shed", { tasks: [task("a", "x1"), task("b", "x2")] })],
+            browser,
+          ),
+        ).toEqual({ p1: "already-moved" });
+      });
+
       it("finds what it made before when sent again after someone was renamed", async () => {
         const fake = createFakeDatabase();
         saveList(fake, [{ id: "b9", name: "Boris" }]);
@@ -613,6 +679,34 @@ describe("the project store", () => {
 
       expect(await store.read("ada", "p1")).toMatchObject({
         project: { assignee: "unassigned" },
+      });
+    });
+
+    it("restores tasks whose person was removed as Unassigned (AD #66)", async () => {
+      const { fake, store } = setUp();
+      const saveList = (people: { id: string; name: string }[]) =>
+        fake.people.set("ada", { data: { version: 1, people }, revision: 1 });
+      saveList([
+        { id: "andy", name: "Andy" },
+        { id: "boris", name: "Boris" },
+      ]);
+      await store.create(
+        "ada",
+        "p1",
+        project("p1", "Paint", {
+          assignee: "boris",
+          tasks: [task("a", "andy"), task("b", "boris")],
+        }),
+      );
+      await store.remove("ada", "p1");
+      saveList([{ id: "boris", name: "Boris" }]);
+      await store.restore("ada", "p1");
+
+      expect(await store.read("ada", "p1")).toMatchObject({
+        project: {
+          assignee: "boris",
+          tasks: [{ assignee: "unassigned" }, { assignee: "boris" }],
+        },
       });
     });
 

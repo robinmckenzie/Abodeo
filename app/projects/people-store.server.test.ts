@@ -164,7 +164,7 @@ describe("the people store", () => {
       });
       expect(
         await store.apply("ada", { op: "remove", id: "andy", dryRun: true }),
-      ).toEqual({ kind: "preview", count: 2, unreadable: 1 });
+      ).toEqual({ kind: "preview", count: 2, taskCount: 0, unreadable: 1 });
       expect(fake.people.size).toBe(0);
     });
 
@@ -211,11 +211,71 @@ describe("the people store", () => {
           id: "andy",
           expectedCount: 1,
         }),
-      ).toEqual({ kind: "count-changed", count: 2, unreadable: 0 });
+      ).toEqual({
+        kind: "count-changed",
+        count: 2,
+        taskCount: 0,
+        unreadable: 0,
+      });
       expect(assigneesOf()).toEqual({ p1: "andy", p2: "andy" });
       expect(await store.read("ada")).toMatchObject({
         people: [{ id: "andy", name: "Andy" }],
       });
+    });
+
+    it("counts and unassigns their tasks, and only theirs (AD #66)", async () => {
+      const { fake, store } = setUp({ p1: "boris" });
+      const task = (id: string, assignee: string) => ({
+        id,
+        title: id,
+        isDone: false,
+        assignee,
+      });
+      fake.projects.push({
+        user_id: "ada",
+        id: "p2",
+        // Saved as version 3, before tasks had assignees.
+        data: { ...JSON.parse(serialiseProject(project("p2"))), version: 3 },
+        revision: 1,
+      });
+      fake.projects[0].data = JSON.parse(
+        serialiseProject(
+          project("p1", {
+            assignee: "boris",
+            tasks: [task("a", "andy"), task("b", "boris"), task("c", "andy")],
+          }),
+        ),
+      );
+      await store.apply("ada", { op: "establish" });
+      await store.apply("ada", { op: "add", id: "andy", name: "Andy" });
+      expect(
+        await store.apply("ada", { op: "remove", id: "andy", dryRun: true }),
+      ).toEqual({ kind: "preview", count: 0, taskCount: 2, unreadable: 0 });
+      expect(
+        await store.apply("ada", {
+          op: "remove",
+          id: "andy",
+          expectedCount: 0,
+          expectedTaskCount: 1,
+        }),
+      ).toMatchObject({ kind: "count-changed", count: 0, taskCount: 2 });
+      expect(
+        await store.apply("ada", {
+          op: "remove",
+          id: "andy",
+          expectedCount: 0,
+          expectedTaskCount: 2,
+        }),
+      ).toMatchObject({ kind: "done" });
+      const p1 = fake.projects[0].data as Project;
+      expect(p1.assignee).toBe("boris");
+      expect(p1.tasks.map((t) => t.assignee)).toEqual([
+        "unassigned",
+        "boris",
+        "unassigned",
+      ]);
+      // The project without their tasks is left as it was.
+      expect((fake.projects[1].data as { version: number }).version).toBe(3);
     });
 
     it("finds the person already removed when the removal is sent again", async () => {
@@ -277,7 +337,7 @@ describe("the people store and the Bin (AD #62 Delete Projects)", () => {
     fake.projects[1].deletedAt = "2026-10-22T00:00:00.000Z";
     expect(
       await store.apply("ada", { op: "remove", id: "andy", dryRun: true }),
-    ).toEqual({ kind: "preview", count: 1, unreadable: 0 });
+    ).toEqual({ kind: "preview", count: 1, taskCount: 0, unreadable: 0 });
   });
 
   it("leaves a binned project's person alone when they are removed", async () => {

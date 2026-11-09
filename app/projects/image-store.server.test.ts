@@ -15,6 +15,7 @@ type ImageRow = {
   content_hash: string;
   caption: string;
   created_at: string;
+  task_id?: string | null;
 };
 type BytesRow = {
   user_id: string;
@@ -28,7 +29,12 @@ type BytesRow = {
 // recording each one, and undoing a transaction's changes on rollback.
 function createFakeDatabase() {
   const state = {
-    projects: [] as { user_id: string; id: string; isBinned?: boolean }[],
+    projects: [] as {
+      user_id: string;
+      id: string;
+      isBinned?: boolean;
+      tasks?: string[];
+    }[],
     images: [] as ImageRow[],
     bytes: [] as BytesRow[],
   };
@@ -45,7 +51,26 @@ function createFakeDatabase() {
       (row) => row.user_id === userId && row.id === projectId && !row.isBinned,
     );
 
+  // A statement that names a task in the saved data reaches a project only
+  // while its saved tasks include that task, given as $3.
+  const hasSavedTask = (sql: string, userId: string, projectId: string) =>
+    state.projects.some(
+      (row) =>
+        row.user_id === userId &&
+        row.id === projectId &&
+        (row.tasks ?? []).includes(String(currentValues[2])),
+    );
+  let currentValues: unknown[] = [];
+
+  // Whether a row is a project image, or the task's, as the statement asks.
+  const isInScope = (sql: string, values: unknown[], row: ImageRow) => {
+    if (sql.includes("task_id is null")) return !row.task_id;
+    const match = /task_id = \$(\d)/.exec(sql);
+    return !match || row.task_id === values[Number(match[1]) - 1];
+  };
+
   const run = async (text: string, values: unknown[]) => {
+    currentValues = values;
     const sql = text.replace(/\s+/g, " ").trim();
     statements.push({ text: sql, values });
     if (failOn?.pattern.test(sql)) throw failOn.error;
@@ -56,7 +81,9 @@ function createFakeDatabase() {
       const found =
         state.projects.some(
           (row) => row.user_id === userId && row.id === projectId,
-        ) && isReached(sql, userId, projectId);
+        ) &&
+        isReached(sql, userId, projectId) &&
+        (!sql.includes("@>") || hasSavedTask(sql, userId, projectId));
       return { rows: found ? [{ found: 1 }] : [] };
     }
     if (sql.includes("as used from project_image")) {
@@ -80,15 +107,20 @@ function createFakeDatabase() {
     }
     if (sql.startsWith("select id, content_type")) {
       const mine = state.images
-        .filter((row) => row.user_id === userId && row.project_id === projectId)
+        .filter(
+          (row) =>
+            row.user_id === userId &&
+            row.project_id === projectId &&
+            isInScope(sql, values, row),
+        )
         .sort(
           (a, b) =>
             b.created_at.localeCompare(a.created_at) ||
             b.id.localeCompare(a.id),
         );
-      const limit = Number(values.at(-1));
-      const before =
-        values.length === 5 ? { at: values[2], id: values[3] } : null;
+      const hasCursor = sql.includes("(created_at, id) <");
+      const limit = Number(values[hasCursor ? 4 : 2]);
+      const before = hasCursor ? { at: values[2], id: values[3] } : null;
       const page = mine.filter(
         (row) =>
           !before ||
@@ -122,6 +154,7 @@ function createFakeDatabase() {
         original_size: Number(values[4]),
         thumbnail_size: Number(values[5]),
         content_hash: String(values[6]),
+        task_id: (values[7] as string | null) ?? null,
         caption: "",
         created_at: `2026-10-22T10:00:00.${String(++clock).padStart(6, "0")}Z`,
       };
@@ -169,6 +202,51 @@ function createFakeDatabase() {
       if (row) row.caption = String(values[3]);
       return { rows: row ? [row] : [] };
     }
+    if (sql.startsWith("select distinct on (task_id)")) {
+      const counts = new Map<string, number>();
+      const newest = new Map<string, ImageRow>();
+      for (const row of state.images) {
+        if (row.user_id !== userId || row.project_id !== projectId) continue;
+        if (!row.task_id) continue;
+        counts.set(row.task_id, (counts.get(row.task_id) ?? 0) + 1);
+        const known = newest.get(row.task_id);
+        if (!known || row.created_at > known.created_at) {
+          newest.set(row.task_id, row);
+        }
+      }
+      return {
+        rows: [...newest].map(([taskId, row]) => ({
+          task_id: taskId,
+          id: row.id,
+          count: String(counts.get(taskId)),
+        })),
+      };
+    }
+    if (sql.startsWith("delete from project_image") && sql.includes("@>")) {
+      if (
+        !isReached(sql, userId, projectId) ||
+        hasSavedTask(sql, userId, projectId)
+      ) {
+        return { rows: [] };
+      }
+      const removed = state.images.filter(
+        (row) =>
+          row.user_id === userId &&
+          row.project_id === projectId &&
+          row.task_id === values[2],
+      );
+      state.images = state.images.filter((row) => !removed.includes(row));
+      state.bytes = state.bytes.filter(
+        (bytes) =>
+          !removed.some(
+            (row) =>
+              row.user_id === bytes.user_id &&
+              row.project_id === bytes.project_id &&
+              row.id === bytes.image_id,
+          ),
+      );
+      return { rows: removed.map(({ id }) => ({ id })) };
+    }
     if (sql.startsWith("delete from project_image ")) {
       const index = state.images.findIndex(
         (row) =>
@@ -213,8 +291,13 @@ function createFakeDatabase() {
     database,
     state,
     statements,
-    addProject(userId: string, id: string) {
-      state.projects.push({ user_id: userId, id });
+    addProject(userId: string, id: string, tasks: string[] = []) {
+      state.projects.push({ user_id: userId, id, tasks });
+    },
+    setTasks(userId: string, id: string, tasks: string[]) {
+      state.projects.find(
+        (row) => row.user_id === userId && row.id === id,
+      )!.tasks = tasks;
     },
     binProject(userId: string, id: string) {
       state.projects.find(
@@ -232,8 +315,8 @@ const thumbnail = Buffer.from("thumb");
 
 function setup() {
   const fake = createFakeDatabase();
-  fake.addProject("ada", "shed");
-  fake.addProject("bob", "shed");
+  fake.addProject("ada", "shed", ["task-1", "task-2"]);
+  fake.addProject("bob", "shed", ["task-1"]);
   return { ...fake, store: createImageStore(fake.database) };
 }
 
@@ -662,5 +745,206 @@ describe("removing", () => {
     expect(deletes).toHaveLength(1);
     expect(deletes[0].text).toContain("delete from project_image ");
     expect(await store.remove("ada", "shed", "one")).toBeNull();
+  });
+});
+
+describe("a task's photos (AD #67 Add Photos To Tasks)", () => {
+  const addPhoto = (
+    store: ReturnType<typeof setup>["store"],
+    imageId: string,
+    taskId: string | null,
+    userId = "ada",
+  ) =>
+    store.upload(
+      userId,
+      "shed",
+      imageId,
+      "image/png",
+      Buffer.from(imageId),
+      thumbnail,
+      taskId,
+    );
+
+  it("are kept apart from the project's images and from other tasks", async () => {
+    const { store } = setup();
+    await addPhoto(store, "project", null);
+    await addPhoto(store, "first", "task-1");
+    await addPhoto(store, "second", "task-2");
+    const ids = async (taskId: string | null) =>
+      (await store.list("ada", "shed", undefined, taskId))?.images.map(
+        (image) => image.id,
+      );
+    expect(await ids(null)).toEqual(["project"]);
+    expect(await ids("task-1")).toEqual(["first"]);
+    expect(await ids("task-2")).toEqual(["second"]);
+    // Calls made before task photos list only the project's own.
+    expect((await store.list("ada", "shed"))?.images).toHaveLength(1);
+  });
+
+  it("page by the task too", async () => {
+    const { store } = setup();
+    await addPhoto(store, "a", "task-1");
+    await addPhoto(store, "b", "task-1");
+    await addPhoto(store, "c", null);
+    const page = await store.list("ada", "shed", undefined, "task-1");
+    const older = await store.list(
+      "ada",
+      "shed",
+      { createdAt: page!.images[1].createdAt, id: "b" },
+      "task-1",
+    );
+    expect(older?.images.map((image) => image.id)).toEqual(["a"]);
+  });
+
+  it("are added only to a task already saved in the project", async () => {
+    const { store, state } = setup();
+    expect(await addPhoto(store, "one", "unsaved")).toEqual({
+      kind: "not-found",
+    });
+    expect(state.images).toHaveLength(0);
+    expect(await addPhoto(store, "one", "task-1")).toMatchObject({
+      kind: "added",
+    });
+    expect(state.images[0].task_id).toBe("task-1");
+  });
+
+  it("are not added to a project in the Bin", async () => {
+    const { store, binProject } = setup();
+    binProject("ada", "shed");
+    expect(await addPhoto(store, "one", "task-1")).toEqual({
+      kind: "not-found",
+    });
+  });
+
+  it("refuse a retry that names another task", async () => {
+    const { store } = setup();
+    await addPhoto(store, "one", "task-1");
+    expect(await addPhoto(store, "one", "task-1")).toMatchObject({
+      kind: "existing",
+    });
+    expect(await addPhoto(store, "one", "task-2")).toEqual({
+      kind: "conflict",
+    });
+    expect(await addPhoto(store, "one", null)).toEqual({ kind: "conflict" });
+  });
+
+  it("share the account's allowance with its project images", async () => {
+    const { store, state } = setup();
+    state.images.push({
+      user_id: "ada",
+      project_id: "shed",
+      id: "big",
+      content_type: "image/png",
+      original_size: accountImageBytes - 10,
+      thumbnail_size: 0,
+      content_hash: "x",
+      caption: "",
+      created_at: "2026-10-22T09:00:00.000000Z",
+      task_id: null,
+    });
+    expect(
+      await store.upload(
+        "ada",
+        "shed",
+        "two",
+        "image/png",
+        Buffer.alloc(6),
+        Buffer.alloc(5),
+        "task-1",
+      ),
+    ).toEqual({ kind: "no-space" });
+  });
+
+  it("are read, captioned and removed through their project like any image", async () => {
+    const { store } = setup();
+    await addPhoto(store, "one", "task-1");
+    expect((await store.read("ada", "shed", "one", "original"))?.bytes).toEqual(
+      Buffer.from("one"),
+    );
+    expect(
+      await store.setCaption("ada", "shed", "one", "", "Tap"),
+    ).toMatchObject({ kind: "saved", image: { caption: "Tap" } });
+    expect(
+      await store.setCaption("ada", "shed", "one", "", "Old"),
+    ).toMatchObject({ kind: "conflict", image: { caption: "Tap" } });
+    expect(await store.remove("ada", "shed", "one")).toEqual({ usedBytes: 0 });
+  });
+
+  it("are counted per task, with the newest, leaving out project images", async () => {
+    const { store } = setup();
+    await addPhoto(store, "project", null);
+    await addPhoto(store, "a", "task-1");
+    await addPhoto(store, "b", "task-1");
+    await addPhoto(store, "c", "task-2");
+    await addPhoto(store, "bobs", "task-1", "bob");
+    expect(await store.summarizeTasks("ada", "shed")).toEqual({
+      tasks: {
+        "task-1": { count: 2, latestImageId: "b" },
+        "task-2": { count: 1, latestImageId: "c" },
+      },
+    });
+    expect(await store.summarizeTasks("ada", "nope")).toBeNull();
+  });
+
+  it("are removed with their bytes once the task is gone, giving the allowance back", async () => {
+    const { store, state, setTasks } = setup();
+    await addPhoto(store, "project", null);
+    await addPhoto(store, "a", "task-1");
+    await addPhoto(store, "b", "task-1");
+    await addPhoto(store, "c", "task-2");
+    setTasks("ada", "shed", ["task-2"]);
+    const outcome = await store.removeTaskImages("ada", "shed", "task-1");
+    const left = state.images.map((row) => row.id);
+    expect(left).toEqual(["project", "c"]);
+    expect(outcome).toEqual({
+      kind: "removed",
+      usedBytes: state.images.reduce(
+        (sum, row) => sum + row.original_size + row.thumbnail_size,
+        0,
+      ),
+    });
+    expect(state.bytes.map((row) => row.image_id).sort()).toEqual([
+      "c",
+      "c",
+      "project",
+      "project",
+    ]);
+  });
+
+  it("are kept while the task is in the saved tasks, as after Undo", async () => {
+    const { store, state } = setup();
+    await addPhoto(store, "a", "task-1");
+    expect(await store.removeTaskImages("ada", "shed", "task-1")).toEqual({
+      kind: "task-present",
+    });
+    expect(state.images).toHaveLength(1);
+  });
+
+  it("are neither listed, counted nor removed while the project is in the Bin", async () => {
+    const { store, state, binProject, setTasks } = setup();
+    await addPhoto(store, "a", "task-1");
+    setTasks("ada", "shed", []);
+    binProject("ada", "shed");
+    expect(await store.list("ada", "shed", undefined, "task-1")).toBeNull();
+    expect(await store.summarizeTasks("ada", "shed")).toBeNull();
+    expect(await store.removeTaskImages("ada", "shed", "task-1")).toEqual({
+      kind: "not-found",
+    });
+    expect(state.images).toHaveLength(1);
+  });
+
+  it("are kept from another account with a project and task of the same ids", async () => {
+    const { store, statements } = setup();
+    await addPhoto(store, "one", "task-1");
+    statements.length = 0;
+    expect(
+      (await store.list("bob", "shed", undefined, "task-1"))?.images,
+    ).toEqual([]);
+    expect(await store.summarizeTasks("bob", "shed")).toEqual({ tasks: {} });
+    expect(await store.read("bob", "shed", "one", "original")).toBeNull();
+    for (const { text, values } of statements) {
+      expect(values[0]).toBe("bob");
+      expect(text).toMatch(/user_id = \$1/);
+    }
   });
 });

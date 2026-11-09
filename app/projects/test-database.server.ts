@@ -18,9 +18,14 @@ export function createFakeDatabase() {
   const projects: Row[] = [];
   // Each account's list of people (AD #61 Manage People).
   const people = new Map<string, { data: unknown; revision: number }>();
-  // The newest image of each project, as the database would answer.
-  const latestImages: { user_id: string; project_id: string; id: string }[] =
-    [];
+  // The newest image of each project, as the database would answer, and
+  // any task photo (AD #67), which the query must leave out.
+  const latestImages: {
+    user_id: string;
+    project_id: string;
+    id: string;
+    task_id?: string;
+  }[] = [];
   // Every image, for counts: the newest of each project is in latestImages.
   const images: { user_id: string; project_id: string; id: string }[] = [];
   const statements: { text: string; values: unknown[] }[] = [];
@@ -176,7 +181,9 @@ export function createFakeDatabase() {
       return {
         rows: latestImages.filter(
           (row) =>
-            row.user_id === userId && !find(userId, row.project_id)?.deletedAt,
+            row.user_id === userId &&
+            !find(userId, row.project_id)?.deletedAt &&
+            !(row.task_id && sql.includes("task_id is null")),
         ),
       };
     }
@@ -237,27 +244,34 @@ export function createFakeDatabase() {
       }
       return { rows: [] };
     }
+    // The projects with the person assigned to them or to any of their
+    // tasks (AD #66 Assign Tasks To People).
     if (sql.includes("data->>'assignee' = $2")) {
+      const isAssigned = (data: unknown) => {
+        const project = data as {
+          assignee?: unknown;
+          tasks?: { assignee?: unknown }[];
+        } | null;
+        return (
+          project?.assignee === values[1] ||
+          (Array.isArray(project?.tasks) &&
+            project.tasks.some((task) => task?.assignee === values[1]))
+        );
+      };
       return {
         rows: projects
           .filter(
             (row) =>
               row.user_id === userId &&
               isReached(row, sql) &&
-              (row.data as { assignee?: string })?.assignee === values[1],
+              isAssigned(row.data),
           )
-          .map(({ id, data }) => ({ id, data })),
+          .map(({ id, data, revision }) => ({
+            id,
+            data,
+            revision: String(revision),
+          })),
       };
-    }
-    if (sql.startsWith("update project set data = jsonb_set(")) {
-      const ids = JSON.parse(values[1] as string) as string[];
-      for (const id of ids) {
-        const row = find(userId, id);
-        if (!row) continue;
-        row.data = { ...(row.data as object), assignee: "unassigned" };
-        row.revision++;
-      }
-      return { rows: [] };
     }
     if (sql.startsWith("update project set data")) {
       beforeUpdate?.();

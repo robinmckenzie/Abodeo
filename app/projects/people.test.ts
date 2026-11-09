@@ -4,10 +4,12 @@ import {
   addPerson,
   checkPersonName,
   countAssignedProjects,
+  countAssignedTasks,
   derivePeopleFromProjects,
   describePerson,
   findSubtitle,
   findAssigneeName,
+  findUnassignChanges,
   isKnownAssignee,
   mapAssigneesByName,
   movePerson,
@@ -156,6 +158,41 @@ describe("who is assigned", () => {
     ];
     expect(countAssignedProjects(projects, "andy")).toBe(2);
     expect(countAssignedProjects(projects, "zed")).toBe(0);
+  });
+});
+
+describe("tasks assigned to a person (AD #66 Assign Tasks To People)", () => {
+  const task = (id: string, assignee: string) => ({
+    id,
+    title: "Task",
+    isDone: false,
+    assignee,
+  });
+  const kitchen = {
+    assignee: "boris",
+    tasks: [task("a", "andy"), task("b", "boris"), task("c", "andy")],
+  };
+  const hall = { assignee: "andy", tasks: [task("d", "unassigned")] };
+
+  it("counts the tasks assigned to a person across projects", () => {
+    expect(countAssignedTasks([kitchen, hall], "andy")).toBe(2);
+    expect(countAssignedTasks([kitchen, hall], "boris")).toBe(1);
+    expect(countAssignedTasks([kitchen, hall], "zed")).toBe(0);
+  });
+
+  it("sets to Unassigned the project and only the tasks assigned to someone gone", () => {
+    const isAndy = (id: string) => id === "andy";
+    expect(findUnassignChanges(kitchen, isAndy)).toEqual({
+      tasks: [
+        task("a", "unassigned"),
+        task("b", "boris"),
+        task("c", "unassigned"),
+      ],
+    });
+    expect(findUnassignChanges(hall, isAndy)).toEqual({
+      assignee: "unassigned",
+    });
+    expect(findUnassignChanges(kitchen, (id) => id === "zed")).toBeNull();
   });
 });
 

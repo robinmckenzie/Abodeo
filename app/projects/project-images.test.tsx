@@ -11,7 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleImagesRequest } from "./image-handler.server";
 import { maxCaptionLength } from "./images-api";
-import { ImageViewer, ProjectImages, type AddFiles } from "./project-images";
+import {
+  ImageTimeline,
+  ImageViewer,
+  ProjectImages,
+  taskPhotosWording,
+  type AddFiles,
+} from "./project-images";
 import { createMemoryImageStore } from "./test-image-store.server";
 import { makeJpeg, makePng } from "./test-images";
 
@@ -22,6 +28,16 @@ vi.mock("./thumbnail", () => ({
     async () => new Blob([makeJpeg(500)], { type: "image/jpeg" }),
   ),
 }));
+
+// Answers the window that asks before an image is removed. jsdom has no modal
+// dialogs, so the window is not open there, and its buttons are found by text.
+function answerRemoval(answer: "Remove" | "Cancel") {
+  const button = [
+    ...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button"),
+  ].find((each) => each.textContent === answer);
+  if (!button) throw new Error("The removal window is not showing.");
+  fireEvent.click(button);
+}
 
 type Server = {
   session: string | null;
@@ -175,7 +191,7 @@ describe("ProjectImages", () => {
     expect(document.querySelectorAll(".image-entry")).toHaveLength(2);
     expect(document.querySelectorAll(".image-pending-entry")).toHaveLength(0);
     expect(onMessage).toHaveBeenCalledWith(
-      "holiday.png: Sorry, only JPEG and PNG images can be added.",
+      "holiday.png: This looks like a GIF file. Only JPEG and PNG can be added.",
     );
     // The size is checked after the type, so a large non-image is a format
     // problem, and a large image is a size problem.
@@ -184,6 +200,64 @@ describe("ProjectImages", () => {
     expect(server.store.accounts.get("ada")).toHaveLength(2);
     // The messages float, so none is left in the Images section.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("names a recognised other format named .jpg, and otherwise gives the general message (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const webp = new File(
+      ["RIFF\u0024\u0000\u0000\u0000WEBPVP8 "],
+      "photo.jpg",
+      { type: "image/jpeg" },
+    );
+    const unknown = new File(["just some text"], "notes.jpg", {
+      type: "image/jpeg",
+    });
+    chooseFiles([webp, unknown]);
+    await waitFor(() => expect(onMessage).toHaveBeenCalledTimes(2));
+    expect(onMessage).toHaveBeenCalledWith(
+      "photo.jpg: This looks like a WebP file. Only JPEG and PNG can be added.",
+    );
+    expect(onMessage).toHaveBeenCalledWith(
+      "notes.jpg: Sorry, only JPEG and PNG images can be added.",
+    );
+    expect(server.store.accounts.get("ada") ?? []).toHaveLength(0);
+  });
+
+  it("adds a JPEG with data after its end, as phones write (AD #53)", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", []);
+    const onMessage = vi.fn();
+    render(
+      <ProjectImages accountId="ada" projectId="shed" onMessage={onMessage} />,
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    const photo = new File(
+      [Uint8Array.from([...makeJpeg(500), ...makeJpeg(300)])],
+      "phone.jpg",
+      { type: "image/jpeg" },
+    );
+    chooseFiles([photo]);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
+    );
+    expect(server.store.accounts.get("ada")).toHaveLength(1);
+    expect(onMessage).not.toHaveBeenCalled();
   });
 
   it("refuses an image over 4 MiB as too large", async () => {
@@ -494,7 +568,6 @@ describe("ProjectImages", () => {
   it("tells the newest image's id once loaded, and as images are added and removed", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const onLatestImageChange = vi.fn();
     render(
       <ProjectImages
@@ -519,6 +592,7 @@ describe("ProjectImages", () => {
 
     const removes = screen.getAllByRole("button", { name: "Remove image" });
     fireEvent.click(removes[2]);
+    answerRemoval("Remove");
     await waitFor(() =>
       expect(onLatestImageChange).toHaveBeenLastCalledWith("two"),
     );
@@ -597,15 +671,23 @@ describe("ProjectImages", () => {
     });
   });
 
-  it("removes an image after confirming", async () => {
+  it("asks in a window before removing an image, and removes it on Remove", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one", "two"]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ProjectImages accountId="ada" projectId="shed" />);
     const [first] = await screen.findAllByRole("button", {
       name: "Remove image",
     });
     fireEvent.click(first);
+    const dialog = document.querySelector(".confirm-dialog");
+    expect(dialog?.querySelector("h2")?.textContent).toBe("Remove this image?");
+    expect(dialog?.querySelector("p")?.textContent).toBe(
+      "It cannot be undone.",
+    );
+    expect(server.store.accounts.get("ada")).toHaveLength(2);
+
+    answerRemoval("Remove");
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
     await waitFor(() =>
       expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
     );
@@ -613,14 +695,35 @@ describe("ProjectImages", () => {
     expect(document.querySelector("[data-image-id=one]")).toBeNull();
   });
 
-  it("keeps an image when the person does not confirm", async () => {
+  it("keeps an image when the person cancels", async () => {
     const server = fakeServer();
     await seed(server, "ada", ["one"]);
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<ProjectImages accountId="ada" projectId="shed" />);
     fireEvent.click(
       await screen.findByRole("button", { name: "Remove image" }),
     );
+    answerRemoval("Cancel");
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(server.store.accounts.get("ada")).toHaveLength(1);
+    expect(document.querySelector("[data-image-id=one]")).not.toBeNull();
+  });
+
+  it("keeps an image when the person presses Esc in the window", async () => {
+    const server = fakeServer();
+    await seed(server, "ada", ["one"]);
+    render(<ProjectImages accountId="ada" projectId="shed" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove image" }),
+    );
+    // A browser sends cancel to an open modal dialog on Esc.
+    fireEvent(
+      document.querySelector(".confirm-dialog")!,
+      new Event("cancel", { cancelable: true }),
+    );
+    expect(document.querySelector(".confirm-dialog")).toBeNull();
     expect(server.store.accounts.get("ada")).toHaveLength(1);
   });
 
@@ -675,5 +778,83 @@ describe("ProjectImages", () => {
     expect(details?.lastElementChild?.getAttribute("datetime")).toBe(
       "2026-10-22T10:30:00Z",
     );
+  });
+});
+
+describe("files chosen on a task before its photos have loaded (AD #67)", () => {
+  it("waits for the list, so that a late list cannot replace the photo just added", async () => {
+    const server = fakeServer();
+    const answerRequest = vi.mocked(fetch);
+    // The first list is read at once, while the task has no photos, and its
+    // answer is held back.
+    let releaseList: () => void = () => {};
+    const listHeld = new Promise<void>((resolve) => (releaseList = resolve));
+    let isFirstList = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string, init: RequestInit = {}) => {
+        const answer = answerRequest(path, init);
+        if (isFirstList && path === "/api/projects/shed/tasks/t1/images") {
+          isFirstList = false;
+          await listHeld;
+        }
+        return answer;
+      }),
+    );
+    const summaries: [number, string | null][] = [];
+    render(
+      <ImageTimeline
+        accountId="ada"
+        projectId="shed"
+        taskId="t1"
+        wording={taskPhotosWording}
+        filesToAdd={[pngFile("new-photo.png")]}
+        onSummaryChange={(count, latest) => summaries.push([count, latest])}
+      />,
+    );
+    // Let the upload finish, if it were sent before the list arrived.
+    for (let i = 0; i < 20; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    expect(server.calls).not.toContain(
+      "POST /api/projects/shed/tasks/t1/images",
+    );
+
+    await act(async () => releaseList());
+    await waitFor(() =>
+      expect(server.store.accounts.get("ada")).toHaveLength(1),
+    );
+    const [stored] = server.store.accounts.get("ada")!;
+    await waitFor(() =>
+      expect(document.querySelectorAll(".image-entry")).toHaveLength(1),
+    );
+    // Nothing that arrives later takes it away.
+    for (let i = 0; i < 5; i++) await act(async () => {});
+    expect(document.querySelectorAll(".image-entry")).toHaveLength(1);
+    expect(summaries.at(-1)).toEqual([1, stored.image.id]);
+  });
+
+  it("adds nothing, and says so, when the photos cannot be loaded", async () => {
+    const server = fakeServer();
+    server.session = null;
+    const messages: string[] = [];
+    render(
+      <ImageTimeline
+        accountId="ada"
+        projectId="shed"
+        taskId="t1"
+        wording={taskPhotosWording}
+        filesToAdd={[pngFile("new-photo.png")]}
+        onMessage={(text) => messages.push(text)}
+      />,
+    );
+    await waitFor(() => expect(messages).toHaveLength(1));
+    expect(messages[0]).toMatch(/new-photo\.png/);
+    expect(server.calls).not.toContain(
+      "POST /api/projects/shed/tasks/t1/images",
+    );
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

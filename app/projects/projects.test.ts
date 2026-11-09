@@ -17,8 +17,8 @@ const project: Project = {
   assignee: "boris",
   dueDate: "2026-10-16",
   tasks: [
-    { id: "t1", title: "Buy tiles", isDone: true },
-    { id: "t2", title: "**Grout**", isDone: false },
+    { id: "t1", title: "Buy tiles", isDone: true, assignee: "unassigned" },
+    { id: "t2", title: "**Grout**", isDone: false, assignee: "unassigned" },
   ],
   createdAt: "2026-10-15T10:00:00.000Z",
   updatedAt: "2026-10-15T10:00:00.000Z",
@@ -68,6 +68,26 @@ describe("projects", () => {
     expect(parseProject("a", json)).toEqual({ ...project, tasks: [] });
   });
 
+  it("reads tasks saved before they could be assigned as Unassigned (AD #66)", () => {
+    const older = {
+      ...saved(),
+      version: 3,
+      tasks: [
+        { id: "t1", title: "Buy tiles", isDone: true },
+        { id: "t2", title: "**Grout**", isDone: false },
+      ],
+    };
+    expect(parseProject("a", JSON.stringify(older))).toEqual(project);
+  });
+
+  it("reads back who each task is assigned to (AD #66)", () => {
+    const assigned = {
+      ...project,
+      tasks: [{ ...project.tasks[0], assignee: "andy" }, project.tasks[1]],
+    };
+    expect(parseProject("a", serialiseProject(assigned))).toEqual(assigned);
+  });
+
   it("reads back a project with no tasks", () => {
     const empty = { ...project, tasks: [] };
     expect(parseProject("a", serialiseProject(empty))).toEqual(empty);
@@ -76,7 +96,7 @@ describe("projects", () => {
   it.each([
     ["damaged JSON", "{"],
     ["nothing", null],
-    ["a later version", JSON.stringify({ ...saved(), version: 4 })],
+    ["a later version", JSON.stringify({ ...saved(), version: 5 })],
     ["an empty title", JSON.stringify({ ...saved(), title: " " })],
     ["missing notes", JSON.stringify({ ...saved(), notes: undefined })],
     [
@@ -98,7 +118,7 @@ describe("projects", () => {
       "a task without a title",
       JSON.stringify({
         ...saved(),
-        tasks: [{ id: "t", title: " ", isDone: false }],
+        tasks: [{ id: "t", title: " ", isDone: false, assignee: "unassigned" }],
       }),
     ],
     [

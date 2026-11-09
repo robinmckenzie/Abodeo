@@ -1,7 +1,8 @@
 // An opened account project's images, as a journal-style timeline (AD #48
 // Add Images To Projects): oldest at the top, newest at the bottom, each with
 // the time it was added and a caption. Signed out, a project has none, and
-// this says so in place of the button to add them.
+// this says so in place of the button to add them. A task's photos (AD #67
+// Add Photos To Tasks) use the same timeline, in their own dialog.
 import {
   useEffect,
   useLayoutEffect,
@@ -11,6 +12,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { ConfirmDialog } from "../ui/confirm-dialog";
+import { fitHeightToText } from "../ui/fit-height-to-text";
 import { raiseFloatingMessages } from "../ui/floating-messages";
 import { ArrowIcon, BinIcon, PlusIcon } from "../ui/icons";
 import {
@@ -26,11 +29,45 @@ import {
   type ImageInfo,
 } from "./images-api";
 import type { ImageFailure } from "./images-client";
-import { fitHeightToText } from "./task-list";
-import { useProjectImages, type PendingImage } from "./use-project-images";
+import {
+  useProjectImages,
+  type PendingImage,
+  type StorageUsageRef,
+} from "./use-project-images";
 
 // What the dashboard calls to add files dropped on the page.
 export type AddFiles = (files: File[]) => void;
+
+// The words a timeline uses for what it holds.
+export type TimelineWording = {
+  heading: string;
+  add: string;
+  adding: string;
+  empty: string;
+  older: string;
+  remove: string;
+  confirmQuestion: string;
+};
+
+export const projectImagesWording: TimelineWording = {
+  heading: "Images",
+  add: "Add image",
+  adding: "Adding images",
+  empty: "No images yet. Choose Add image, or drop pictures here.",
+  older: "Show older images",
+  remove: "Remove image",
+  confirmQuestion: "Remove this image?",
+};
+
+export const taskPhotosWording: TimelineWording = {
+  heading: "Photos",
+  add: "Add photos",
+  adding: "Adding photos",
+  empty: "No photos yet. Choose Add photos, or drop pictures here.",
+  older: "Show older photos",
+  remove: "Remove photo",
+  confirmQuestion: "Remove this photo?",
+};
 
 export function formatAddedTime(createdAt: string) {
   const date = new Date(createdAt);
@@ -44,6 +81,7 @@ export function formatAddedTime(createdAt: string) {
 export function ProjectImages({
   accountId,
   projectId,
+  usageRef,
   onFailure,
   onMessage,
   addFilesRef,
@@ -53,6 +91,8 @@ export function ProjectImages({
   // Null while signed out, when images are unavailable.
   accountId: string | null;
   projectId: string;
+  // The account's storage use, shared with its task photos (AD #67).
+  usageRef?: StorageUsageRef;
   onFailure?: (reason: ImageFailure) => void;
   // Says something to the person, as a floating message.
   onMessage?: (text: string) => void;
@@ -75,10 +115,11 @@ export function ProjectImages({
   // Keyed, so that a change of account or project starts again, and nothing
   // of the earlier one is left.
   return (
-    <SignedInImages
+    <ImageTimeline
       key={`${accountId}/${projectId}`}
       accountId={accountId}
       projectId={projectId}
+      usageRef={usageRef}
       onFailure={onFailure}
       onMessage={onMessage}
       addFilesRef={addFilesRef}
@@ -88,26 +129,47 @@ export function ProjectImages({
   );
 }
 
-function SignedInImages({
+// Mount it keyed by account, project and task, so that a change of any
+// starts again with nothing of the earlier one left.
+export function ImageTimeline({
   accountId,
   projectId,
+  taskId = null,
+  wording = projectImagesWording,
+  usageRef,
   onFailure,
   onMessage,
   addFilesRef,
+  filesToAdd = null,
+  onFilesTaken,
   onLatestImageChange,
   onCountChange,
+  onSummaryChange,
 }: {
   accountId: string;
   projectId: string;
+  // A task's photos instead of the project's own images.
+  taskId?: string | null;
+  wording?: TimelineWording;
+  usageRef?: StorageUsageRef;
   onFailure?: (reason: ImageFailure) => void;
   onMessage?: (text: string) => void;
   addFilesRef?: RefObject<AddFiles | null>;
+  // Files to add once mounted, such as those chosen on a task's row. Once
+  // taken, onFilesTaken is called, and they should be cleared.
+  filesToAdd?: File[] | null;
+  onFilesTaken?: () => void;
   onLatestImageChange?: (imageId: string | null) => void;
   onCountChange?: (count: number | null) => void;
+  // Given how many there are and the newest's id once they have loaded, and
+  // again whenever either changes.
+  onSummaryChange?: (count: number, latestImageId: string | null) => void;
 }) {
   const images = useProjectImages({
     accountId,
     projectId,
+    taskId,
+    usageRef,
     onFailure,
     onMessage,
   });
@@ -129,6 +191,16 @@ function SignedInImages({
     onCountRef.current?.(imageCount);
     return () => onCountRef.current?.(null);
   }, [imageCount]);
+  const onSummaryRef = useRef(onSummaryChange);
+  useEffect(() => {
+    onSummaryRef.current = onSummaryChange;
+  });
+  const loadedCount = state.images.length;
+  useEffect(() => {
+    if (state.status === "ready") {
+      onSummaryRef.current?.(loadedCount, latestImageId);
+    }
+  }, [state.status, loadedCount, latestImageId]);
   const inputRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [viewing, setViewing] = useState<{
@@ -138,6 +210,8 @@ function SignedInImages({
     caption: string;
     createdAt: string;
   } | null>(null);
+  // The image whose removal is being asked about.
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const addFiles = images.addFiles;
   useEffect(() => {
@@ -147,6 +221,24 @@ function SignedInImages({
       addFilesRef.current = null;
     };
   });
+
+  // Added after the effects have settled, so that React's second run of
+  // them in development does not add the files twice, or to a session that
+  // has ended.
+  const addFilesLatestRef = useRef(addFiles);
+  const onFilesTakenRef = useRef(onFilesTaken);
+  useEffect(() => {
+    addFilesLatestRef.current = addFiles;
+    onFilesTakenRef.current = onFilesTaken;
+  });
+  useEffect(() => {
+    if (!filesToAdd || filesToAdd.length === 0) return;
+    const timer = setTimeout(() => {
+      onFilesTakenRef.current?.();
+      void addFilesLatestRef.current(filesToAdd);
+    });
+    return () => clearTimeout(timer);
+  }, [filesToAdd]);
 
   // Opens at the bottom, where the newest image is.
   const isScrolledRef = useRef(false);
@@ -211,15 +303,15 @@ function SignedInImages({
   const nextImage = state.images[viewingIndex + 1];
 
   return (
-    <section className="project-images" aria-label="Images">
+    <section className="project-images" aria-label={wording.heading}>
       <div className="project-images-header">
-        <h3 className="task-heading">Images</h3>
+        <h3 className="task-heading">{wording.heading}</h3>
         <button
           type="button"
           className="icon-button project-images-add"
           disabled={state.status !== "ready" || state.isAdding}
-          aria-label={state.isAdding ? "Adding images" : "Add image"}
-          title="Add image"
+          aria-label={state.isAdding ? wording.adding : wording.add}
+          title={wording.add}
           onClick={() => inputRef.current?.click()}
         >
           <PlusIcon />
@@ -255,9 +347,7 @@ function SignedInImages({
       {state.status === "ready" &&
         state.images.length === 0 &&
         state.pending.length === 0 && (
-          <p className="project-images-note">
-            No images yet. Choose Add image, or drop pictures here.
-          </p>
+          <p className="project-images-note">{wording.empty}</p>
         )}
       <div
         ref={timelineRef}
@@ -270,7 +360,7 @@ function SignedInImages({
             className="button-secondary button-small image-timeline-older"
             onClick={() => void showOlder()}
           >
-            Show older images
+            {wording.older}
           </button>
         )}
         {state.images.map((image) => (
@@ -280,11 +370,8 @@ function SignedInImages({
             thumbnailUrl={state.thumbnails[image.id]}
             onVisible={() => images.requestThumbnail(image.id)}
             onView={() => void view(image)}
-            onRemove={() => {
-              if (window.confirm("Remove this image? It cannot be undone.")) {
-                void images.remove(image.id);
-              }
-            }}
+            removeLabel={wording.remove}
+            onRemove={() => setRemovingId(image.id)}
             onCaption={images.changeCaption}
           />
         ))}
@@ -292,6 +379,20 @@ function SignedInImages({
           <PendingEntry key={entry.key} entry={entry} />
         ))}
       </div>
+      {removingId &&
+        createPortal(
+          <ConfirmDialog
+            question={wording.confirmQuestion}
+            detail="It cannot be undone."
+            confirmLabel="Remove"
+            onConfirm={() => {
+              setRemovingId(null);
+              void images.remove(removingId);
+            }}
+            onCancel={() => setRemovingId(null)}
+          />,
+          document.body,
+        )}
       {viewing &&
         createPortal(
           <ImageViewer
@@ -371,6 +472,7 @@ function ImageEntry({
   thumbnailUrl,
   onVisible,
   onView,
+  removeLabel,
   onRemove,
   onCaption,
 }: {
@@ -378,6 +480,7 @@ function ImageEntry({
   thumbnailUrl: string | undefined;
   onVisible: () => void;
   onView: () => void;
+  removeLabel: string;
   onRemove: () => void;
   onCaption: (
     image: ImageInfo,
@@ -512,8 +615,8 @@ function ImageEntry({
       <button
         type="button"
         className="icon-button project-images-remove"
-        aria-label="Remove image"
-        title="Remove image"
+        aria-label={removeLabel}
+        title={removeLabel}
         onClick={onRemove}
       >
         <BinIcon />

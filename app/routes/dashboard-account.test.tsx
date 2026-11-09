@@ -23,7 +23,10 @@ import Dashboard from "./dashboard";
 import { activityReportInterval } from "../account/activity-report";
 import { recheckInterval } from "../account/use-account";
 import { forgetPresentation } from "../projects/presentation";
-import { handleImagesRequest } from "../projects/image-handler.server";
+import {
+  handleImagesRequest,
+  isImagesPath,
+} from "../projects/image-handler.server";
 import { handlePeopleRequest } from "../projects/people-handler.server";
 import {
   createPeopleStore,
@@ -35,6 +38,7 @@ import { createMemoryImageStore } from "../projects/test-image-store.server";
 import { makeJpeg, makePng } from "../projects/test-images";
 import { createProjectStore } from "../projects/project-store.server";
 import { createMemoryProjectStore } from "../projects/test-projects.server";
+import { undoDuration } from "../projects/task-list";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
@@ -123,7 +127,7 @@ function fakeServer(overrides: Partial<Server> = {}) {
     vi.fn(async (path: string, init: RequestInit = {}) => {
       server.calls.push(`${init.method ?? "GET"} ${path}`);
       if (server.hang) return new Promise(() => {});
-      if (/^\/api\/projects\/[^/]+\/images/.test(path)) {
+      if (isImagesPath(path.split("?")[0])) {
         const headers = new Headers(init.headers);
         if (server.session) headers.set("cookie", "ada");
         return handleImagesRequest(
@@ -627,6 +631,39 @@ describe("leaving to sign in or out", () => {
     expect(confirm.mock.calls[0][0]).toMatch(/tasks typed but not yet added/);
   });
 
+  it("does not ask about tasks typed as blank text", async () => {
+    fakeServer();
+    const confirm = vi.spyOn(window, "confirm");
+    await renderDashboard();
+    await addProject("Paint the fence");
+    await click(screen.getByRole("button", { name: /Paint the fence/ }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Add tasks, one per line" }),
+      { target: { value: "  \n " } },
+    );
+
+    await click(signInButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("does not ask about tasks once they are added", async () => {
+    fakeServer();
+    const confirm = vi.spyOn(window, "confirm");
+    await renderDashboard();
+    await addProject("Paint the fence");
+    await click(screen.getByRole("button", { name: /Paint the fence/ }));
+    const box = screen.getByRole("textbox", { name: "Add tasks, one per line" });
+    fireEvent.change(box, { target: { value: "Buy paint" } });
+    await act(async () => {
+      fireEvent.keyDown(box, { key: "Enter" });
+    });
+
+    await click(signInButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("asks the same before signing out", async () => {
     const server = fakeServer({
       session: { name: "Ada Lovelace", email: "ada@example.com" },
@@ -663,9 +700,6 @@ describe("the Calendar test", () => {
 
   it("sends the browser's time zone, and says so when the test cannot start", async () => {
     const server = fakeServer({ session: ada });
-    // Earlier tests can leave typed tasks behind, which the check before
-    // leaving asks about.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await renderDashboard();
     await click(screen.getByRole("button", { name: /Signed in as/ }));
 
@@ -1118,8 +1152,8 @@ describe("a signed-in account's projects (AD #41)", () => {
         title,
         ...fields,
         tasks: [
-          { id: "t1", title: "Tiles", isDone: false },
-          { id: "t2", title: "Grout", isDone: false },
+          { id: "t1", title: "Tiles", isDone: false, assignee: "unassigned" },
+          { id: "t2", title: "Grout", isDone: false, assignee: "unassigned" },
         ],
       });
       await renderDashboard();
@@ -1554,6 +1588,216 @@ describe("images on the dashboard (AD #48)", () => {
       document.body.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
+  });
+});
+
+describe("task photos on the dashboard (AD #67)", () => {
+  const ada = { name: "Ada Lovelace", email: "ada@example.com" };
+  const paint = {
+    id: "t1",
+    title: "Paint",
+    isDone: false,
+    assignee: "unassigned" as const,
+  };
+
+  async function settle() {
+    for (let i = 0; i < 8; i++) await act(async () => {});
+  }
+
+  const png = (name = "porch.png") =>
+    new File([makePng()], name, { type: "image/png" });
+
+  // The images server knows which tasks each project has saved. What is
+  // seeded is in place before the project opens.
+  async function serverWithTask(
+    seed: (server: Server) => Promise<void> = async () => {},
+  ) {
+    const projects = createMemoryProjectStore();
+    const images = createMemoryImageStore({
+      hasTask: (userId, projectId, taskId) =>
+        projects.accounts
+          .get(userId)
+          ?.get(projectId)
+          ?.tasks.some(({ id }) => id === taskId) ?? false,
+    });
+    const server = fakeServer({ session: ada, projects, images });
+    await projects.store.create("ada", "a1", {
+      title: "Shed",
+      notes: "",
+      assignee: "unassigned",
+      dueDate: null,
+      tasks: [paint],
+    });
+    await seed(server);
+    await renderDashboard();
+    await settle();
+    await click(screen.getByRole("button", { name: /Shed/ }));
+    await settle();
+    return server;
+  }
+
+  const dropOn = async (target: Element, files: File[]) => {
+    await act(async () => {
+      fireEvent.drop(target, { dataTransfer: { types: ["Files"], files } });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await settle();
+  };
+
+  const taskRow = () =>
+    document.querySelector<HTMLElement>('[data-photo-task-id="t1"]')!;
+  const photosOf = (server: Server) =>
+    server.images.accounts.get("ada")?.filter(({ taskId }) => taskId) ?? [];
+
+  async function addTaskPhotos(server: Server, count: number) {
+    await dropOn(
+      taskRow(),
+      Array.from({ length: count }, (_, index) => png(`p${index}.png`)),
+    );
+    expect(photosOf(server)).toHaveLength(count);
+    await click(screen.getByRole("button", { name: "Close photos" }));
+    await settle();
+  }
+
+  it("adds pictures dropped on a task to it, in its own dialog, apart from the project's images", async () => {
+    const server = await serverWithTask();
+    await dropOn(taskRow(), [png("a.png"), png("b.png")]);
+
+    const dialog = screen.getByRole("dialog", { name: "Paint" });
+    expect(within(dialog).getAllByRole("button", { name: /View full size/ }))
+      .toHaveLength(2);
+    expect(photosOf(server).map(({ taskId }) => taskId)).toEqual(["t1", "t1"]);
+    await click(within(dialog).getByRole("button", { name: "Close photos" }));
+    await settle();
+
+    expect(screen.queryByRole("dialog", { name: "Paint" })).toBeNull();
+    expect(document.querySelectorAll(".project-images .image-entry"))
+      .toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "2 photos of Paint" }),
+    ).toBeTruthy();
+  });
+
+  it("still adds a picture dropped elsewhere to the project", async () => {
+    const server = await serverWithTask();
+    await dropOn(document.body, [png()]);
+    expect(screen.queryByRole("dialog", { name: "Paint" })).toBeNull();
+    expect(server.images.accounts.get("ada")?.map(({ taskId }) => taskId))
+      .toEqual([null]);
+  });
+
+  it("counts task photos in the delete window", async () => {
+    const server = await serverWithTask();
+    await addTaskPhotos(server, 2);
+    await dropOn(document.body, [png()]);
+    await click(screen.getByRole("button", { name: "Delete project" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete “Shed”?" });
+    expect(within(dialog).getByText("3 images")).toBeTruthy();
+  });
+
+  describe("the account's allowance, once task photos are removed", () => {
+    const mib = 1024 * 1024;
+    // 94 MiB elsewhere in the account and two 2 MiB photos of the task, out
+    // of 100 MiB: 3 MiB more fits only once the photos are removed.
+    const nearlyFull = async (server: Server) => {
+      await server.images.store.upload(
+        "ada",
+        "elsewhere",
+        "filler",
+        "image/png",
+        Buffer.alloc(94 * mib),
+        Buffer.alloc(1),
+      );
+      for (const id of ["tp1", "tp2"]) {
+        await server.images.store.upload(
+          "ada",
+          "a1",
+          id,
+          "image/png",
+          Buffer.alloc(2 * mib),
+          Buffer.alloc(1),
+          "t1",
+        );
+      }
+    };
+    const projectImagesOf = (server: Server) =>
+      server.images.accounts
+        .get("ada")
+        ?.filter(({ projectId, taskId }) => projectId === "a1" && !taskId) ??
+      [];
+
+    async function expectProjectImageAdded(server: Server) {
+      await dropOn(document.body, [
+        new File([makePng(3 * mib)], "big.png", { type: "image/png" }),
+      ]);
+      await vi.waitFor(() => expect(projectImagesOf(server)).toHaveLength(1));
+      expect(server.calls).toContain("POST /api/projects/a1/images");
+    }
+
+    it("lets the project's images use what removing photos one by one gave back", async () => {
+      const server = await serverWithTask(nearlyFull);
+      await click(screen.getByRole("button", { name: "2 photos of Paint" }));
+      await settle();
+      const dialog = screen.getByRole("dialog", { name: "Paint" });
+      for (const button of within(dialog).getAllByRole("button", {
+        name: "Remove photo",
+      })) {
+        await click(button);
+        const question = screen.getByRole("heading", {
+          name: "Remove this photo?",
+        });
+        await click(
+          within(question.closest("dialog")!).getByRole("button", {
+            name: "Remove",
+          }),
+        );
+        await settle();
+      }
+      expect(photosOf(server)).toHaveLength(0);
+      await click(within(dialog).getByRole("button", { name: "Close photos" }));
+      await settle();
+
+      await expectProjectImageAdded(server);
+    });
+
+    it("lets the project's images use what a deleted task's photos gave back once Undo ends", async () => {
+      const server = await serverWithTask(nearlyFull);
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        await click(screen.getByRole("button", { name: "Delete Paint" }));
+        await settle();
+        await act(async () => vi.advanceTimersByTime(undoDuration));
+      } finally {
+        vi.useRealTimers();
+      }
+      await settle();
+      expect(server.calls).toContain("DELETE /api/projects/a1/tasks/t1/images");
+      expect(photosOf(server)).toHaveLength(0);
+
+      await expectProjectImageAdded(server);
+    });
+  });
+
+  it("keeps a deleted task's photos through Undo, and removes them once the project closes", async () => {
+    const server = await serverWithTask();
+    await addTaskPhotos(server, 1);
+
+    await click(screen.getByRole("button", { name: "Delete Paint" }));
+    await settle();
+    await click(screen.getByRole("button", { name: "Undo deleting Paint" }));
+    await settle();
+    expect(screen.getByRole("button", { name: "1 photo of Paint" }))
+      .toBeTruthy();
+
+    await click(screen.getByRole("button", { name: "Delete Paint" }));
+    await settle();
+    expect(photosOf(server)).toHaveLength(1);
+    await click(screen.getByRole("button", { name: "Close" }));
+    await settle();
+    expect(photosOf(server)).toHaveLength(0);
+    expect(server.calls).toContain("DELETE /api/projects/a1/tasks/t1/images");
   });
 });
 

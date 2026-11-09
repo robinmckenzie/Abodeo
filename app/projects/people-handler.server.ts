@@ -18,6 +18,7 @@ import {
   type PeopleOperation,
 } from "./people-api";
 import type { PeopleStore } from "./people-store.server";
+import { readJsonBody } from "./json-body.server";
 import { readRequestAccount } from "./request-account.server";
 
 export function isPeoplePath(pathname: string) {
@@ -47,8 +48,20 @@ function reportPeopleFailure(code: string | undefined) {
 // checked by the store, which says what is wrong with it.
 function readOperation(body: unknown): PeopleOperation | undefined {
   if (typeof body !== "object" || body === null) return undefined;
-  const { op, id, name, jobTitle, phone, email, toIndex, expectedCount, dryRun } =
-    body as Record<string, unknown>;
+  const {
+    op,
+    id,
+    name,
+    jobTitle,
+    phone,
+    email,
+    toIndex,
+    expectedCount,
+    expectedTaskCount,
+    dryRun,
+  } = body as Record<string, unknown>;
+  const isCount = (value: unknown) =>
+    value === undefined || (Number.isInteger(value) && (value as number) >= 0);
   switch (op) {
     case "details":
       if (!isPersonId(id) || typeof name !== "string" || typeof jobTitle !== "string" || typeof phone !== "string" || typeof email !== "string") return undefined;
@@ -70,10 +83,7 @@ function readOperation(body: unknown): PeopleOperation | undefined {
         : undefined;
     case "remove": {
       if (!isPersonId(id)) return undefined;
-      if (
-        expectedCount !== undefined &&
-        !(Number.isInteger(expectedCount) && (expectedCount as number) >= 0)
-      ) {
+      if (!isCount(expectedCount) || !isCount(expectedTaskCount)) {
         return undefined;
       }
       if (dryRun !== undefined && typeof dryRun !== "boolean") {
@@ -85,29 +95,14 @@ function readOperation(body: unknown): PeopleOperation | undefined {
         ...(expectedCount !== undefined && {
           expectedCount: expectedCount as number,
         }),
+        ...(expectedTaskCount !== undefined && {
+          expectedTaskCount: expectedTaskCount as number,
+        }),
         ...(dryRun !== undefined && { dryRun }),
       };
     }
   }
   return undefined;
-}
-
-// The body as JSON, undefined if it is not JSON, or "too-large".
-async function readBody(request: Request) {
-  const length = Number(request.headers.get("Content-Length"));
-  if (length > peopleBodyLimit) return "too-large" as const;
-  let buffer: ArrayBuffer;
-  try {
-    buffer = await request.arrayBuffer();
-  } catch {
-    return undefined;
-  }
-  if (buffer.byteLength > peopleBodyLimit) return "too-large" as const;
-  try {
-    return JSON.parse(new TextDecoder().decode(buffer)) as unknown;
-  } catch {
-    return undefined;
-  }
 }
 
 export async function handlePeopleRequest(
@@ -150,7 +145,7 @@ export async function handlePeopleRequest(
         : respondWithJson(200, read);
     }
 
-    const body = await readBody(request);
+    const body = await readJsonBody(request, peopleBodyLimit);
     if (body === "too-large") return respondWithPeopleError(413, "too_large");
     const operation = readOperation(body);
     if (!operation) return respondWithPeopleError(400, "invalid_request");
@@ -165,6 +160,7 @@ export async function handlePeopleRequest(
       case "preview":
         return respondWithJson(200, {
           count: outcome.count,
+          taskCount: outcome.taskCount,
           unreadable: outcome.unreadable,
         });
       case "invalid-name":
@@ -178,6 +174,7 @@ export async function handlePeopleRequest(
       case "count-changed":
         return respondWithPeopleError(409, "count_changed", {
           count: outcome.count,
+          taskCount: outcome.taskCount,
           unreadable: outcome.unreadable,
         });
       case "unreadable":

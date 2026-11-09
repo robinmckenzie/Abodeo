@@ -29,6 +29,7 @@ import {
   updateStoredPersonDetails,
   type PeopleLoad,
 } from "./people-management";
+import type { RemovalCount } from "./people-api";
 import { isPeopleKey } from "./people-storage";
 import type { PersonFailure } from "./people-messages";
 import { refreshProjects } from "./use-projects";
@@ -101,23 +102,20 @@ export type PeopleSource = {
     id: string,
     toIndex: number,
   ): Promise<{ ok: true } | { ok: false; reason: PersonFailure }>;
-  // How many projects removing the person would set to Unassigned, and how
-  // many could not be read and would be left as they are.
+  // How many projects and tasks removing the person would set to
+  // Unassigned, and how many projects could not be read and would be left as
+  // they are.
   countAssignedProjects(
     id: string,
   ): Promise<
-    | { ok: true; count: number; unreadable: number }
-    | { ok: false; reason: PersonFailure }
+    ({ ok: true } & RemovalCount) | { ok: false; reason: PersonFailure }
   >;
   removePerson(
     id: string,
-    expectedCount: number,
+    expected: Pick<RemovalCount, "count" | "taskCount">,
   ): Promise<
     | { ok: true }
-    | ({ ok: false; reason: "count-changed" } & {
-        count: number;
-        unreadable: number;
-      })
+    | ({ ok: false; reason: "count-changed" } & RemovalCount)
     | { ok: false; reason: PersonFailure }
   >;
   reload(): void;
@@ -366,20 +364,20 @@ export function usePeople(
         if (!result.ok) noteFailure(result.reason);
         return result;
       }
-      const count = countStoredAssignedProjects(id);
-      return count === null
+      const counts = countStoredAssignedProjects(id);
+      return counts === null
         ? { ok: false, reason: "unavailable" }
-        : { ok: true, count, unreadable: 0 };
+        : { ok: true, ...counts, unreadable: 0 };
     },
 
-    async removePerson(id, expectedCount) {
+    async removePerson(id, expected) {
       if (accountId) {
-        const result = await removeAccountPerson(accountId, id, expectedCount);
+        const result = await removeAccountPerson(accountId, id, expected);
         if (result.ok) showChange(accountId, result);
         else if (result.reason !== "count-changed") noteFailure(result.reason);
         return result;
       }
-      const result = await removeStoredPerson(id, expectedCount);
+      const result = await removeStoredPerson(id, expected);
       refreshPeople();
       refreshProjects();
       if (result.ok) return { ok: true };
