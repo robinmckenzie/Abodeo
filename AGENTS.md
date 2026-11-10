@@ -15,3 +15,17 @@ Abodeo is an app for managing tasks and projects around the home.
 - Touching the database, `db/` or README queries: [saved data](docs/agents/saved-data.md)
 - Reviewing, validating or handing over: [reviews and validation](docs/agents/reviews-and-validation.md)
 - Planning work that may relate to a known idea or tech debt: [future considerations](docs/agents/future-considerations.md)
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on robinmckenzie/Abodeo, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Not used. The ticket stage labels (`STUB`, `DRAFT`, `Agreed`) do that job; see [tickets](docs/agents/tickets.md).
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
