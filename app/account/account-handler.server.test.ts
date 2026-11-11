@@ -646,7 +646,14 @@ describe("createAccountRequestHandler", () => {
 
     expect(response.status).toBe(204);
     expect(visits).toEqual([
-      { label: "Andrew", welcome: true, isBot: false, country: "", city: "" },
+      {
+        label: "Andrew",
+        word: "",
+        welcome: true,
+        isBot: false,
+        country: "",
+        city: "",
+      },
     ]);
   });
 

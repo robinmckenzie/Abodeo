@@ -15,6 +15,7 @@ import {
   type HistoryStore,
 } from "./account-history.server";
 import { readLabel } from "./usage-label.server";
+import { readVisitorWord } from "./visitor-word.server";
 
 // The only Better Auth endpoints served. Requests for any other path are
 // refused before they reach Better Auth, which also covers endpoints a later
@@ -200,6 +201,9 @@ type SignInContext = { request?: Request; headers?: Headers };
 export type SignInCapture = {
   calendarToken?: { accessToken: string; expiresAt: number };
   userId?: string;
+  // The label and word of a /demo sign-in (AD #138), which has no browser
+  // headers for the session hook to read.
+  demoUsage?: { label: string; word: string };
 };
 
 type GoogleTokens = {
@@ -251,7 +255,8 @@ export function buildDatabaseHooks(
           await recordSignInQuietly(
             history,
             session.userId,
-            readLabel(headers),
+            capture?.demoUsage?.label ?? readLabel(headers),
+            capture?.demoUsage?.word ?? readVisitorWord(headers),
           );
         },
       },

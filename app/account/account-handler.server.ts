@@ -130,7 +130,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const auth = createAccountAuth(config, pool, history, signIn);
   return {
     handleAuthRequest: (request) => auth.handler(request),
-    handleDemoRequest: (request) => respondWithDemoSignIn(request, auth),
+    handleDemoRequest: (request) =>
+      respondWithDemoSignIn(request, auth, signIn),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),

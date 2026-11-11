@@ -45,11 +45,15 @@ function postActivity(headers: Record<string, string> = {}, body = "{}") {
 describe("createHistoryStore", () => {
   it("adds a sign-in for the account with its label, timed by the database", async () => {
     const { database, query } = createFakeDatabase();
-    await createHistoryStore(database).recordSignIn("ada", "Andrew");
+    await createHistoryStore(database).recordSignIn(
+      "ada",
+      "Andrew",
+      "qwertyui",
+    );
 
     expect(query).toHaveBeenCalledWith(
-      "insert into account_sign_in (user_id, label) values ($1, $2)",
-      ["ada", "Andrew"],
+      "insert into account_sign_in (user_id, label, visitor_word) values ($1, $2, $3)",
+      ["ada", "Andrew", "qwertyui"],
     );
   });
 
@@ -82,9 +86,9 @@ describe("createHistoryStore", () => {
     await createHistoryStore(database).recordActivity("ada", "");
 
     const insert = query.mock.calls.find(([text]) =>
-      text.includes("insert into account_visit (user_id, label"),
+      text.includes("insert into account_visit"),
     );
-    expect(insert?.[1]).toEqual(["ada", ""]);
+    expect(insert?.[1]).toEqual(["ada", "", ""]);
     expect(insert?.[0]).toContain("clock_timestamp()");
     expect(insert?.[0]).not.toContain("now()");
   });
@@ -128,8 +132,12 @@ describe("createHistoryStore", () => {
 describe("recordSignInQuietly", () => {
   it("records the sign-in", async () => {
     const history = createFakeHistory();
-    await recordSignInQuietly(history, "ada", "Andrew");
-    expect(history.recordSignIn).toHaveBeenCalledWith("ada", "Andrew");
+    await recordSignInQuietly(history, "ada", "Andrew", "qwertyui");
+    expect(history.recordSignIn).toHaveBeenCalledWith(
+      "ada",
+      "Andrew",
+      "qwertyui",
+    );
   });
 
   it("reports only the code of a failed write, and does not throw", async () => {
@@ -139,7 +147,7 @@ describe("recordSignInQuietly", () => {
         throw Object.assign(new Error("password=secret"), { code: "42P01" });
       },
     });
-    await recordSignInQuietly(history, "ada", "", { reportFailure });
+    await recordSignInQuietly(history, "ada", "", "", { reportFailure });
     expect(reportFailure).toHaveBeenCalledWith("42P01");
   });
 
@@ -148,7 +156,7 @@ describe("recordSignInQuietly", () => {
     const history = createFakeHistory({
       recordSignIn: () => new Promise(() => {}),
     });
-    await recordSignInQuietly(history, "ada", "", {
+    await recordSignInQuietly(history, "ada", "", "", {
       timeout: 10,
       reportFailure,
     });
@@ -168,7 +176,7 @@ describe("handleActivityRequest", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
-    expect(history.recordActivity).toHaveBeenCalledWith("ada", "");
+    expect(history.recordActivity).toHaveBeenCalledWith("ada", "", "");
   });
 
   it("records activity under the label in the cookie", async () => {
@@ -177,7 +185,7 @@ describe("handleActivityRequest", () => {
       postActivity({ Cookie: "abodeo_label=Andrew%20B" }),
       { readSessionUserId: signedIn, history },
     );
-    expect(history.recordActivity).toHaveBeenCalledWith("ada", "Andrew B");
+    expect(history.recordActivity).toHaveBeenCalledWith("ada", "Andrew B", "");
   });
 
   it("records an invalid label cookie as empty", async () => {
@@ -189,7 +197,7 @@ describe("handleActivityRequest", () => {
         history,
       },
     );
-    expect(history.recordActivity).toHaveBeenCalledWith("ada", "");
+    expect(history.recordActivity).toHaveBeenCalledWith("ada", "", "");
   });
 
   it("refuses other methods", async () => {

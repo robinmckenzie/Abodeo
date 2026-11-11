@@ -1,10 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import {
-  demoAccountEmail,
-  respondWithDemoSignIn,
-} from "./demo-sign-in.server";
+import type { SignInCapture } from "./account-auth.server";
+import { demoAccountEmail, respondWithDemoSignIn } from "./demo-sign-in.server";
 import {
   createTestAuth,
   signInTestAccount,
@@ -59,5 +57,61 @@ describe("respondWithDemoSignIn", () => {
     );
     expect(response.status).toBe(404);
     expect(response.headers.get("Set-Cookie")).toBeNull();
+  });
+
+  describe("label and random word", () => {
+    async function openDemo(address: string, cookie?: string) {
+      const { auth } = createTestAuth();
+      await signInTestAccount(auth, { email: demoAccountEmail, sub: "demo" });
+      const capture: SignInCapture = {};
+      const response = await respondWithDemoSignIn(
+        new Request(`${testBaseUrl}${address}`, {
+          headers: cookie ? { Cookie: cookie } : {},
+        }),
+        auth,
+        capture,
+      );
+      const cookies = response.headers.getSetCookie();
+      const value = (name: string) =>
+        cookies.find((c) => c.startsWith(`${name}=`))?.split(";")[0];
+      return { capture, value };
+    }
+
+    it("gives a new visitor a word and keeps the label from the address", async () => {
+      const { capture, value } = await openDemo("/demo?label=Moodys");
+      expect(capture.demoUsage?.label).toBe("Moodys");
+      expect(capture.demoUsage?.word).toMatch(/^[a-z]{8}$/);
+      expect(value("abodeo_label")).toBe("abodeo_label=Moodys");
+      expect(value("abodeo_visitor")).toBe(
+        `abodeo_visitor=${capture.demoUsage?.word}`,
+      );
+    });
+
+    it("keeps the same word when the label changes", async () => {
+      const first = await openDemo("/demo?label=Moodys");
+      const word = first.capture.demoUsage?.word;
+      const second = await openDemo(
+        "/demo?label=Bob",
+        `abodeo_visitor=${word}`,
+      );
+      expect(second.capture.demoUsage).toEqual({ label: "Bob", word });
+    });
+
+    it("uses the word as the label when the address has none, again on a second visit", async () => {
+      const first = await openDemo("/demo");
+      const word = first.capture.demoUsage?.word;
+      expect(first.capture.demoUsage?.label).toBe(word);
+      const second = await openDemo("/demo", `abodeo_visitor=${word}`);
+      expect(second.capture.demoUsage).toEqual({ label: word, word });
+    });
+
+    it("treats an invalid label or PUBLIC as no label", async () => {
+      const bad = await openDemo("/demo?label=a%3Cb");
+      expect(bad.capture.demoUsage?.label).toBe(bad.capture.demoUsage?.word);
+      const clear = await openDemo("/demo?label=public");
+      expect(clear.capture.demoUsage?.label).toBe(
+        clear.capture.demoUsage?.word,
+      );
+    });
   });
 });

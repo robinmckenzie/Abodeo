@@ -4,7 +4,13 @@
 import { makeSignature } from "better-auth/crypto";
 
 import { accountReturnPath } from "./account-api";
-import type { AccountAuth } from "./account-auth.server";
+import type { AccountAuth, SignInCapture } from "./account-auth.server";
+import { formatLabelCookie, readLabelRequest } from "./usage-label";
+import {
+  formatVisitorWordCookie,
+  makeVisitorWord,
+  readVisitorWord,
+} from "./visitor-word.server";
 
 export const demoAccountEmail = "abodeodemo@gmail.com";
 
@@ -31,20 +37,37 @@ export async function openDemoSessionCookie(auth: DemoSessionAuth) {
   return parts.join("; ");
 }
 
-// Signs in as the demo account and moves on to the projects page. Any query
-// in the address is ignored.
+// The label and word of this visit. The word is the browser's, made on its
+// first visit. The label is ?label=NAME, or the word when the address has
+// none (or PUBLIC), so that every demo visit can be told apart.
+export function planDemoVisit(request: Request) {
+  const existing = readVisitorWord(request.headers);
+  const word = existing || makeVisitorWord();
+  const labelRequest = readLabelRequest(new URL(request.url).search);
+  const label = labelRequest.kind === "set" ? labelRequest.label : word;
+  return { word, label, isNewVisitor: existing === "" };
+}
+
+// Signs in as the demo account and moves on to the projects page. Only the
+// label in the address is read; the rest of the query is ignored. The label
+// and word are kept in cookies for later requests and in the capture for the
+// sign-in's own record.
 export async function respondWithDemoSignIn(
   request: Request,
   auth: DemoSessionAuth,
+  capture: SignInCapture = {},
 ) {
+  const visit = planDemoVisit(request);
+  capture.demoUsage = { label: visit.label, word: visit.word };
   const cookie = await openDemoSessionCookie(auth);
   if (!cookie) return new Response(null, { status: 404 });
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: new URL(accountReturnPath, request.url).toString(),
-      "Set-Cookie": cookie,
-      "Cache-Control": "no-store",
-    },
+  const isSecure = new URL(request.url).protocol === "https:";
+  const headers = new Headers({
+    Location: new URL(accountReturnPath, request.url).toString(),
+    "Cache-Control": "no-store",
   });
+  headers.append("Set-Cookie", cookie);
+  headers.append("Set-Cookie", formatLabelCookie(visit.label, isSecure));
+  headers.append("Set-Cookie", formatVisitorWordCookie(visit.word, isSecure));
+  return new Response(null, { status: 302, headers });
 }

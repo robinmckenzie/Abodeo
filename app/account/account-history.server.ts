@@ -12,6 +12,7 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 import { readLabel } from "./usage-label.server";
+import { readVisitorWord } from "./visitor-word.server";
 
 // A visit ends after this long without a click or keypress, so that later
 // activity starts a new one. A provisional default.
@@ -23,11 +24,12 @@ export const signInRecordTimeout = 3000;
 
 export type HistoryStore = {
   // The label is the usage label from the request (AD #51), or "".
-  recordSignIn(userId: string, label: string): Promise<void>;
+  // The word is the visitor's random word (AD #138), or "".
+  recordSignIn(userId: string, label: string, word?: string): Promise<void>;
   // Extends the latest visit of the account and label, or starts a new one if
   // it has been idle for visitGapMinutes or more. People using one account
   // under different labels at once each have their own running visit.
-  recordActivity(userId: string, label: string): Promise<void>;
+  recordActivity(userId: string, label: string, word?: string): Promise<void>;
 };
 
 // A Postgres pool: a visit is recorded in a transaction on one connection.
@@ -37,13 +39,13 @@ export type HistoryDatabase = Queryable & {
 
 export function createHistoryStore(database: HistoryDatabase): HistoryStore {
   return {
-    async recordSignIn(userId, label) {
+    async recordSignIn(userId, label, word = "") {
       await database.query(
-        "insert into account_sign_in (user_id, label) values ($1, $2)",
-        [userId, label],
+        "insert into account_sign_in (user_id, label, visitor_word) values ($1, $2, $3)",
+        [userId, label, word],
       );
     },
-    async recordActivity(userId, label) {
+    async recordActivity(userId, label, word = "") {
       const client = await database.connect();
       try {
         await client.query("begin", []);
@@ -67,9 +69,10 @@ export function createHistoryStore(database: HistoryDatabase): HistoryStore {
         );
         if (rows.length === 0) {
           await client.query(
-            `insert into account_visit (user_id, label, started_at, last_active_at)
-             values ($1, $2, clock_timestamp(), clock_timestamp())`,
-            [userId, label],
+            `insert into account_visit
+               (user_id, label, visitor_word, started_at, last_active_at)
+             values ($1, $2, $3, clock_timestamp(), clock_timestamp())`,
+            [userId, label, word],
           );
         }
         await client.query("commit", []);
@@ -93,6 +96,7 @@ export async function recordSignInQuietly(
   history: HistoryStore,
   userId: string,
   label: string,
+  word: string,
   {
     timeout = signInRecordTimeout,
     reportFailure = reportHistoryFailure,
@@ -102,7 +106,7 @@ export async function recordSignInQuietly(
   } = {},
 ) {
   try {
-    await withTimeout(history.recordSignIn(userId, label), timeout);
+    await withTimeout(history.recordSignIn(userId, label, word), timeout);
   } catch (error) {
     reportFailure(readErrorCode(error));
   }
@@ -140,7 +144,11 @@ export async function handleActivityRequest(
     );
     if (userId === undefined) return respondWithError(401, "not_signed_in");
     await withTimeout(
-      history.recordActivity(userId, readLabel(request.headers)),
+      history.recordActivity(
+        userId,
+        readLabel(request.headers),
+        readVisitorWord(request.headers),
+      ),
       timeout,
     );
     return new Response(null, {

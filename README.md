@@ -304,6 +304,17 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   database, before the new code is deployed. It adds the columns and replaces the visit index.
 - If the label cannot be read or saved, the app works and the record has an empty label.
 
+### Demo sign-in (AD #138)
+- `/demo` signs in as the demo account (`abodeodemo@gmail.com`, which must have signed in with
+  Google once) and opens the projects page. Only `?label=NAME` is read from the address. Any
+  other query is ignored, so the address cannot choose another account.
+- The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent only to
+  `/api`). Sign-in, visit and site visit records store the label and the word
+  (`visitor_word`). With no label in the address, the word is the label. Visits under different
+  labels from one browser share a word. It works within one browser on one device.
+- Run `db/visitor-word.sql` v1.138.0 in Neon for each account store before deploying: it adds
+  the `visitor_word` columns, and without them sign-in and visit records fail.
+
 ### Visits before sign-in
 
 AD #94 Log Visits Before Sign-In. Each browser tab that opens the app reports one visit to

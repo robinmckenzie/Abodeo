@@ -22,6 +22,7 @@ const settings: VisitAlertSettings = {
 
 const human: Visit = {
   label: "",
+  word: "",
   welcome: true,
   isBot: false,
   country: "",
@@ -128,7 +129,7 @@ describe("createVisitStore", () => {
     expect(texts[2]).toContain("site_visit");
     expect(query.mock.calls[2][1]).toEqual(["", 4, 7]);
     expect(texts[3]).toContain("insert into site_visit");
-    expect(query.mock.calls[3][1]).toEqual(["", true, false, "", "", true]);
+    expect(query.mock.calls[3][1]).toEqual(["", "", true, false, "", "", true]);
     expect(texts[4]).toBe("commit");
     expect(release).toHaveBeenCalledOnce();
   });
@@ -142,7 +143,15 @@ describe("createVisitStore", () => {
     );
 
     expect(emailed).toBe(false);
-    expect(query.mock.calls[3][1]).toEqual(["", true, false, "", "", false]);
+    expect(query.mock.calls[3][1]).toEqual([
+      "",
+      "",
+      true,
+      false,
+      "",
+      "",
+      false,
+    ]);
   });
 
   it("does not check the cooldown when email is not wanted", async () => {
@@ -198,6 +207,7 @@ describe("handleSiteVisitRequest", () => {
     expect(store.recordVisit).toHaveBeenCalledWith(
       {
         label: "Andrew",
+        word: "",
         welcome: true,
         isBot: false,
         country: "GB",
