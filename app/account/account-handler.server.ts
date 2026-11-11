@@ -82,12 +82,14 @@ import {
   handleSiteVisitRequest,
   type VisitDependencies,
 } from "./site-visit.server";
+import { respondWithDemoSignIn } from "./demo-sign-in.server";
 import { readVisitAlertSettings } from "./visit-alert.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
+  handleDemoRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
@@ -128,6 +130,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const auth = createAccountAuth(config, pool, history, signIn);
   return {
     handleAuthRequest: (request) => auth.handler(request),
+    handleDemoRequest: (request) => respondWithDemoSignIn(request, auth),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
@@ -368,6 +371,29 @@ export function createAccountRequestHandler(
   };
 }
 
+// The /demo address: signs in as the demo account. Like the account API, it
+// is unavailable where sign-in is not configured.
+export function createDemoRequestHandler(
+  openRuntime: () => AccountRuntime | undefined,
+  reportFailure: (code: string | undefined) => void = reportAuthFailure,
+) {
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== "GET") return new Response(null, { status: 405 });
+    const runtime = openRuntime();
+    if (!runtime) return new Response(null, { status: 503 });
+    try {
+      return await runtime.handleDemoRequest(request);
+    } catch (error) {
+      reportFailure(readErrorCode(error));
+      return new Response(null, { status: 503 });
+    } finally {
+      await withTimeout(runtime.close(), accountCloseTimeout).catch(
+        () => undefined,
+      );
+    }
+  };
+}
+
 export function createAccountRequestHandlerFromEnvironment(
   env: Record<string, string | undefined>,
   isDevelopmentServer: boolean,
@@ -380,6 +406,15 @@ export function createAccountRequestHandlerFromEnvironment(
 }
 
 let serverHandler: ((request: Request) => Promise<Response>) | undefined;
+let demoHandler: ((request: Request) => Promise<Response>) | undefined;
+
+export function handleDemoRequest(request: Request) {
+  const config = readAccountConfig(process.env, import.meta.env.DEV);
+  demoHandler ??= createDemoRequestHandler(() =>
+    config ? openNeonAccountRuntime(config) : undefined,
+  );
+  return demoHandler(request);
+}
 
 // Settings are read once per server instance, on its first account request.
 export function handleAccountRequest(request: Request) {

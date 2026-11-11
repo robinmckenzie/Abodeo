@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import type { SignInCapture } from "./account-auth.server";
 import {
   createAccountRequestHandler,
+  createDemoRequestHandler,
   listenForPoolErrors,
   type AccountRuntime,
 } from "./account-handler.server";
@@ -86,6 +87,7 @@ function createTestHandler() {
   const calendar = createFakeCalendarDependencies();
   const projectStore = createMemoryProjectStore();
   const runtime: AccountRuntime = {
+    handleDemoRequest: async () => new Response(null),
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
@@ -169,6 +171,7 @@ describe("createAccountRequestHandler", () => {
     try {
       const handle = createAccountRequestHandler(
         () => ({
+          handleDemoRequest: async () => new Response(null),
           handleAuthRequest: () => new Promise(() => {}),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -202,6 +205,7 @@ describe("createAccountRequestHandler", () => {
   it("returns the browser to the dashboard when Better Auth answers Google's return with an error", async () => {
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
         handleAuthRequest: async () => new Response(null, { status: 500 }),
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
@@ -682,6 +686,7 @@ describe("createAccountRequestHandler", () => {
     const reportFailure = vi.fn();
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
         handleAuthRequest: async () => {
           throw Object.assign(new Error("postgres://secret refused"), {
             code: "ECONNREFUSED",
@@ -714,6 +719,7 @@ describe("createAccountRequestHandler", () => {
     try {
       const handle = createAccountRequestHandler(
         () => ({
+          handleDemoRequest: async () => new Response(null),
           handleAuthRequest: async () => Response.json(null),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -809,6 +815,7 @@ describe("Google's return to sign-in", () => {
     const signIn: SignInCapture = {};
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
         handleAuthRequest: async () => {
           Object.assign(signIn, capture);
           return answer;
@@ -895,5 +902,21 @@ describe("Google's return to sign-in", () => {
       `${testBaseUrl}/dashboard?error=unavailable`,
     );
     expect(readTokenCookie(response)).toBeUndefined();
+  });
+});
+
+describe("createDemoRequestHandler", () => {
+  it("answers 503 when sign-in is not configured", async () => {
+    const handle = createDemoRequestHandler(() => undefined);
+    const response = await handle(new Request(`${testBaseUrl}/demo`));
+    expect(response.status).toBe(503);
+  });
+
+  it("refuses a method other than GET", async () => {
+    const handle = createDemoRequestHandler(() => undefined);
+    const response = await handle(
+      new Request(`${testBaseUrl}/demo`, { method: "POST" }),
+    );
+    expect(response.status).toBe(405);
   });
 });

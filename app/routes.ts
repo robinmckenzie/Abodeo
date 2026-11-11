@@ -8,5 +8,6 @@ export default [
     route("people", "routes/people.tsx"),
     route("bin", "routes/bin.tsx"),
   ]),
+  route("demo", "routes/demo.ts"),
   route("api/*", "routes/api.ts"),
 ] satisfies RouteConfig;
