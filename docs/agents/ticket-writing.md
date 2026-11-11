@@ -1,6 +1,7 @@
 # Ticket writing
 
-- From DRAFT onwards, the ticket's body has the sections User story, Requirements and Acceptance criteria, in that order.
+- From DRAFT onwards, the ticket's body has the sections User story, Requirements and Acceptance criteria, in that order. A ticket that is large enough to need it also has a final Stages section.
+- Stages split a ticket into tracer bullets: thin, complete paths through every layer, each demonstrable on its own. Number them in the order they are done, say what each is blocked by, and give each a demo and an observation that would show it failed. Put preparatory refactoring first. Do not name files or line numbers. Do not make a stage a single layer, such as only the database or only the screen.
 - Findings and discussion go in comments. Do not wrap lines, because GitHub shows every line break in an issue.
 - Describe the problem and the behaviour wanted, not how to build it. Put a constraint in Requirements only when it is genuinely required, such as one imposed by an external API, security or saved-data compatibility.
 - When a ticket depends on another that is not yet done, say so in the body and also set GitHub's blocked-by link, so that the order shows on the issue and an agent can check it. Priority labels do not record an order. A parent ticket groups related tickets and does not imply an order.
