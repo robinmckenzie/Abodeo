@@ -39,10 +39,29 @@ describe("readVisitorWord", () => {
 });
 
 describe("formatVisitorWordCookie", () => {
-  it("keeps the word for a year, for /api only and out of scripts' reach", () => {
+  function readPath(cookie: string) {
+    return cookie.match(/; Path=([^;]*)/)?.[1] ?? "";
+  }
+
+  // The browser's rule: the cookie goes with a request whose path is the
+  // cookie's path or lies below it.
+  function isSentTo(cookiePath: string, requestPath: string) {
+    return (
+      requestPath === cookiePath ||
+      requestPath.startsWith(cookiePath.endsWith("/") ? cookiePath : `${cookiePath}/`)
+    );
+  }
+
+  it("keeps the word for a year and out of scripts' reach", () => {
     expect(formatVisitorWordCookie("qwertyui", false)).toBe(
-      "abodeo_visitor=qwertyui; Max-Age=31536000; Path=/api; HttpOnly; SameSite=Lax",
+      "abodeo_visitor=qwertyui; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax",
     );
     expect(formatVisitorWordCookie("qwertyui", true)).toMatch(/; Secure$/);
+  });
+
+  it("is sent to /demo, where the word is read, as well as to /api", () => {
+    const path = readPath(formatVisitorWordCookie("qwertyui", false));
+    expect(isSentTo(path, "/demo")).toBe(true);
+    expect(isSentTo(path, "/api/account/activity")).toBe(true);
   });
 });

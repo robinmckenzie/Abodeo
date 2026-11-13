@@ -1,6 +1,6 @@
 // The visitor's random word (AD #138 Demo Entry And Seed): given the first
-// time a browser opens /demo and kept in a cookie that /api requests carry,
-// so that visits under different labels from one browser can be joined up.
+// time a browser opens /demo and kept in a cookie that both /demo and /api
+// requests carry, so that visits under different labels from one browser can be joined up.
 // It identifies a browser, not a person, and is stored with every usage
 // record.
 export const visitorWordCookieName = "abodeo_visitor";
@@ -37,9 +37,10 @@ export function readVisitorWord(headers: Headers | undefined): string {
   return "";
 }
 
-// The Set-Cookie text keeping the word, sent only to /api like the label.
+// The Set-Cookie text keeping the word. A cookie has one Path, and the word is
+// read at /demo and used at /api, so the path is the whole site.
 export function formatVisitorWordCookie(word: string, isSecure: boolean) {
-  return `${visitorWordCookieName}=${word}; Max-Age=${visitorWordLifetimeSeconds}; Path=/api; HttpOnly; SameSite=Lax${
+  return `${visitorWordCookieName}=${word}; Max-Age=${visitorWordLifetimeSeconds}; Path=/; HttpOnly; SameSite=Lax${
     isSecure ? "; Secure" : ""
   }`;
 }
