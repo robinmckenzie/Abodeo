@@ -138,12 +138,15 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   listenForPoolErrors(pool);
   const history = createHistoryStore(pool);
   const projects = createProjectStore(pool);
+  const seed = createDemoSeedStore(pool);
   const signIn: SignInCapture = {};
   const auth = createAccountAuth(config, pool, history, signIn);
   return {
     handleAuthRequest: (request) => auth.handler(request),
     handleDemoRequest: (request) =>
-      respondWithDemoSignIn(request, auth, signIn),
+      respondWithDemoSignIn(request, auth, signIn, (userId) =>
+        seed.reset(userId),
+      ),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
@@ -155,7 +158,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     projects,
     people: createPeopleStore(pool),
     images: createImageStore(pool),
-    seed: createDemoSeedStore(pool),
+    seed,
     ignoredLabels: readIgnoredLabels(process.env),
     calendar: {
       secret: config.secret,

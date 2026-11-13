@@ -17,13 +17,21 @@ export const demoAccountEmail = "abodeodemo@gmail.com";
 // What opening a demo session needs from Better Auth.
 export type DemoSessionAuth = Pick<AccountAuth, "$context">;
 
-// The demo account's session cookie, as a Set-Cookie value, or undefined when
-// the demo account has not signed in with Google yet.
-export async function openDemoSessionCookie(auth: DemoSessionAuth) {
+// The demo account's id, or undefined when it has not signed in with Google
+// yet.
+export async function findDemoUserId(auth: DemoSessionAuth) {
   const context = await auth.$context;
   const found = await context.internalAdapter.findUserByEmail(demoAccountEmail);
-  if (!found) return undefined;
-  const session = await context.internalAdapter.createSession(found.user.id);
+  return found?.user.id;
+}
+
+// A session cookie for the demo account, as a Set-Cookie value.
+export async function openDemoSessionCookie(
+  auth: DemoSessionAuth,
+  userId: string,
+) {
+  const context = await auth.$context;
+  const session = await context.internalAdapter.createSession(userId);
   const signature = await makeSignature(session.token, context.secret);
   const { name, attributes } = context.authCookies.sessionToken;
   const parts = [
@@ -51,16 +59,20 @@ export function planDemoVisit(request: Request) {
 // Signs in as the demo account and moves on to the projects page. Only the
 // label in the address is read; the rest of the query is ignored. The label
 // and word are kept in cookies for later requests and in the capture for the
-// sign-in's own record.
+// sign-in's own record. A new visitor first has the account reset to the
+// saved seed; a returning one finds it as they left it.
 export async function respondWithDemoSignIn(
   request: Request,
   auth: DemoSessionAuth,
   capture: SignInCapture = {},
+  resetToSeed?: (userId: string) => Promise<unknown>,
 ) {
   const visit = planDemoVisit(request);
   capture.demoUsage = { label: visit.label, word: visit.word };
-  const cookie = await openDemoSessionCookie(auth);
-  if (!cookie) return new Response(null, { status: 404 });
+  const userId = await findDemoUserId(auth);
+  if (!userId) return new Response(null, { status: 404 });
+  if (visit.isNewVisitor) await resetToSeed?.(userId);
+  const cookie = await openDemoSessionCookie(auth, userId);
   const isSecure = new URL(request.url).protocol === "https:";
   const headers = new Headers({
     Location: new URL(accountReturnPath, request.url).toString(),

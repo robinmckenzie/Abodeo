@@ -18,9 +18,21 @@ function createFakeSeedDatabase() {
   const imageSizes = { largest: 0, total: 0, count: 0 };
   let imageCopies = 0;
   const events: string[] = [];
+  const statements: string[] = [];
   const query = async (text: string, values: unknown[]) => {
     const sql = text.replace(/\s+/g, " ").trim();
     if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
+    if (sql.startsWith("select 1 from demo_seed")) {
+      return { rows: seed ? [{}] : [] };
+    }
+    if (
+      /^(delete from project|insert into project|insert into account_people|select pg_advisory)/.test(
+        sql,
+      )
+    ) {
+      statements.push(sql.split(" (")[0].split(" select")[0]);
+      return { rows: [] };
+    }
     if (sql.startsWith("select 1 from auth_user")) {
       return { rows: values[0] === "demo-user" ? [{}] : [] };
     }
@@ -65,6 +77,7 @@ function createFakeSeedDatabase() {
     projectRows,
     imageSizes,
     events,
+    statements,
     readSeed: () => seed,
     imageCopies: () => imageCopies,
   };
@@ -133,5 +146,30 @@ describe("createDemoSeedStore", () => {
     await expect(
       createDemoSeedStore(database).save("demo-user"),
     ).rejects.toBeInstanceOf(SeedTooLargeError);
+  });
+
+  describe("reset", () => {
+    it("changes nothing when no seed has been saved", async () => {
+      const { database, statements } = createFakeSeedDatabase();
+      expect(await createDemoSeedStore(database).reset("demo-user")).toBe(
+        false,
+      );
+      expect(statements).toEqual([]);
+    });
+
+    it("replaces the account's projects, images and people with the seed", async () => {
+      const { database, statements } = createFakeSeedDatabase();
+      const store = createDemoSeedStore(database);
+      await store.save("demo-user");
+      statements.length = 0;
+      expect(await store.reset("demo-user")).toBe(true);
+      expect(statements[1]).toBe("delete from project where user_id = $1");
+      expect(statements.slice(2)).toEqual([
+        "insert into project",
+        "insert into project_image",
+        "insert into project_image_bytes",
+        "insert into account_people",
+      ]);
+    });
   });
 });

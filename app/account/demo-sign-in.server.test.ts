@@ -114,4 +114,46 @@ describe("respondWithDemoSignIn", () => {
       );
     });
   });
+
+  describe("reset to the seed", () => {
+    async function openDemo(cookie?: string) {
+      const { auth } = createTestAuth();
+      const { user } = await signInTestAccount(auth, {
+        email: demoAccountEmail,
+        sub: "demo",
+      });
+      const resets: string[] = [];
+      await respondWithDemoSignIn(
+        new Request(`${testBaseUrl}/demo`, {
+          headers: cookie ? { Cookie: cookie } : {},
+        }),
+        auth,
+        {},
+        async (userId) => resets.push(userId),
+      );
+      return { resets, userId: user.id };
+    }
+
+    it("resets the demo account for a new visitor", async () => {
+      const { resets, userId } = await openDemo();
+      expect(resets).toEqual([userId]);
+    });
+
+    it("leaves the account as it is for a returning visitor", async () => {
+      const { resets } = await openDemo("abodeo_visitor=abcdefgh");
+      expect(resets).toEqual([]);
+    });
+
+    it("does not reset when the demo account does not exist", async () => {
+      const { auth } = createTestAuth();
+      const resets: string[] = [];
+      await respondWithDemoSignIn(
+        new Request(`${testBaseUrl}/demo`),
+        auth,
+        {},
+        async (userId) => resets.push(userId),
+      );
+      expect(resets).toEqual([]);
+    });
+  });
 });

@@ -1,7 +1,10 @@
 // The demo seed (AD #138 Demo Entry And Seed), in the demo_seed table of
 // db/demo-seed.sql: one row holding the demo account's projects and people as
 // Robin last saved them. Saving replaces the row.
-import { readAccountPeople } from "../projects/people-store.server";
+import {
+  lockAccountPeople,
+  readAccountPeople,
+} from "../projects/people-store.server";
 import { serialisePeople } from "../projects/people";
 import {
   inTransaction,
@@ -28,6 +31,10 @@ export type DemoSeedStore = {
   // images as the seed, replacing any earlier seed. Throws SeedTooLargeError
   // if an image or all together are over the limits.
   save(userId: string): Promise<SeedSaveResponse>;
+  // Puts the account back to the saved seed: its projects (with the Bin),
+  // images and people are replaced by the seed's. Gives false, changing
+  // nothing, if no seed has been saved.
+  reset(userId: string): Promise<boolean>;
 };
 
 export function createDemoSeedStore(
@@ -112,6 +119,49 @@ export function createDemoSeedStore(
           peopleCount: people.people.length,
           imageCount: Number(count),
         };
+      }),
+
+    reset: (userId) =>
+      inTransaction(database, async (client) => {
+        const found = await client.query("select 1 from demo_seed", []);
+        if (found.rows.length === 0) return false;
+        await lockAccountPeople(client, userId);
+        // Removing a project removes its images and their files.
+        await client.query("delete from project where user_id = $1", [userId]);
+        await client.query(
+          `insert into project (user_id, id, data)
+           select $1, e->>'id', e->'data'
+           from demo_seed, jsonb_array_elements(projects) e`,
+          [userId],
+        );
+        await client.query(
+          `insert into project_image
+             (user_id, project_id, id, content_type, original_size,
+              thumbnail_size, content_hash, caption, created_at, task_id)
+           select $1, project_id, id, content_type, octet_length(original),
+             octet_length(thumbnail), content_hash, caption, created_at,
+             task_id
+           from demo_seed_image`,
+          [userId],
+        );
+        await client.query(
+          `insert into project_image_bytes
+             (user_id, project_id, image_id, kind, data)
+           select $1, project_id, id, 'original', original
+           from demo_seed_image
+           union all
+           select $1, project_id, id, 'thumbnail', thumbnail
+           from demo_seed_image`,
+          [userId],
+        );
+        await client.query(
+          `insert into account_people (user_id, data)
+           select $1, people from demo_seed
+           on conflict (user_id) do update
+           set data = excluded.data, revision = account_people.revision + 1`,
+          [userId],
+        );
+        return true;
       }),
   };
 }

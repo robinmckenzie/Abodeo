@@ -320,6 +320,10 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   the seed, replacing any earlier seed. The save is refused, and the old seed kept, if an image's
   original is over 1 MiB or the images are over 4 MiB together (`maxSeedImageBytes`,
   `maxSeedTotalBytes`; provisional).
+- A new visitor (a browser with no `abodeo_visitor` cookie) opening `/demo` first resets the demo
+  account to the saved seed, in one transaction: all its projects (including the Bin), images and
+  people are replaced by the seed's, however the last visitor left them. A returning visitor finds
+  the account as it was left. With no seed saved, nothing is reset. Appointments come later.
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
 - Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
