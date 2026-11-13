@@ -316,9 +316,14 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   the `visitor_word` columns, and without them sign-in and visit records fail.
 - Robin saves the demo seed from the "Demo seed" section of the account panel, which shows only
   in a demo session whose label is one of `VISIT_ALERT_IGNORE_LABELS`. It saves the demo
-  account's projects (not in the Bin) and people as one row, replacing any earlier seed.
+  account's projects (not in the Bin), people and the projects' images (details and both files) as
+  the seed, replacing any earlier seed. The save is refused, and the old seed kept, if an image's
+  original is over 1 MiB or the images are over 4 MiB together (`maxSeedImageBytes`,
+  `maxSeedTotalBytes`; provisional).
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
+- Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
+  the `demo_seed_image` table, and without it saving the seed fails.
 
 ### Visits before sign-in
 
