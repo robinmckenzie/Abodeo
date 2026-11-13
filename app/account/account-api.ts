@@ -11,6 +11,10 @@ export const accountActivityPath = "/api/account/activity";
 // The demo seed (AD #138): whether the control shows, and saving the seed.
 export const accountSeedPath = "/api/account/seed";
 
+// The demo account (AD #138). Fixed here, so that nothing in a request can
+// choose another one.
+export const demoAccountEmail = "abodeodemo@gmail.com";
+
 // Where the page reports a visit, signed in or not (AD #94).
 export const siteVisitPath = "/api/visit";
 

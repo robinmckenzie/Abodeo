@@ -3,7 +3,9 @@
 // list and add appointments without going through Google each time. It is
 // HttpOnly and scoped to the Calendar endpoints, so the browser's own code
 // never sees it, and it is never saved in the database or logged. The token
-// is read only if it was made for the signed-in account.
+// is read only if it was made for the signed-in account. For the demo
+// account alone the token can come from stored access instead of a trip to
+// Google (see demo-calendar-access.server.ts), and the cookie says so.
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 
 import { calendarBasePath } from "./calendar-api";
@@ -14,6 +16,9 @@ export const calendarTokenCookieName = "abodeo_calendar_token";
 // The longest the cookie is kept. Google's token lasts an hour.
 export const calendarTokenLifetime = 55 * 60 * 1000;
 
+// How long a token is assumed to last when Google gives no expiry.
+export const unknownTokenLifetime = 30 * 60 * 1000;
+
 // A token with less than this left is treated as near expiry: it is not
 // enough to fill in a form with. Tunable.
 export const calendarTokenNearExpiry = 5 * 60 * 1000;
@@ -23,6 +28,8 @@ type StoredToken = {
   // The account the token was granted for.
   userId: string;
   expiresAt: number;
+  // Present when the token came from the account's stored access.
+  isStored?: true;
 };
 
 export type CalendarToken = {
@@ -30,6 +37,8 @@ export type CalendarToken = {
   expiresAt: number;
   // Less than calendarTokenNearExpiry is left.
   isNearExpiry: boolean;
+  // It came from the account's stored access, not from a trip to Google.
+  isStored: boolean;
 };
 
 function serialise(value: string, maxAge: number, isSecure: boolean) {
@@ -57,6 +66,7 @@ export async function createCalendarTokenCookie({
   userId,
   expiresAt,
   now,
+  isStored = false,
 }: {
   secret: string;
   isSecure: boolean;
@@ -65,11 +75,17 @@ export async function createCalendarTokenCookie({
   // When Google's token ends, in milliseconds.
   expiresAt: number;
   now: number;
+  isStored?: boolean;
 }) {
   const end = Math.min(expiresAt, now + calendarTokenLifetime);
   const maxAge = Math.floor((end - now) / 1000);
   if (maxAge <= 0) return clearCalendarTokenCookie(isSecure);
-  const stored: StoredToken = { accessToken, userId, expiresAt: end };
+  const stored: StoredToken = {
+    accessToken,
+    userId,
+    expiresAt: end,
+    ...(isStored ? { isStored: true } : {}),
+  };
   const value = await symmetricEncrypt({
     key: secret,
     data: JSON.stringify(stored),
@@ -112,5 +128,6 @@ export async function readCalendarToken(
     accessToken: stored.accessToken,
     expiresAt: stored.expiresAt,
     isNearExpiry: stored.expiresAt - now < calendarTokenNearExpiry,
+    isStored: stored.isStored === true,
   };
 }

@@ -21,6 +21,7 @@ import {
   type CalendarDependencies,
 } from "../calendar/calendar-handler.server";
 import { createCalendarStore } from "../calendar/calendar-store.server";
+import { createDemoCalendarAccessStore } from "../calendar/demo-calendar-access.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
 import {
   handleImagesRequest,
@@ -92,7 +93,7 @@ import {
   createDemoSeedStore,
   type DemoSeedStore,
 } from "./demo-seed-store.server";
-import { handleSeedRequest } from "./seed-handler.server";
+import { canManageDemo, handleSeedRequest } from "./seed-handler.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
@@ -141,6 +142,7 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const seed = createDemoSeedStore(pool);
   const signIn: SignInCapture = {};
   const auth = createAccountAuth(config, pool, history, signIn);
+  const ignoredLabels = readIgnoredLabels(process.env);
   return {
     handleAuthRequest: (request) => auth.handler(request),
     handleDemoRequest: (request) =>
@@ -159,13 +161,18 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     people: createPeopleStore(pool),
     images: createImageStore(pool),
     seed,
-    ignoredLabels: readIgnoredLabels(process.env),
+    ignoredLabels,
     calendar: {
       secret: config.secret,
       isSecure: config.baseUrl.startsWith("https:"),
       google: createCalendarGoogle(config),
       calendar: createGoogleCalendar(),
       store: createCalendarStore(pool),
+      demoAccess: {
+        store: createDemoCalendarAccessStore(pool),
+        canManage: (headers, userId) =>
+          canManageDemo(headers, userId, { store: seed, ignoredLabels }),
+      },
       hasProject: async (userId, projectId) =>
         (await projects.read(userId, projectId)).kind !== "not-found",
     },

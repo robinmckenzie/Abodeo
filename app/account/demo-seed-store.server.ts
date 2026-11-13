@@ -11,11 +11,11 @@ import {
   type TransactionalDatabase,
 } from "../projects/transaction.server";
 import {
+  demoAccountEmail,
   maxSeedImageBytes,
   maxSeedTotalBytes,
   type SeedSaveResponse,
 } from "./account-api";
-import { demoAccountEmail } from "./demo-sign-in.server";
 
 // The images are too big to keep in the seed. Nothing was saved.
 export class SeedTooLargeError extends Error {

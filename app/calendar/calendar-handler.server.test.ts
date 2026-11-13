@@ -16,10 +16,14 @@ import {
   testAppointmentTitle,
   type CalendarRequestDependencies,
 } from "./calendar-handler.server";
+import { symmetricDecrypt } from "better-auth/crypto";
+
 import {
   createFakeCalendarDependencies,
   testAccessToken,
   testIdToken,
+  testRefreshToken,
+  testSecret,
 } from "./test-calendar.server";
 
 const origin = "http://localhost:5173";
@@ -180,6 +184,25 @@ describe("Google's Calendar address", () => {
     expect(parameters.get("redirect_uri")).toBe(
       `${testConfig.baseUrl}/api/calendar/callback`,
     );
+  });
+
+  it("asks for a refresh token, with Google's consent screen, only to store access", async () => {
+    const google = createCalendarGoogle(testConfig);
+    const url = await google.createAuthorizationURL({
+      state: "state-1",
+      codeVerifier: "v".repeat(64),
+      loginHint: "google-sub-1",
+      storeAccess: true,
+    });
+
+    const parameters = url.searchParams;
+    expect(parameters.get("access_type")).toBe("offline");
+    expect(parameters.get("prompt")).toBe("consent");
+    expect(parameters.get("scope")?.split(" ")).toEqual([
+      "openid",
+      calendarScope,
+    ]);
+    expect(parameters.get("include_granted_scopes")).toBe("false");
   });
 });
 
@@ -713,5 +736,122 @@ describe("a grant for a project's appointments", () => {
       .getSetCookie()
       .find((value) => value.startsWith("abodeo_calendar_token="));
     expect(token).toContain("Max-Age=600");
+  });
+});
+
+// AD #138 Demo Entry And Seed: Robin's grant that stores the demo account's
+// Calendar access.
+describe("the demo account's stored access", () => {
+  const path = `${origin}/api/calendar/demo-access`;
+  const postAccess = (contentType = "application/json") =>
+    new Request(path, {
+      method: "POST",
+      headers: { "Content-Type": contentType },
+      body: "{}",
+    });
+
+  function setUpDemo() {
+    const test = setUp();
+    test.demoManagers.add("user-1");
+    test.google.answer.tokens.refreshToken = testRefreshToken;
+    return test;
+  }
+
+  async function grant(test: TestSetUp) {
+    const started = await test.handle(postAccess());
+    expect(started.status).toBe(200);
+    const { url } = (await started.json()) as { url: string };
+    const cookie = (started.headers.get("Set-Cookie") ?? "").split(";")[0];
+    const state = new URL(url).searchParams.get("state") ?? "";
+    const response = await test.handle(
+      callback(`state=${encodeURIComponent(state)}&code=google-code`, cookie),
+    );
+    return { url: new URL(url), response };
+  }
+
+  it("is for Robin in the demo account only", async () => {
+    const test = setUp();
+
+    expect((await test.handle(new Request(path))).status).toBe(403);
+    const refused = await test.handle(postAccess());
+    expect(refused.status).toBe(403);
+    expect(refused.headers.get("Set-Cookie")).toBeNull();
+    test.session.userId = undefined;
+    expect((await test.handle(new Request(path))).status).toBe(401);
+    expect((await test.handle(postAccess())).status).toBe(401);
+  });
+
+  it("accepts only a GET or a JSON post", async () => {
+    const test = setUpDemo();
+    expect((await test.handle(postAccess("text/plain"))).status).toBe(400);
+    expect(
+      (await test.handle(new Request(path, { method: "PUT" }))).status,
+    ).toBe(405);
+  });
+
+  it("stores Google's refresh token encrypted, and says when", async () => {
+    const test = setUpDemo();
+    const before = await test.handle(new Request(path));
+    expect(await before.json()).toEqual({ savedAt: null });
+
+    const { url, response } = await grant(test);
+
+    expect(url.searchParams.get("access_type")).toBe("offline");
+    expect(readResult(response)).toBe("stored");
+    expect(test.demoAccess.saved.userId).toBe("user-1");
+    expect(test.demoAccess.saved.token).not.toContain(testRefreshToken);
+    expect(
+      await symmetricDecrypt({
+        key: testSecret,
+        data: test.demoAccess.saved.token ?? "",
+      }),
+    ).toBe(testRefreshToken);
+    // Nothing is added to the calendar, and the calendar store gets no token.
+    expect(eventCount(test)).toBe(0);
+    expect(test.store.written.join(",")).not.toContain(testRefreshToken);
+    const after = await test.handle(new Request(path));
+    expect(await after.json()).toEqual({
+      savedAt: "2026-11-13T10:00:00.000Z",
+    });
+  });
+
+  it("stores nothing when Google gives no refresh token", async () => {
+    const test = setUpDemo();
+    test.google.answer.tokens.refreshToken = undefined;
+
+    const { response } = await grant(test);
+
+    expect(readResult(response)).toBe("failed");
+    expect(test.failures).toEqual([["store", "refresh_token_missing"]]);
+    expect(test.demoAccess.saved.token).toBeUndefined();
+  });
+
+  it("stores nothing for another Google account, or once the grant is no longer Robin's", async () => {
+    const wrong = setUpDemo();
+    wrong.google.answer.subject = "google-sub-2";
+    expect(readResult((await grant(wrong)).response)).toBe("wrong-account");
+    expect(wrong.demoAccess.saved.token).toBeUndefined();
+
+    const test = setUpDemo();
+    const started = await test.handle(postAccess());
+    const { url } = (await started.json()) as { url: string };
+    test.demoManagers.clear();
+    const response = await test.handle(
+      callback(
+        `state=${new URL(url).searchParams.get("state")}&code=google-code`,
+        (started.headers.get("Set-Cookie") ?? "").split(";")[0],
+      ),
+    );
+    expect(readResult(response)).toBe("failed");
+    expect(test.failures).toEqual([["store", "not_allowed"]]);
+    expect(test.demoAccess.saved.token).toBeUndefined();
+  });
+
+  it("stores nothing from any other grant, even if Google sends a refresh token", async () => {
+    const test = setUpDemo();
+
+    expect(await runTest(test)).toBe("created");
+
+    expect(test.demoAccess.saved.token).toBeUndefined();
   });
 });

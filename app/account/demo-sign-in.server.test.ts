@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { SignInCapture } from "./account-auth.server";
-import { demoAccountEmail, respondWithDemoSignIn } from "./demo-sign-in.server";
+import { demoAccountEmail } from "./account-api";
+import { respondWithDemoSignIn } from "./demo-sign-in.server";
 import {
   createTestAuth,
   signInTestAccount,

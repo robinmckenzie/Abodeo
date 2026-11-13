@@ -78,7 +78,8 @@ received at the first sign-in, which later sign-ins do not refresh. Then the pre
 set (`user_profile`), and one session row per signed-in browser, deleted on sign-out. Google's
 tokens, the profile photo, and the IP address and browser details of a sign-in are never stored:
 their columns exist because Better Auth expects them, and are always empty. Tests in
-`app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
+`app/account/` check this. The one exception is the demo account's Calendar refresh token, in
+`demo_calendar_access` (see [Demo sign-in](#demo-sign-in-ad-138)). The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
 projects and their tasks are in `project`. The images added to its projects are in
@@ -323,11 +324,33 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 - A new visitor (a browser with no `abodeo_visitor` cookie) opening `/demo` first resets the demo
   account to the saved seed, in one transaction: all its projects (including the Bin), images and
   people are replaced by the seed's, however the last visitor left them. A returning visitor finds
-  the account as it was left. With no seed saved, nothing is reset. Appointments come later.
+  the account as it was left. With no seed saved, nothing is reset. Appointments in the seed come
+  later.
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
 - Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
   the `demo_seed_image` table, and without it saving the seed fails.
+- A demo visitor is never sent to Google. Abodeo stores Calendar access for the demo account, and
+  for no other: Google's refresh token, encrypted with `BETTER_AUTH_SECRET`, in the one row of
+  `demo_calendar_access`. When the demo account's token cookie is missing or near its end,
+  `/api/calendar/connection` and `/api/calendar/appointments` get a new access token from Google
+  with it and set the usual token cookie. With stored access the account is never told to
+  connect: if Google gives no token or refuses it, appointments are reported as unavailable. The
+  account panel does not offer the demo account "Create test appointment", which goes to Google.
+- Robin stores the access once per database, as it is encrypted with that database's secret:
+  sign in with Google as the demo account, open `/demo?label=` with one of his own labels, and
+  press "Store Calendar access" under "Demo calendar" in the account panel (shown with the Demo
+  seed control). It posts to `/api/calendar/demo-access`, which sends the browser to Google's
+  consent screen asking for offline access, and Google's return to `/api/calendar/callback` saves
+  the token and shows "Calendar access is stored for the demo account." Storing again replaces
+  it. To remove the access, delete the row, or withdraw the permission in the demo Google account.
+- Google ends a refresh token after 7 days while the app's Audience is "Testing" (see Setting it
+  up from scratch), after six months unused, or when the permission is withdrawn. Appointments
+  in the demo then show as unavailable until Robin stores the access again. Publishing the app
+  ("In production") removes the 7-day limit.
+- Run `db/demo-calendar-access.sql` v1.138.3 in Neon for each account store before deploying: it
+  adds the `demo_calendar_access` table. Without it nothing is stored, and every account works as
+  before.
 
 ### Visits before sign-in
 
@@ -367,12 +390,14 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   `openid` and `calendar.app.created`,
   which lets it make its own calendars and manage their events, and nothing else in the person's
   Google Calendar. Google classes it as non-sensitive. It suggests the signed-in Google account
-  and asks for an online token, so Google issues no refresh token.
+  and asks for an online token, so Google issues no refresh token. (Only Robin's grant for the
+  demo account asks for one: see [Demo sign-in](#demo-sign-in-ad-138).)
 - The state and PKCE verifier are kept for 10 minutes in an `HttpOnly` cookie for `/api/calendar`
   only, encrypted with `BETTER_AUTH_SECRET`. Better Auth's tables and endpoints are not used.
 - Google returns to `/api/calendar/callback`, which checks the cookie, the session and that the
   permission was ticked, refuses a Google account other than the signed-in one, and exchanges the
-  code for a token. The token is never saved in the database or logged. It is used for the test
+  code for a token. The token is never saved in the database (but for the demo account's) or
+  logged. It is used for the test
   and kept for up to an hour in the cookie described under
   [Project appointments](#project-appointments).
 - The appointment, "Abodeo test appointment", is at the next whole hour for 30 minutes, in a
@@ -435,7 +460,8 @@ output. The production address is https://abodeo-kappa.vercel.app.
     4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
        `.../auth/userinfo.profile`, `openid` and `.../auth/calendar.app.created`, then Update,
        then Save. All four are non-sensitive.
-    5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
+    5. Audience: stay in Testing, with Robin as a test user, until production is ready. While
+       in Testing, the demo account's stored Calendar access ends after 7 days. Testing
        allows 100 test users over the app's lifetime. Google says only test users can sign in, but
        an account not on the list did so during testing, so do not rely on it.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs

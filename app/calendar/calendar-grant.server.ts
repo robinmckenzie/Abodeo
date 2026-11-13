@@ -2,7 +2,9 @@
 // The browser goes to Google with a state and PKCE verifier that are kept in
 // an encrypted cookie, and comes back to the callback, which checks them and
 // exchanges Google's code for a token. The token is held only in memory, for
-// the one action, and is never saved.
+// the one action, and is never saved. The one exception is Robin's grant for
+// the demo account (AD #138 Demo Entry And Seed), which asks Google for a
+// refresh token to store (see demo-calendar-access.server.ts).
 import {
   generateRandomString,
   symmetricDecrypt,
@@ -35,6 +37,8 @@ export type CalendarGrant = {
   returnProjectId: string | null;
   // Whether to open the project's new appointment form on return.
   openForm: boolean;
+  // Whether this is Robin's grant to store the demo account's access.
+  storeAccess: boolean;
   expiresAt: number;
 };
 
@@ -45,6 +49,8 @@ export type CalendarTokens = {
   scopes: string[];
   // When the access token ends, in milliseconds, if Google said.
   accessTokenExpiresAt: number | undefined;
+  // Only from a grant that asked for stored access.
+  refreshToken?: string;
 };
 
 // Google's side of the grant, which the tests stand in for.
@@ -53,6 +59,8 @@ export type CalendarGoogle = {
     state: string;
     codeVerifier: string;
     loginHint: string;
+    // Asks for a refresh token as well, for stored access.
+    storeAccess?: boolean;
   }): Promise<URL>;
   exchangeCode(input: {
     code: string;
@@ -61,21 +69,33 @@ export type CalendarGoogle = {
   // The Google account ID in a verified ID token, or undefined if the token
   // is not valid for Abodeo.
   readIdTokenSubject(idToken: string): Promise<string | undefined>;
+  // A new access token from a stored refresh token.
+  refreshAccessToken(refreshToken: string): Promise<{
+    accessToken: string | undefined;
+    accessTokenExpiresAt: number | undefined;
+  }>;
 };
 
 export function createCalendarGoogle(config: AccountConfig): CalendarGoogle {
   const redirectURI = `${config.baseUrl}${calendarCallbackPath}`;
-  const provider = google({
+  const options = {
     clientId: config.google.clientId,
     clientSecret: config.google.clientSecret,
     // Otherwise the helper adds the email and profile permissions.
     disableDefaultScope: true,
-    // Google then issues no refresh token.
-    accessType: "online",
+  };
+  // Google then issues no refresh token.
+  const provider = google({ ...options, accessType: "online" });
+  // For stored access: Google issues a refresh token, which it does reliably
+  // only when it shows its consent screen.
+  const offlineProvider = google({
+    ...options,
+    accessType: "offline",
+    prompt: "consent",
   });
   return {
-    createAuthorizationURL: ({ state, codeVerifier, loginHint }) =>
-      provider.createAuthorizationURL({
+    createAuthorizationURL: ({ state, codeVerifier, loginHint, storeAccess }) =>
+      (storeAccess ? offlineProvider : provider).createAuthorizationURL({
         state,
         codeVerifier,
         redirectURI,
@@ -97,6 +117,14 @@ export function createCalendarGoogle(config: AccountConfig): CalendarGoogle {
         idToken: tokens.idToken,
         scopes: tokens.scopes ?? [],
         accessTokenExpiresAt: tokens.accessTokenExpiresAt?.getTime(),
+        refreshToken: tokens.refreshToken,
+      };
+    },
+    refreshAccessToken: async (refreshToken) => {
+      const tokens = await offlineProvider.refreshAccessToken?.(refreshToken);
+      return {
+        accessToken: tokens?.accessToken,
+        accessTokenExpiresAt: tokens?.accessTokenExpiresAt?.getTime(),
       };
     },
     readIdTokenSubject: async (idToken) => {
@@ -140,6 +168,7 @@ export async function startCalendarGrant(
     timeZone,
     returnProjectId = null,
     openForm = false,
+    storeAccess = false,
     now,
   }: {
     secret: string;
@@ -150,6 +179,7 @@ export async function startCalendarGrant(
     timeZone: string | null;
     returnProjectId?: string | null;
     openForm?: boolean;
+    storeAccess?: boolean;
     now: number;
   },
 ) {
@@ -160,12 +190,14 @@ export async function startCalendarGrant(
     timeZone,
     returnProjectId,
     openForm,
+    storeAccess,
     expiresAt: now + calendarGrantLifetime,
   };
   const url = await calendarGoogle.createAuthorizationURL({
     state: grant.state,
     codeVerifier: grant.verifier,
     loginHint: googleAccountId,
+    storeAccess,
   });
   const value = await symmetricEncrypt({
     key: secret,
@@ -201,6 +233,7 @@ function isCalendarGrant(value: unknown): value is CalendarGrant {
     (grant.returnProjectId === null ||
       typeof grant.returnProjectId === "string") &&
     typeof grant.openForm === "boolean" &&
+    typeof grant.storeAccess === "boolean" &&
     typeof grant.expiresAt === "number"
   );
 }

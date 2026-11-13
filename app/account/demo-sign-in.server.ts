@@ -3,7 +3,7 @@
 // nothing in the request can choose another one.
 import { makeSignature } from "better-auth/crypto";
 
-import { accountReturnPath } from "./account-api";
+import { accountReturnPath, demoAccountEmail } from "./account-api";
 import type { AccountAuth, SignInCapture } from "./account-auth.server";
 import { formatLabelCookie, readLabelRequest } from "./usage-label";
 import {
@@ -11,8 +11,6 @@ import {
   makeVisitorWord,
   readVisitorWord,
 } from "./visitor-word.server";
-
-export const demoAccountEmail = "abodeodemo@gmail.com";
 
 // What opening a demo session needs from Better Auth.
 export type DemoSessionAuth = Pick<AccountAuth, "$context">;

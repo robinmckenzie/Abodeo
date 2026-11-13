@@ -577,7 +577,8 @@ body:has(.app-layout) {
 }
 
 /* Opens over the page beside the column, which is too narrow for it. */
-.account .calendar-message-created {
+.account .calendar-message-created,
+.account .calendar-message-stored {
   color: inherit;
 }
 

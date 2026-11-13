@@ -698,6 +698,25 @@ describe("the Calendar test", () => {
     expect(screen.getByText(/ID of your Abodeo calendar/)).toBeTruthy();
   });
 
+  // AD #138: a demo visitor is never sent to Google, which the test would do.
+  it("is not offered to the demo account", async () => {
+    fakeServer({
+      session: { name: "Abodeo Demo", email: "abodeodemo@gmail.com" },
+    });
+    await renderDashboard();
+
+    await click(screen.getByRole("button", { name: /Signed in as/ }));
+
+    expect(
+      screen.queryByRole("button", { name: "Create test appointment" }),
+    ).toBeNull();
+    expect(screen.getByText(/without a Google sign-in/)).toBeTruthy();
+    // Robin's controls show only when the server says so.
+    expect(
+      screen.queryByRole("button", { name: "Store Calendar access" }),
+    ).toBeNull();
+  });
+
   it("sends the browser's time zone, and says so when the test cannot start", async () => {
     const server = fakeServer({ session: ada });
     await renderDashboard();

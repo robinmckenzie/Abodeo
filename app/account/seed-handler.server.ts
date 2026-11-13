@@ -16,6 +16,22 @@ import {
 } from "./demo-seed-store.server";
 import { readLabel } from "./usage-label.server";
 
+// Whether this is Robin in the demo account: the session is the demo account
+// and the label cookie is one of Robin's own labels.
+export async function canManageDemo(
+  headers: Headers,
+  userId: string,
+  {
+    store,
+    ignoredLabels,
+  }: { store: Pick<DemoSeedStore, "isDemoAccount">; ignoredLabels: string[] },
+) {
+  return (
+    ignoredLabels.includes(readLabel(headers).toLowerCase()) &&
+    (await store.isDemoAccount(userId))
+  );
+}
+
 export type SeedRequestDependencies = {
   readSessionUserId: ReadSessionUserId;
   store: DemoSeedStore;
@@ -48,10 +64,10 @@ export async function handleSeedRequest(
       timeout,
     );
     if (userId === undefined) return respondWithError(401, "not_signed_in");
-    const label = readLabel(request.headers).toLowerCase();
-    const canSave =
-      ignoredLabels.includes(label) &&
-      (await withTimeout(store.isDemoAccount(userId), timeout));
+    const canSave = await withTimeout(
+      canManageDemo(request.headers, userId, { store, ignoredLabels }),
+      timeout,
+    );
     if (request.method === "GET") {
       const savedAt = canSave
         ? await withTimeout(store.readSavedAt(), timeout)

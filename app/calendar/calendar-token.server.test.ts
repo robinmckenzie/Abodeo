@@ -61,7 +61,28 @@ describe("the Calendar token cookie", () => {
       accessToken: testAccessToken,
       expiresAt: now + calendarTokenLifetime,
       isNearExpiry: false,
+      isStored: false,
     });
+  });
+
+  it("says when the token came from stored access", async () => {
+    const cookie = await createCalendarTokenCookie({
+      secret: testSecret,
+      isSecure: false,
+      accessToken: testAccessToken,
+      userId: "user-1",
+      expiresAt: now + 59 * minute,
+      now,
+      isStored: true,
+    });
+
+    const token = await readCalendarToken(
+      toCookieHeader(cookie),
+      testSecret,
+      "user-1",
+      now,
+    );
+    expect(token?.isStored).toBe(true);
   });
 
   it("does not give a token made for another account", async () => {
