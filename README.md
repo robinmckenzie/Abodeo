@@ -308,12 +308,17 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 - `/demo` signs in as the demo account (`abodeodemo@gmail.com`, which must have signed in with
   Google once) and opens the projects page. Only `?label=NAME` is read from the address. Any
   other query is ignored, so the address cannot choose another account.
-- The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent only to
-  `/api`). Sign-in, visit and site visit records store the label and the word
+- The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent to the
+  whole site, as `/demo` and `/api` both read it). Sign-in, visit and site visit records store the label and the word
   (`visitor_word`). With no label in the address, the word is the label. Visits under different
   labels from one browser share a word. It works within one browser on one device.
 - Run `db/visitor-word.sql` v1.138.0 in Neon for each account store before deploying: it adds
   the `visitor_word` columns, and without them sign-in and visit records fail.
+- Robin saves the demo seed from the "Demo seed" section of the account panel, which shows only
+  in a demo session whose label is one of `VISIT_ALERT_IGNORE_LABELS`. It saves the demo
+  account's projects (not in the Bin) and people as one row, replacing any earlier seed.
+- Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
+  `demo_seed` table, and without it the control stays hidden.
 
 ### Visits before sign-in
 
