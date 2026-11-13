@@ -12,5 +12,6 @@
 - For code changes, run `npm run build`, `npm run typecheck`, `npm run lint` and `npm test`. Report failures and any checks that could not run.
 - Add or update regression tests for changed logic where useful, but not for development-only tools, such as tuning panels, unless Robin asks.
 - For changes to a user interface, verify the affected behaviour in the running application at one desktop size, adding sizes only where the change depends on window width. For development-only tools, a quick look is enough. Phone and tablet are out of scope until Robin brings them back.
+- For changes to what the server does that a browser would see (such as cookies, redirects and status codes), verify the behaviour in the running application, for example in a browser or with curl. Tests that set up the request by hand can miss faults a browser would hit.
 - Implementing a ticket includes one mandatory independent review after committing, covering the commit and ticket text. Record the review in the pull request description.
 - When handing over, summarise the resulting behaviour, and state what was verified, what was not, and why. Do not report something as verified if it could not be checked reliably.
