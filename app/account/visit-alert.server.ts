@@ -47,6 +47,16 @@ function readCount(env: Environment, name: string, fallback: number) {
   return text !== undefined && /^\d{1,5}$/.test(text) ? Number(text) : fallback;
 }
 
+// Robin's own labels, lower case. They send no visit email and (AD #138) show
+// the control that saves the demo seed. Read apart from the alert settings,
+// which exist only where Resend is set up.
+export function readIgnoredLabels(env: Environment) {
+  return (read(env, "VISIT_ALERT_IGNORE_LABELS") ?? "")
+    .split(",")
+    .map((label) => label.trim().toLowerCase())
+    .filter((label) => label !== "");
+}
+
 export function readVisitAlertSettings(
   env: Environment,
 ): VisitAlertSettings | undefined {
@@ -57,10 +67,7 @@ export function readVisitAlertSettings(
     apiKey,
     to,
     from: read(env, "VISIT_ALERT_FROM") ?? defaultSender,
-    ignoredLabels: (read(env, "VISIT_ALERT_IGNORE_LABELS") ?? "")
-      .split(",")
-      .map((label) => label.trim().toLowerCase())
-      .filter((label) => label !== ""),
+    ignoredLabels: readIgnoredLabels(env),
     cooldownMinutes: readCount(
       env,
       "VISIT_ALERT_COOLDOWN_MINUTES",

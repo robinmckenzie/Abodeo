@@ -5,10 +5,13 @@ import {
   accountActivityPath,
   siteVisitPath,
   accountProfilePath,
+  accountSeedPath,
   accountStatusPath,
   authBasePath,
   type AccountProfileResponse,
   type AccountStatusResponse,
+  type SeedSaveResponse,
+  type SeedStatusResponse,
 } from "./account-api";
 
 export const requestTimeout = 8000;
@@ -183,4 +186,43 @@ export async function reportVisit(welcome: boolean, fetchFn: Fetch = fetch) {
     keepalive: true,
   });
   if (!response.ok) throw new Error("The visit was not recorded.");
+}
+
+// Whether the demo seed control shows, and when the seed was saved (AD #138).
+// Anything that goes wrong hides the control.
+export async function loadSeedStatus(
+  fetchFn: Fetch = fetch,
+): Promise<SeedStatusResponse> {
+  try {
+    const response = await sendRequest(fetchFn, accountSeedPath);
+    const body: unknown = response.ok ? await response.json() : undefined;
+    const status = isRecord(body) ? (body as Partial<SeedStatusResponse>) : {};
+    return {
+      canSave: status.canSave === true,
+      savedAt: typeof status.savedAt === "string" ? status.savedAt : null,
+    };
+  } catch {
+    return { canSave: false, savedAt: null };
+  }
+}
+
+// Saves the demo account's projects and people as the seed. Gives undefined
+// if it could not be saved.
+export async function saveSeed(
+  fetchFn: Fetch = fetch,
+): Promise<SeedSaveResponse | undefined> {
+  try {
+    const response = await sendRequest(fetchFn, accountSeedPath, {
+      method: "PUT",
+    });
+    const body: unknown = response.ok ? await response.json() : undefined;
+    const saved = isRecord(body) ? (body as Partial<SeedSaveResponse>) : {};
+    return typeof saved.savedAt === "string" &&
+      typeof saved.projectCount === "number" &&
+      typeof saved.peopleCount === "number"
+      ? (saved as SeedSaveResponse)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }

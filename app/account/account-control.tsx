@@ -12,6 +12,7 @@ import {
 import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import { useActivityReport } from "./use-activity-report";
+import { useDemoSeed } from "./use-demo-seed";
 import type { Account, AccountView, ProfileSaveResult } from "./use-account";
 
 const saveMessages: Record<ProfileSaveResult, string> = {
@@ -116,6 +117,7 @@ export function AccountControl({
           calendar={calendar}
           view={view}
           panelId={panelId}
+          onBeforeSeedSave={onBeforeLeave}
           onClose={() => setIsOpen(false)}
         />
       )}
@@ -128,14 +130,17 @@ function AccountPanel({
   calendar,
   view,
   panelId,
+  onBeforeSeedSave,
   onClose,
 }: {
   account: Account;
   calendar: CalendarTest;
   view: SignedIn;
   panelId: string;
+  onBeforeSeedSave: () => Promise<boolean>;
   onClose: () => void;
 }) {
+  const seed = useDemoSeed(onBeforeSeedSave);
   const [draft, setDraft] = useState(view.preferredName ?? "");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -230,6 +235,29 @@ function AccountPanel({
       >
         Create test appointment
       </button>
+      {seed.canSave && (
+        <>
+          <h2>Demo seed</h2>
+          <p className="account-hint">
+            Saves this account&rsquo;s projects and people as the seed for new
+            demo visitors. It replaces the seed saved before.
+          </p>
+          <button
+            type="button"
+            className="button-secondary button-small account-seed-save"
+            disabled={seed.isSaving || account.isLeaving}
+            onClick={() => void seed.save()}
+          >
+            Save as demo seed
+          </button>
+          <p className="account-save-message" role="status">
+            {seed.message ??
+              (seed.savedAt
+                ? `Saved ${new Date(seed.savedAt).toLocaleString()}.`
+                : "No seed saved yet.")}
+          </p>
+        </>
+      )}
       <h2>What Abodeo keeps about you</h2>
       <ul>
         <li>The permanent ID that Google gives your account.</li>

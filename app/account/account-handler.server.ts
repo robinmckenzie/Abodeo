@@ -49,6 +49,7 @@ import {
 
 import {
   accountActivityPath,
+  accountSeedPath,
   siteVisitPath,
   accountProfilePath,
   accountReturnPath,
@@ -83,7 +84,15 @@ import {
   type VisitDependencies,
 } from "./site-visit.server";
 import { respondWithDemoSignIn } from "./demo-sign-in.server";
-import { readVisitAlertSettings } from "./visit-alert.server";
+import {
+  readIgnoredLabels,
+  readVisitAlertSettings,
+} from "./visit-alert.server";
+import {
+  createDemoSeedStore,
+  type DemoSeedStore,
+} from "./demo-seed-store.server";
+import { handleSeedRequest } from "./seed-handler.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
@@ -97,6 +106,9 @@ export type AccountRuntime = {
   projects: ProjectStore;
   people: PeopleStore;
   images: ImageStore;
+  seed: DemoSeedStore;
+  // Robin's own labels, which show the seed control (AD #138).
+  ignoredLabels: string[];
   calendar: CalendarDependencies;
   // What this request's sign-in callback learned from Google, if anything.
   signIn: SignInCapture;
@@ -143,6 +155,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     projects,
     people: createPeopleStore(pool),
     images: createImageStore(pool),
+    seed: createDemoSeedStore(pool),
+    ignoredLabels: readIgnoredLabels(process.env),
     calendar: {
       secret: config.secret,
       isSecure: config.baseUrl.startsWith("https:"),
@@ -233,6 +247,7 @@ export function createAccountRequestHandler(
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
     const isSiteVisit = pathname === siteVisitPath;
+    const isSeed = pathname === accountSeedPath;
     const isCalendar = isCalendarPath(pathname);
     const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
@@ -241,6 +256,7 @@ export function createAccountRequestHandler(
     if (
       !isProfile &&
       !isActivity &&
+      !isSeed &&
       !isSiteVisit &&
       !isCalendar &&
       !isAppointments &&
@@ -280,6 +296,13 @@ export function createAccountRequestHandler(
       return isCalendar ? respondCalendarUnavailable(request) : fail();
     }
     try {
+      if (isSeed) {
+        return await handleSeedRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.seed,
+          ignoredLabels: runtime.ignoredLabels,
+        });
+      }
       if (isAppointments) {
         return await handleAppointmentRequest(request, {
           ...runtime.calendar,

@@ -8,6 +8,9 @@ export const accountProfilePath = "/api/account/profile";
 // Where the page reports a click or keypress, for the visit history.
 export const accountActivityPath = "/api/account/activity";
 
+// The demo seed (AD #138): whether the control shows, and saving the seed.
+export const accountSeedPath = "/api/account/seed";
+
 // Where the page reports a visit, signed in or not (AD #94).
 export const siteVisitPath = "/api/visit";
 
@@ -23,7 +26,21 @@ export type AccountStatusResponse = { configured: boolean };
 export type AccountProfileResponse = { preferredName: string | null };
 
 export type AccountErrorCode =
-  "not_signed_in" | "invalid_request" | "method_not_allowed" | "unavailable";
+  | "not_signed_in"
+  | "not_allowed"
+  | "invalid_request"
+  | "method_not_allowed"
+  | "unavailable";
+
+// canSave: this is the demo account under one of Robin's own labels. savedAt
+// is an ISO time, or null if no seed is saved.
+export type SeedStatusResponse = { canSave: boolean; savedAt: string | null };
+
+export type SeedSaveResponse = {
+  savedAt: string;
+  projectCount: number;
+  peopleCount: number;
+};
 
 export type AccountErrorResponse = { error: AccountErrorCode };
 

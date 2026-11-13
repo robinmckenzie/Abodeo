@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createMemoryDemoSeedStore } from "./test-demo-seed.server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventEmitter } from "node:events";
@@ -88,6 +89,8 @@ function createTestHandler() {
   const projectStore = createMemoryProjectStore();
   const runtime: AccountRuntime = {
     handleDemoRequest: async () => new Response(null),
+    seed: createMemoryDemoSeedStore(),
+    ignoredLabels: [],
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
@@ -172,6 +175,8 @@ describe("createAccountRequestHandler", () => {
       const handle = createAccountRequestHandler(
         () => ({
           handleDemoRequest: async () => new Response(null),
+          seed: createMemoryDemoSeedStore(),
+          ignoredLabels: [],
           handleAuthRequest: () => new Promise(() => {}),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -206,6 +211,8 @@ describe("createAccountRequestHandler", () => {
     const handle = createAccountRequestHandler(
       () => ({
         handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => new Response(null, { status: 500 }),
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
@@ -694,6 +701,8 @@ describe("createAccountRequestHandler", () => {
     const handle = createAccountRequestHandler(
       () => ({
         handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => {
           throw Object.assign(new Error("postgres://secret refused"), {
             code: "ECONNREFUSED",
@@ -727,6 +736,8 @@ describe("createAccountRequestHandler", () => {
       const handle = createAccountRequestHandler(
         () => ({
           handleDemoRequest: async () => new Response(null),
+          seed: createMemoryDemoSeedStore(),
+          ignoredLabels: [],
           handleAuthRequest: async () => Response.json(null),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -823,6 +834,8 @@ describe("Google's return to sign-in", () => {
     const handle = createAccountRequestHandler(
       () => ({
         handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => {
           Object.assign(signIn, capture);
           return answer;
