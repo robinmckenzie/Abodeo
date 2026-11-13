@@ -29,6 +29,7 @@ export type AccountErrorCode =
   | "not_signed_in"
   | "not_allowed"
   | "invalid_request"
+  | "seed_too_large"
   | "method_not_allowed"
   | "unavailable";
 
@@ -40,7 +41,13 @@ export type SeedSaveResponse = {
   savedAt: string;
   projectCount: number;
   peopleCount: number;
+  imageCount: number;
 };
+
+// The most the seed's images may hold, to spare the database quota
+// (provisional): each original, and all files together.
+export const maxSeedImageBytes = 1024 * 1024;
+export const maxSeedTotalBytes = 4 * 1024 * 1024;
 
 export type AccountErrorResponse = { error: AccountErrorCode };
 

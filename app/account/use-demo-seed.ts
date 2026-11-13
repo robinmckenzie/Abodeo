@@ -18,6 +18,9 @@ export type DemoSeed = {
 export const seedFailedMessage =
   "The demo seed could not be saved. Please try again.";
 
+export const seedTooLargeMessage =
+  "The demo seed was not saved: its images are too big. Use smaller or fewer images.";
+
 export function useDemoSeed(onBeforeSave: () => Promise<boolean>): DemoSeed {
   const [status, setStatus] = useState({
     canSave: false,
@@ -42,7 +45,8 @@ export function useDemoSeed(onBeforeSave: () => Promise<boolean>): DemoSeed {
     try {
       if (!(await onBeforeSave())) return;
       const saved = await saveSeed();
-      if (saved) setStatus({ canSave: true, savedAt: saved.savedAt });
+      if (saved === "too-large") setMessage(seedTooLargeMessage);
+      else if (saved) setStatus({ canSave: true, savedAt: saved.savedAt });
       else setMessage(seedFailedMessage);
     } finally {
       setIsSaving(false);

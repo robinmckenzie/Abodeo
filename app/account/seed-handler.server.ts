@@ -10,7 +10,10 @@ import {
   withTimeout,
   type ReadSessionUserId,
 } from "./account-profile.server";
-import type { DemoSeedStore } from "./demo-seed-store.server";
+import {
+  SeedTooLargeError,
+  type DemoSeedStore,
+} from "./demo-seed-store.server";
 import { readLabel } from "./usage-label.server";
 
 export type SeedRequestDependencies = {
@@ -61,6 +64,9 @@ export async function handleSeedRequest(
     if (!canSave) return respondWithError(403, "not_allowed");
     return respondWithJson(200, await withTimeout(store.save(userId), timeout));
   } catch (error) {
+    if (error instanceof SeedTooLargeError) {
+      return respondWithError(413, "seed_too_large");
+    }
     reportFailure(readErrorCode(error));
     return respondWithError(503, "unavailable");
   }

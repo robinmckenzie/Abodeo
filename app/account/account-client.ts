@@ -206,20 +206,23 @@ export async function loadSeedStatus(
   }
 }
 
-// Saves the demo account's projects and people as the seed. Gives undefined
-// if it could not be saved.
+// Saves the demo account's projects, people and images as the seed. Gives
+// "too-large" if its images are over the limits, or undefined if it could not
+// be saved.
 export async function saveSeed(
   fetchFn: Fetch = fetch,
-): Promise<SeedSaveResponse | undefined> {
+): Promise<SeedSaveResponse | "too-large" | undefined> {
   try {
     const response = await sendRequest(fetchFn, accountSeedPath, {
       method: "PUT",
     });
+    if (response.status === 413) return "too-large";
     const body: unknown = response.ok ? await response.json() : undefined;
     const saved = isRecord(body) ? (body as Partial<SeedSaveResponse>) : {};
     return typeof saved.savedAt === "string" &&
       typeof saved.projectCount === "number" &&
-      typeof saved.peopleCount === "number"
+      typeof saved.peopleCount === "number" &&
+      typeof saved.imageCount === "number"
       ? (saved as SeedSaveResponse)
       : undefined;
   } catch {

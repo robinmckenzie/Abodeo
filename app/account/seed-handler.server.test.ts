@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { accountSeedPath } from "./account-api";
+import { SeedTooLargeError } from "./demo-seed-store.server";
 import { handleSeedRequest } from "./seed-handler.server";
 import { createMemoryDemoSeedStore } from "./test-demo-seed.server";
 
@@ -60,6 +61,7 @@ describe("handleSeedRequest", () => {
     expect(await saved.json()).toMatchObject({
       projectCount: 2,
       peopleCount: 3,
+      imageCount: 4,
     });
     expect(store.saves).toEqual(["demo-user"]);
     expect(await (await handle("GET", "abodeo_label=robin")).json()).toEqual({
@@ -76,6 +78,16 @@ describe("handleSeedRequest", () => {
     expect((await other.handle("PUT", "abodeo_label=Robin")).status).toBe(403);
     expect(demo.store.saves).toEqual([]);
     expect(other.store.saves).toEqual([]);
+  });
+
+  it("answers 413 when the images are too big, without a failure report", async () => {
+    const { handle, store } = setup();
+    store.save = async () => {
+      throw new SeedTooLargeError();
+    };
+    const response = await handle("PUT", "abodeo_label=robin");
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: "seed_too_large" });
   });
 
   it("accepts only GET and PUT", async () => {

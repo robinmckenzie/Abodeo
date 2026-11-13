@@ -239,8 +239,8 @@ function AccountPanel({
         <>
           <h2>Demo seed</h2>
           <p className="account-hint">
-            Saves this account&rsquo;s projects and people as the seed for new
-            demo visitors. It replaces the seed saved before.
+            Saves this account&rsquo;s projects, people and images as the seed
+            for new demo visitors. It replaces the seed saved before.
           </p>
           <button
             type="button"

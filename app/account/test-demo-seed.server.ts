@@ -13,7 +13,12 @@ export function createMemoryDemoSeedStore(
     save: async (userId) => {
       saves.push(userId);
       savedAt = new Date("2026-11-13T10:00:00.000Z");
-      return { savedAt: savedAt.toISOString(), projectCount: 2, peopleCount: 3 };
+      return {
+        savedAt: savedAt.toISOString(),
+        projectCount: 2,
+        peopleCount: 3,
+        imageCount: 4,
+      };
     },
   };
 }

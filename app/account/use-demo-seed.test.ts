@@ -1,7 +1,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { seedFailedMessage, useDemoSeed } from "./use-demo-seed";
+import {
+  seedFailedMessage,
+  seedTooLargeMessage,
+  useDemoSeed,
+} from "./use-demo-seed";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -29,7 +33,12 @@ describe("useDemoSeed", () => {
   it("saves, then shows the new time", async () => {
     const fetchMock = stubFetch(
       { canSave: true, savedAt: null },
-      { savedAt: "2026-11-13T10:00:00.000Z", projectCount: 2, peopleCount: 3 },
+      {
+        savedAt: "2026-11-13T10:00:00.000Z",
+        projectCount: 2,
+        peopleCount: 3,
+        imageCount: 4,
+      },
     );
     const { result } = renderHook(() => useDemoSeed(async () => true));
     await waitFor(() => expect(result.current.canSave).toBe(true));
@@ -47,6 +56,21 @@ describe("useDemoSeed", () => {
     await waitFor(() => expect(result.current.canSave).toBe(true));
     await act(() => result.current.save());
     expect(result.current.message).toBe(seedFailedMessage);
+  });
+
+  it("says so when the images are too big", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_path: string, init?: RequestInit) =>
+        init?.method === "PUT"
+          ? new Response("{}", { status: 413 })
+          : new Response(JSON.stringify({ canSave: true, savedAt: null })),
+      ),
+    );
+    const { result } = renderHook(() => useDemoSeed(async () => true));
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    await act(() => result.current.save());
+    expect(result.current.message).toBe(seedTooLargeMessage);
   });
 
   it("does not save when the page is not ready to be left", async () => {

@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { createDemoSeedStore } from "./demo-seed-store.server";
+import {
+  createDemoSeedStore,
+  SeedTooLargeError,
+} from "./demo-seed-store.server";
 import type { TransactionalDatabase } from "../projects/transaction.server";
 
 // Stands in for Postgres, understanding only this store's statements.
@@ -12,6 +15,9 @@ function createFakeSeedDatabase() {
   ];
   let seed: { projects: string; people: string; savedAt: string } | null = null;
   let saveCount = 0;
+  const imageSizes = { largest: 0, total: 0, count: 0 };
+  let imageCopies = 0;
+  const events: string[] = [];
   const query = async (text: string, values: unknown[]) => {
     const sql = text.replace(/\s+/g, " ").trim();
     if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
@@ -24,6 +30,19 @@ function createFakeSeedDatabase() {
     if (sql.startsWith("select id, data from project")) {
       expect(sql).toContain("deleted_at is null");
       return { rows: projectRows };
+    }
+    if (sql.includes("max(i.original_size)")) {
+      return { rows: [imageSizes] };
+    }
+    if (sql.startsWith("delete from demo_seed_image")) {
+      events.push("delete images");
+      return { rows: [] };
+    }
+    if (sql.startsWith("insert into demo_seed_image")) {
+      expect(sql).toContain("p.deleted_at is null");
+      imageCopies += 1;
+      events.push("copy images");
+      return { rows: [] };
     }
     if (sql.includes("account_people")) return { rows: [] };
     if (sql.startsWith("insert into demo_seed")) {
@@ -41,7 +60,14 @@ function createFakeSeedDatabase() {
     query,
     connect: async () => ({ query, release: () => {} }),
   };
-  return { database, projectRows, readSeed: () => seed };
+  return {
+    database,
+    projectRows,
+    imageSizes,
+    events,
+    readSeed: () => seed,
+    imageCopies: () => imageCopies,
+  };
 }
 
 describe("createDemoSeedStore", () => {
@@ -80,5 +106,32 @@ describe("createDemoSeedStore", () => {
     expect((await store.readSavedAt())?.toISOString()).toBe(
       "2026-11-13T10:02:00.000Z",
     );
+  });
+
+  it("replaces the seed's images with the account's, and counts them", async () => {
+    const { database, imageSizes, events } = createFakeSeedDatabase();
+    Object.assign(imageSizes, { largest: 500_000, total: 900_000, count: 3 });
+    const saved = await createDemoSeedStore(database).save("demo-user");
+    expect(saved.imageCount).toBe(3);
+    expect(events).toEqual(["delete images", "copy images"]);
+  });
+
+  it("refuses an image over the limit, and saves nothing", async () => {
+    const { database, imageSizes, readSeed, imageCopies } =
+      createFakeSeedDatabase();
+    Object.assign(imageSizes, { largest: 1024 * 1024 + 1, total: 2_000_000 });
+    await expect(
+      createDemoSeedStore(database).save("demo-user"),
+    ).rejects.toBeInstanceOf(SeedTooLargeError);
+    expect(readSeed()).toBeNull();
+    expect(imageCopies()).toBe(0);
+  });
+
+  it("refuses images that are too big together", async () => {
+    const { database, imageSizes } = createFakeSeedDatabase();
+    Object.assign(imageSizes, { largest: 900_000, total: 4 * 1024 * 1024 + 1 });
+    await expect(
+      createDemoSeedStore(database).save("demo-user"),
+    ).rejects.toBeInstanceOf(SeedTooLargeError);
   });
 });
