@@ -7,7 +7,7 @@ Abodeo is an app for managing tasks and projects around the home.
 
 ## Read when
 
-- Starting, changing or closing a ticket, or acting in GitHub: [tickets](docs/agents/tickets.md)
+- Starting (including starting a stage of a ticket), changing or closing a ticket, or acting in GitHub: [tickets](docs/agents/tickets.md)
 - Writing or drafting a ticket: [ticket writing](docs/agents/ticket-writing.md)
 - Branching, committing, opening or merging a pull request: [git and PRs](docs/agents/git-and-prs.md)
 - Planning, building or reviewing anything (what not to cover): [prototype scope](docs/agents/prototype-scope.md)
