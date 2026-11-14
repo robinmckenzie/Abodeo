@@ -22,6 +22,11 @@ import {
 } from "../calendar/calendar-handler.server";
 import { createCalendarStore } from "../calendar/calendar-store.server";
 import { createDemoCalendarAccessStore } from "../calendar/demo-calendar-access.server";
+import {
+  collectSeedAppointments,
+  restoreSeedAppointments,
+  type SeedAppointmentDependencies,
+} from "../calendar/demo-seed-appointments.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
 import {
   handleImagesRequest,
@@ -111,6 +116,8 @@ export type AccountRuntime = {
   // Robin's own labels, which show the seed control (AD #138).
   ignoredLabels: string[];
   calendar: CalendarDependencies;
+  // What the demo seed's appointments need (AD #138).
+  seedAppointments: SeedAppointmentDependencies;
   // What this request's sign-in callback learned from Google, if anything.
   signIn: SignInCapture;
   // Closes the database connections, once the response is ready.
@@ -143,12 +150,34 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   const signIn: SignInCapture = {};
   const auth = createAccountAuth(config, pool, history, signIn);
   const ignoredLabels = readIgnoredLabels(process.env);
+  const calendarDependencies: CalendarDependencies = {
+    secret: config.secret,
+    isSecure: config.baseUrl.startsWith("https:"),
+    google: createCalendarGoogle(config),
+    calendar: createGoogleCalendar(),
+    store: createCalendarStore(pool),
+    demoAccess: {
+      store: createDemoCalendarAccessStore(pool),
+      canManage: (headers, userId) =>
+        canManageDemo(headers, userId, { store: seed, ignoredLabels }),
+    },
+    hasProject: async (userId, projectId) =>
+      (await projects.read(userId, projectId)).kind !== "not-found",
+  };
+  const seedAppointments: SeedAppointmentDependencies = calendarDependencies;
   return {
     handleAuthRequest: (request) => auth.handler(request),
     handleDemoRequest: (request) =>
-      respondWithDemoSignIn(request, auth, signIn, (userId) =>
-        seed.reset(userId),
-      ),
+      respondWithDemoSignIn(request, auth, signIn, async (userId) => {
+        // The calendar is put back only once the database has been.
+        if (await seed.reset(userId)) {
+          await restoreSeedAppointments(
+            seedAppointments,
+            userId,
+            await seed.readAppointments(),
+          );
+        }
+      }),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
@@ -162,20 +191,8 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     images: createImageStore(pool),
     seed,
     ignoredLabels,
-    calendar: {
-      secret: config.secret,
-      isSecure: config.baseUrl.startsWith("https:"),
-      google: createCalendarGoogle(config),
-      calendar: createGoogleCalendar(),
-      store: createCalendarStore(pool),
-      demoAccess: {
-        store: createDemoCalendarAccessStore(pool),
-        canManage: (headers, userId) =>
-          canManageDemo(headers, userId, { store: seed, ignoredLabels }),
-      },
-      hasProject: async (userId, projectId) =>
-        (await projects.read(userId, projectId)).kind !== "not-found",
-    },
+    calendar: calendarDependencies,
+    seedAppointments,
     signIn,
     close: () => pool.end(),
   };
@@ -311,6 +328,12 @@ export function createAccountRequestHandler(
           readSessionUserId: runtime.readSessionUserId,
           store: runtime.seed,
           ignoredLabels: runtime.ignoredLabels,
+          collectAppointments: (userId, projectIds) =>
+            collectSeedAppointments(
+              runtime.seedAppointments,
+              userId,
+              projectIds,
+            ),
         });
       }
       if (isAppointments) {

@@ -46,6 +46,7 @@ export type SeedSaveResponse = {
   projectCount: number;
   peopleCount: number;
   imageCount: number;
+  appointmentCount: number;
 };
 
 // The most the seed's images may hold, to spare the database quota

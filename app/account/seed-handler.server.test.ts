@@ -18,6 +18,16 @@ function setup(userId: string | null = "demo-user") {
         readSessionUserId: async () => userId ?? undefined,
         store,
         ignoredLabels: ["robin"],
+        collectAppointments: async (_userId, projectIds) =>
+          projectIds.map((projectId) => ({
+            projectId,
+            event: {
+              summary: "Visit",
+              description: "",
+              start: { date: "2026-12-01" },
+              end: { date: "2026-12-02" },
+            },
+          })),
         reportFailure: () => {},
       },
     );
@@ -68,6 +78,13 @@ describe("handleSeedRequest", () => {
       canSave: true,
       savedAt: "2026-11-13T10:00:00.000Z",
     });
+  });
+
+  it("saves the appointments of the projects", async () => {
+    const { store, handle } = setup();
+    const saved = await handle("PUT", "abodeo_label=robin");
+    expect(await saved.json()).toMatchObject({ appointmentCount: 2 });
+    expect(store.appointments.map((a) => a.projectId)).toEqual(["p1", "p2"]);
   });
 
   it("refuses to save without an allowed label or account", async () => {

@@ -10,6 +10,7 @@ import {
   inTransaction,
   type TransactionalDatabase,
 } from "../projects/transaction.server";
+import type { SeedAppointment } from "../calendar/demo-seed-appointments.server";
 import {
   demoAccountEmail,
   maxSeedImageBytes,
@@ -27,10 +28,18 @@ export type DemoSeedStore = {
   isDemoAccount(userId: string): Promise<boolean>;
   // When the seed was saved, or null if none has been.
   readSavedAt(): Promise<Date | null>;
+  // The ids of the account's projects not in the Bin.
+  readProjectIds(userId: string): Promise<string[]>;
+  // The seed's appointments, or none if no seed has been saved.
+  readAppointments(): Promise<SeedAppointment[]>;
   // Saves the account's projects (not in the Bin), people and the projects'
-  // images as the seed, replacing any earlier seed. Throws SeedTooLargeError
-  // if an image or all together are over the limits.
-  save(userId: string): Promise<SeedSaveResponse>;
+  // images, with the appointments given, as the seed, replacing any earlier
+  // seed. Throws SeedTooLargeError if an image or all together are over the
+  // limits.
+  save(
+    userId: string,
+    appointments: SeedAppointment[],
+  ): Promise<SeedSaveResponse>;
   // Puts the account back to the saved seed: its projects (with the Bin),
   // images and people are replaced by the seed's. Gives false, changing
   // nothing, if no seed has been saved.
@@ -57,7 +66,24 @@ export function createDemoSeedStore(
       return rows.length > 0 ? new Date(String(rows[0].saved_at)) : null;
     },
 
-    save: (userId) =>
+    async readProjectIds(userId) {
+      const { rows } = await database.query(
+        `select id from project
+         where user_id = $1 and deleted_at is null order by id`,
+        [userId],
+      );
+      return rows.map(({ id }) => String(id));
+    },
+
+    async readAppointments() {
+      const { rows } = await database.query(
+        "select appointments from demo_seed",
+        [],
+      );
+      return (rows[0]?.appointments ?? []) as SeedAppointment[];
+    },
+
+    save: (userId, appointments) =>
       inTransaction(database, async (client) => {
         const { rows } = await client.query(
           `select id, data from project
@@ -85,13 +111,17 @@ export function createDemoSeedStore(
           serialisePeople(await readAccountPeople(client, userId)),
         );
         const saved = await client.query(
-          `insert into demo_seed (id, projects, people)
-           values (true, $1::jsonb, $2::jsonb)
+          `insert into demo_seed (id, projects, people, appointments)
+           values (true, $1::jsonb, $2::jsonb, $3::jsonb)
            on conflict (id) do update
            set projects = excluded.projects, people = excluded.people,
-               saved_at = now()
+               appointments = excluded.appointments, saved_at = now()
            returning saved_at`,
-          [JSON.stringify(projects), JSON.stringify(people)],
+          [
+            JSON.stringify(projects),
+            JSON.stringify(people),
+            JSON.stringify(appointments),
+          ],
         );
         await client.query("delete from demo_seed_image", []);
         await client.query(
@@ -118,6 +148,7 @@ export function createDemoSeedStore(
           projectCount: projects.length,
           peopleCount: people.people.length,
           imageCount: Number(count),
+          appointmentCount: appointments.length,
         };
       }),
 

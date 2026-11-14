@@ -10,6 +10,7 @@ import {
   withTimeout,
   type ReadSessionUserId,
 } from "./account-profile.server";
+import type { SeedAppointment } from "../calendar/demo-seed-appointments.server";
 import {
   SeedTooLargeError,
   type DemoSeedStore,
@@ -37,6 +38,11 @@ export type SeedRequestDependencies = {
   store: DemoSeedStore;
   // Robin's own labels, lower case.
   ignoredLabels: string[];
+  // The appointments of the projects, copied out of Google Calendar (AD #138).
+  collectAppointments: (
+    userId: string,
+    projectIds: string[],
+  ) => Promise<SeedAppointment[]>;
   timeout?: number;
   reportFailure?: (code: string | undefined) => void;
 };
@@ -51,6 +57,7 @@ export async function handleSeedRequest(
     readSessionUserId,
     store,
     ignoredLabels,
+    collectAppointments,
     timeout = accountStoreTimeout,
     reportFailure = reportSeedFailure,
   }: SeedRequestDependencies,
@@ -78,7 +85,13 @@ export async function handleSeedRequest(
       });
     }
     if (!canSave) return respondWithError(403, "not_allowed");
-    return respondWithJson(200, await withTimeout(store.save(userId), timeout));
+    const projectIds = await withTimeout(store.readProjectIds(userId), timeout);
+    // Google can be slow, so it has its own limits rather than this one.
+    const appointments = await collectAppointments(userId, projectIds);
+    return respondWithJson(
+      200,
+      await withTimeout(store.save(userId, appointments), timeout),
+    );
   } catch (error) {
     if (error instanceof SeedTooLargeError) {
       return respondWithError(413, "seed_too_large");

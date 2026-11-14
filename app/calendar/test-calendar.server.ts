@@ -103,6 +103,10 @@ export function createMemoryCalendarStore() {
       links.set(userId, calendarId);
       return true;
     },
+    async forgetCalendarId(userId) {
+      check();
+      links.delete(userId);
+    },
     async replaceCalendarId(userId, deletedId, calendarId) {
       check();
       hooks.beforeSave?.();

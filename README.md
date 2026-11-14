@@ -324,12 +324,20 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 - A new visitor (a browser with no `abodeo_visitor` cookie) opening `/demo` first resets the demo
   account to the saved seed, in one transaction: all its projects (including the Bin), images and
   people are replaced by the seed's, however the last visitor left them. A returning visitor finds
-  the account as it was left. With no seed saved, nothing is reset. Appointments in the seed come
-  later.
+  the account as it was left. With no seed saved, nothing is reset.
+- The seed also holds the appointments of its projects, copied from the demo account's Abodeo
+  calendar in Google when the seed is saved, using the stored Calendar access (none are kept without
+  it; a Google failure fails the save). A new visitor's reset then deletes that whole calendar, with
+  every earlier visitor's events, and adds the seed's events to a new one. Without stored access the
+  calendar is left alone. A Google failure during a reset is logged and the visitor still gets in.
+  Making a calendar can take several seconds.
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
 - Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
   the `demo_seed_image` table, and without it saving the seed fails.
+- Run `db/demo-seed-appointments.sql` v1.138.4 in Neon for each account store before deploying: it
+  adds the `appointments` column to `demo_seed`, and without it saving the seed and `/demo` for a
+  new visitor fail.
 - A demo visitor is never sent to Google. Abodeo stores Calendar access for the demo account, and
   for no other: Google's refresh token, encrypted with `BETTER_AUTH_SECRET`, in the one row of
   `demo_calendar_access`. When the demo account's token cookie is missing or near its end,
