@@ -17,7 +17,7 @@ import {
 } from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import { useActivityReport } from "./use-activity-report";
-import { useDemoSeed } from "./use-demo-seed";
+import { describeSeed, useDemoSeed } from "./use-demo-seed";
 import type { Account, AccountView, ProfileSaveResult } from "./use-account";
 
 const saveMessages: Record<ProfileSaveResult, string> = {
@@ -256,8 +256,8 @@ function AccountPanel({
         <>
           <h2>Demo seed</h2>
           <p className="account-hint">
-            Saves this account&rsquo;s projects, people and images as the seed
-            for new demo visitors. It replaces the seed saved before.
+            Saves this account&rsquo;s projects, people, images and
+            appointments as the seed for new demo visitors. It replaces the seed saved before.
           </p>
           <button
             type="button"
@@ -269,9 +269,7 @@ function AccountPanel({
           </button>
           <p className="account-save-message" role="status">
             {seed.message ??
-              (seed.savedAt
-                ? `Saved ${new Date(seed.savedAt).toLocaleString()}.`
-                : "No seed saved yet.")}
+              (seed.seed ? describeSeed(seed.seed) : "No seed saved yet.")}
           </p>
           <DemoCalendarAccess
             onBeforeLeave={onBeforeSeedSave}

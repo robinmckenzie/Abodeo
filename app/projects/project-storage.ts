@@ -7,6 +7,7 @@
 // The saving functions are async, as a database's would be, but they write to
 // local storage before they first wait, so that a save started as the page is
 // left is complete before it goes.
+import { demoArrivalParameter, isDemoArrival } from "../account/account-api";
 import { isKnownAssignee } from "./people";
 import { readStoredPeople, withPeopleLock } from "./people-storage";
 import {
@@ -273,9 +274,10 @@ export function hasOwnProjects() {
 }
 
 // /?welcome shows the welcome screen as to a new visitor, for testing it and
-// its tuning panels once projects are saved.
+// its tuning panels once projects are saved. So does a new demo visitor's
+// arrival from /demo (AD #138), whatever the browser holds.
 export function isWelcomeRequested(search: string) {
-  return new URLSearchParams(search).has("welcome");
+  return new URLSearchParams(search).has("welcome") || isDemoArrival(search);
 }
 
 export const hasProjectsAttribute = "data-has-projects";
@@ -285,7 +287,8 @@ export const hasProjectsAttribute = "data-has-projects";
 // CSS can hide the Get Started button from the first frame. It checks as
 // hasOwnProjects and isWelcomeRequested do.
 export const hasProjectsScript = `try{
-if(!new URLSearchParams(location.search).has("welcome")){
+var q=new URLSearchParams(location.search);
+if(!q.has("welcome")&&!q.has(${JSON.stringify(demoArrivalParameter)})){
 var h=null;try{h=JSON.parse(localStorage.getItem(${JSON.stringify(accountHintKey)}))}catch(e){}
 if(h&&typeof h.hasProjects==="boolean"){
 if(h.hasProjects)document.documentElement.setAttribute(${JSON.stringify(hasProjectsAttribute)},"")}else{

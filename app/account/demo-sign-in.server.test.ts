@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SignInCapture } from "./account-auth.server";
 import { demoAccountEmail } from "./account-api";
-import { respondWithDemoSignIn } from "./demo-sign-in.server";
+import { isCalendarDue, respondWithDemoSignIn } from "./demo-sign-in.server";
 import {
   createTestAuth,
   signInTestAccount,
@@ -11,7 +11,7 @@ import {
 } from "./test-account.server";
 
 describe("respondWithDemoSignIn", () => {
-  it("signs in as the demo account and redirects to the dashboard", async () => {
+  it("signs in as the demo account and sends a new visitor to the welcome screen", async () => {
     const { auth } = createTestAuth();
     const { user } = await signInTestAccount(auth, {
       email: demoAccountEmail,
@@ -22,7 +22,7 @@ describe("respondWithDemoSignIn", () => {
       auth,
     );
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe(`${testBaseUrl}/dashboard`);
+    expect(response.headers.get("Location")).toBe(`${testBaseUrl}/?demo`);
     const cookie = response.headers.get("Set-Cookie") ?? "";
     const session = await auth.api.getSession({
       headers: new Headers({ cookie: cookie.split(";")[0] }),
@@ -117,32 +117,58 @@ describe("respondWithDemoSignIn", () => {
   });
 
   describe("reset to the seed", () => {
-    async function openDemo(cookie?: string) {
+    async function openDemo(cookie?: string, hasSeed = true) {
       const { auth } = createTestAuth();
       const { user } = await signInTestAccount(auth, {
         email: demoAccountEmail,
         sub: "demo",
       });
       const resets: string[] = [];
-      await respondWithDemoSignIn(
+      const response = await respondWithDemoSignIn(
         new Request(`${testBaseUrl}/demo`, {
           headers: cookie ? { Cookie: cookie } : {},
         }),
         auth,
         {},
-        async (userId) => resets.push(userId),
+        async (userId) => {
+          resets.push(userId);
+          return hasSeed;
+        },
       );
-      return { resets, userId: user.id };
+      const calendarDue = response.headers
+        .getSetCookie()
+        .find((c) => c.startsWith("abodeo_demo_calendar="));
+      return {
+        resets,
+        userId: user.id,
+        location: response.headers.get("Location"),
+        calendarDue,
+      };
     }
 
-    it("resets the demo account for a new visitor", async () => {
-      const { resets, userId } = await openDemo();
+    it("resets the demo account for a new visitor, and leaves the calendar due", async () => {
+      const { resets, userId, location, calendarDue } = await openDemo();
       expect(resets).toEqual([userId]);
+      expect(location).toBe(`${testBaseUrl}/?demo`);
+      // Sent only to the request that puts the calendar back.
+      expect(calendarDue).toContain("Path=/api/account/seed/calendar");
+      expect(isCalendarDue(new Headers({ Cookie: calendarDue!.split(";")[0] })))
+        .toBe(true);
     });
 
-    it("leaves the account as it is for a returning visitor", async () => {
-      const { resets } = await openDemo("abodeo_visitor=abcdefgh");
+    it("leaves the calendar alone when there is no seed to reset to", async () => {
+      const { location, calendarDue } = await openDemo(undefined, false);
+      expect(location).toBe(`${testBaseUrl}/?demo`);
+      expect(calendarDue).toBeUndefined();
+    });
+
+    it("leaves the account as it is for a returning visitor, on the projects page", async () => {
+      const { resets, location, calendarDue } = await openDemo(
+        "abodeo_visitor=abcdefgh",
+      );
       expect(resets).toEqual([]);
+      expect(location).toBe(`${testBaseUrl}/dashboard`);
+      expect(calendarDue).toBeUndefined();
     });
 
     it("does not reset when the demo account does not exist", async () => {

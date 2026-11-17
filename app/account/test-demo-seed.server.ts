@@ -1,5 +1,6 @@
 // A demo seed store in memory, for tests of the code around it.
 import type { SeedAppointment } from "../calendar/demo-seed-appointments.server";
+import type { SeedSaveResponse } from "./account-api";
 import type { DemoSeedStore } from "./demo-seed-store.server";
 
 export function createMemoryDemoSeedStore(
@@ -12,7 +13,7 @@ export function createMemoryDemoSeedStore(
   const saves: string[] = [];
   const appointments: SeedAppointment[] = [];
   const resets: string[] = [];
-  let savedAt: Date | null = null;
+  let seed: SeedSaveResponse | null = null;
   return {
     saves,
     resets,
@@ -20,7 +21,7 @@ export function createMemoryDemoSeedStore(
     readProjectIds: async () => ["p1", "p2"],
     readAppointments: async () => appointments,
     isDemoAccount: async (userId) => userId === demoUserId,
-    readSavedAt: async () => savedAt,
+    readSaved: async () => seed,
     reset: async (userId) => {
       resets.push(userId);
       return true;
@@ -28,14 +29,14 @@ export function createMemoryDemoSeedStore(
     save: async (userId, saved) => {
       saves.push(userId);
       appointments.splice(0, appointments.length, ...saved);
-      savedAt = new Date("2026-11-13T10:00:00.000Z");
-      return {
-        savedAt: savedAt.toISOString(),
+      seed = {
+        savedAt: "2026-11-13T10:00:00.000Z",
         projectCount: 2,
         peopleCount: 3,
         imageCount: 4,
         appointmentCount: saved.length,
       };
+      return seed;
     },
   };
 }

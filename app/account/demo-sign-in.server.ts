@@ -3,7 +3,12 @@
 // nothing in the request can choose another one.
 import { makeSignature } from "better-auth/crypto";
 
-import { accountReturnPath, demoAccountEmail } from "./account-api";
+import {
+  accountReturnPath,
+  accountSeedCalendarPath,
+  demoAccountEmail,
+  demoArrivalPath,
+} from "./account-api";
 import type { AccountAuth, SignInCapture } from "./account-auth.server";
 import { formatLabelCookie, readLabelRequest } from "./usage-label";
 import {
@@ -54,11 +59,34 @@ export function planDemoVisit(request: Request) {
   return { word, label, isNewVisitor: existing === "" };
 }
 
-// Signs in as the demo account and moves on to the projects page. Only the
-// label in the address is read; the rest of the query is ignored. The label
-// and word are kept in cookies for later requests and in the capture for the
-// sign-in's own record. A new visitor first has the account reset to the
-// saved seed; a returning one finds it as they left it.
+// Says that the calendar is still to be put back to the seed, after a new
+// visitor's reset. Sent only to the request that does it, which clears it.
+const calendarDueCookieName = "abodeo_demo_calendar";
+const calendarDueLifetimeSeconds = 10 * 60;
+
+function formatCalendarDueCookie(maxAge: number, isSecure: boolean) {
+  return `${calendarDueCookieName}=1; Max-Age=${maxAge}; Path=${accountSeedCalendarPath}; HttpOnly; SameSite=Lax${
+    isSecure ? "; Secure" : ""
+  }`;
+}
+
+export function clearCalendarDueCookie(isSecure: boolean) {
+  return formatCalendarDueCookie(0, isSecure);
+}
+
+export function isCalendarDue(headers: Headers) {
+  return (headers.get("Cookie") ?? "")
+    .split(";")
+    .some((part) => part.trim() === `${calendarDueCookieName}=1`);
+}
+
+// Signs in as the demo account. Only the label in the address is read; the
+// rest of the query is ignored. The label and word are kept in cookies for
+// later requests and in the capture for the sign-in's own record. A new
+// visitor first has the account reset to the saved seed (resetToSeed says
+// whether there was one) and moves on to the welcome screen, which asks for
+// the calendar to be put back, so that /demo never waits for Google. A
+// returning visitor finds the account as they left it, on the projects page.
 export async function respondWithDemoSignIn(
   request: Request,
   auth: DemoSessionAuth,
@@ -69,14 +97,24 @@ export async function respondWithDemoSignIn(
   capture.demoUsage = { label: visit.label, word: visit.word };
   const userId = await findDemoUserId(auth);
   if (!userId) return new Response(null, { status: 404 });
-  if (visit.isNewVisitor) await resetToSeed?.(userId);
+  const wasReset =
+    visit.isNewVisitor && (await resetToSeed?.(userId)) === true;
   const cookie = await openDemoSessionCookie(auth, userId);
   const isSecure = new URL(request.url).protocol === "https:";
   const headers = new Headers({
-    Location: new URL(accountReturnPath, request.url).toString(),
+    Location: new URL(
+      visit.isNewVisitor ? demoArrivalPath : accountReturnPath,
+      request.url,
+    ).toString(),
     "Cache-Control": "no-store",
   });
   headers.append("Set-Cookie", cookie);
+  if (wasReset) {
+    headers.append(
+      "Set-Cookie",
+      formatCalendarDueCookie(calendarDueLifetimeSeconds, isSecure),
+    );
+  }
   headers.append("Set-Cookie", formatLabelCookie(visit.label, isSecure));
   headers.append("Set-Cookie", formatVisitorWordCookie(visit.word, isSecure));
   return new Response(null, { status: 302, headers });

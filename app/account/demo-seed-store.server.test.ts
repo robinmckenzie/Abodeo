@@ -41,8 +41,21 @@ function createFakeSeedDatabase() {
     if (sql.startsWith("select 1 from auth_user")) {
       return { rows: values[0] === "demo-user" ? [{}] : [] };
     }
-    if (sql.startsWith("select saved_at from demo_seed")) {
-      return { rows: seed ? [{ saved_at: seed.savedAt }] : [] };
+    if (sql.startsWith("select saved_at, jsonb_array_length(projects)")) {
+      return {
+        rows: seed
+          ? [
+              {
+                saved_at: seed.savedAt,
+                projects: JSON.parse(seed.projects).length,
+                people: JSON.parse(seed.people).people.length,
+                appointments: JSON.parse(seed.appointments).length,
+                // Postgres gives a count as text.
+                images: String(imageSizes.count),
+              },
+            ]
+          : [],
+      };
     }
     if (sql.startsWith("select id from project")) {
       expect(sql).toContain("deleted_at is null");
@@ -106,9 +119,9 @@ describe("createDemoSeedStore", () => {
     expect(await store.isDemoAccount("other")).toBe(false);
   });
 
-  it("has no saved time until a seed is saved", async () => {
+  it("has no saved seed until one is saved", async () => {
     const { database } = createFakeSeedDatabase();
-    expect(await createDemoSeedStore(database).readSavedAt()).toBeNull();
+    expect(await createDemoSeedStore(database).readSaved()).toBeNull();
   });
 
   it("saves the projects as stored, and the people", async () => {
@@ -152,9 +165,13 @@ describe("createDemoSeedStore", () => {
     const second = await store.save("demo-user", []);
     expect(second.projectCount).toBe(1);
     expect(JSON.parse(readSeed()!.projects)).toHaveLength(1);
-    expect((await store.readSavedAt())?.toISOString()).toBe(
-      "2026-11-13T10:02:00.000Z",
-    );
+    expect(await store.readSaved()).toEqual({
+      savedAt: "2026-11-13T10:02:00.000Z",
+      projectCount: 1,
+      peopleCount: 0,
+      imageCount: 0,
+      appointmentCount: 0,
+    });
   });
 
   it("replaces the seed's images with the account's, and counts them", async () => {

@@ -55,6 +55,7 @@ import {
 
 import {
   accountActivityPath,
+  accountSeedCalendarPath,
   accountSeedPath,
   siteVisitPath,
   accountProfilePath,
@@ -98,7 +99,11 @@ import {
   createDemoSeedStore,
   type DemoSeedStore,
 } from "./demo-seed-store.server";
-import { canManageDemo, handleSeedRequest } from "./seed-handler.server";
+import {
+  canManageDemo,
+  handleSeedCalendarRequest,
+  handleSeedRequest,
+} from "./seed-handler.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
@@ -168,16 +173,10 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   return {
     handleAuthRequest: (request) => auth.handler(request),
     handleDemoRequest: (request) =>
-      respondWithDemoSignIn(request, auth, signIn, async (userId) => {
-        // The calendar is put back only once the database has been.
-        if (await seed.reset(userId)) {
-          await restoreSeedAppointments(
-            seedAppointments,
-            userId,
-            await seed.readAppointments(),
-          );
-        }
-      }),
+      // The calendar is put back afterwards, when the welcome screen asks.
+      respondWithDemoSignIn(request, auth, signIn, (userId) =>
+        seed.reset(userId),
+      ),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
@@ -275,6 +274,7 @@ export function createAccountRequestHandler(
     const isActivity = pathname === accountActivityPath;
     const isSiteVisit = pathname === siteVisitPath;
     const isSeed = pathname === accountSeedPath;
+    const isSeedCalendar = pathname === accountSeedCalendarPath;
     const isCalendar = isCalendarPath(pathname);
     const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
@@ -284,6 +284,7 @@ export function createAccountRequestHandler(
       !isProfile &&
       !isActivity &&
       !isSeed &&
+      !isSeedCalendar &&
       !isSiteVisit &&
       !isCalendar &&
       !isAppointments &&
@@ -333,6 +334,18 @@ export function createAccountRequestHandler(
               runtime.seedAppointments,
               userId,
               projectIds,
+            ),
+        });
+      }
+      if (isSeedCalendar) {
+        return await handleSeedCalendarRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.seed,
+          restoreAppointments: (userId, appointments) =>
+            restoreSeedAppointments(
+              runtime.seedAppointments,
+              userId,
+              appointments,
             ),
         });
       }

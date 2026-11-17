@@ -10,6 +10,19 @@ export const accountActivityPath = "/api/account/activity";
 
 // The demo seed (AD #138): whether the control shows, and saving the seed.
 export const accountSeedPath = "/api/account/seed";
+// Where the welcome screen asks for the seed's appointments to be put back
+// in the calendar, after a new visitor's /demo.
+export const accountSeedCalendarPath = "/api/account/seed/calendar";
+
+// Where /demo sends a new visitor: the welcome screen, marked as a demo
+// arrival so that it shows whatever the browser holds, asks for the calendar
+// to be put back, and leaves the Add project form closed.
+export const demoArrivalParameter = "demo";
+export const demoArrivalPath = `/?${demoArrivalParameter}`;
+
+export function isDemoArrival(search: string) {
+  return new URLSearchParams(search).has(demoArrivalParameter);
+}
 
 // The demo account (AD #138). Fixed here, so that nothing in a request can
 // choose another one.
@@ -37,10 +50,7 @@ export type AccountErrorCode =
   | "method_not_allowed"
   | "unavailable";
 
-// canSave: this is the demo account under one of Robin's own labels. savedAt
-// is an ISO time, or null if no seed is saved.
-export type SeedStatusResponse = { canSave: boolean; savedAt: string | null };
-
+// What the saved seed holds, and when it was saved (an ISO time).
 export type SeedSaveResponse = {
   savedAt: string;
   projectCount: number;
@@ -48,6 +58,16 @@ export type SeedSaveResponse = {
   imageCount: number;
   appointmentCount: number;
 };
+
+// canSave: this is the demo account under one of Robin's own labels. seed is
+// null if no seed is saved, and for everyone else.
+export type SeedStatusResponse = {
+  canSave: boolean;
+  seed: SeedSaveResponse | null;
+};
+
+// restored: the calendar was put back by this request.
+export type SeedCalendarResponse = { restored: boolean };
 
 // The most the seed's images may hold, to spare the database quota
 // (provisional): each original, and all files together.

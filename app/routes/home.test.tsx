@@ -10,9 +10,14 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import Dashboard from "./dashboard";
 import Home from "./home";
+import { requestSeedCalendarOnArrival } from "../account/demo-arrival";
 import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
+
+vi.mock("../account/demo-arrival", () => ({
+  requestSeedCalendarOnArrival: vi.fn(),
+}));
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
 beforeAll(() => {
@@ -98,6 +103,18 @@ describe("Home", () => {
     const title = await screen.findByRole("textbox", { name: "Title" });
     expect(document.activeElement).toBe(title);
     expect(localStorage.length).toBe(0);
+  });
+
+  it("welcomes a new demo visitor, asks for the calendar and leaves the Add project form closed", async () => {
+    saveProject();
+    renderHome("/?demo", NavigationProbe);
+    expect(document.documentElement.hasAttribute("data-has-projects")).toBe(
+      false,
+    );
+    expect(requestSeedCalendarOnArrival).toHaveBeenCalledWith("?demo");
+    fireEvent.click(screen.getByRole("link", { name: "Get Started" }));
+    expect(await screen.findByText(/Arrived by/)).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
   });
 
   it("does not count tuning settings as saved projects", () => {

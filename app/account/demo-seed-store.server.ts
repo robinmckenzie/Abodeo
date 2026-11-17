@@ -26,8 +26,9 @@ export class SeedTooLargeError extends Error {
 export type DemoSeedStore = {
   // Whether the account is the demo account.
   isDemoAccount(userId: string): Promise<boolean>;
-  // When the seed was saved, or null if none has been.
-  readSavedAt(): Promise<Date | null>;
+  // What the saved seed holds and when it was saved, or null if none has
+  // been.
+  readSaved(): Promise<SeedSaveResponse | null>;
   // The ids of the account's projects not in the Bin.
   readProjectIds(userId: string): Promise<string[]>;
   // The seed's appointments, or none if no seed has been saved.
@@ -58,12 +59,24 @@ export function createDemoSeedStore(
       return rows.length > 0;
     },
 
-    async readSavedAt() {
+    async readSaved() {
       const { rows } = await database.query(
-        "select saved_at from demo_seed",
+        `select saved_at, jsonb_array_length(projects) as projects,
+           jsonb_array_length(people->'people') as people,
+           jsonb_array_length(appointments) as appointments,
+           (select count(*) from demo_seed_image) as images
+         from demo_seed`,
         [],
       );
-      return rows.length > 0 ? new Date(String(rows[0].saved_at)) : null;
+      if (rows.length === 0) return null;
+      const [seed] = rows;
+      return {
+        savedAt: new Date(String(seed.saved_at)).toISOString(),
+        projectCount: Number(seed.projects),
+        peopleCount: Number(seed.people),
+        imageCount: Number(seed.images),
+        appointmentCount: Number(seed.appointments),
+      };
     },
 
     async readProjectIds(userId) {

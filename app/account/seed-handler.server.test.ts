@@ -1,9 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { accountSeedPath } from "./account-api";
+import { accountSeedCalendarPath, accountSeedPath } from "./account-api";
 import { SeedTooLargeError } from "./demo-seed-store.server";
-import { handleSeedRequest } from "./seed-handler.server";
+import {
+  handleSeedCalendarRequest,
+  handleSeedRequest,
+} from "./seed-handler.server";
 import { createMemoryDemoSeedStore } from "./test-demo-seed.server";
 
 function setup(userId: string | null = "demo-user") {
@@ -43,7 +46,7 @@ describe("handleSeedRequest", () => {
   it("shows the control to the demo account under an ignored label", async () => {
     const { handle } = setup();
     const response = await handle("GET", "abodeo_label=Robin");
-    expect(await response.json()).toEqual({ canSave: true, savedAt: null });
+    expect(await response.json()).toEqual({ canSave: true, seed: null });
   });
 
   it("hides the control without such a label, or with no label", async () => {
@@ -51,7 +54,7 @@ describe("handleSeedRequest", () => {
     for (const cookie of ["abodeo_label=Acme", undefined]) {
       expect(await (await handle("GET", cookie)).json()).toEqual({
         canSave: false,
-        savedAt: null,
+        seed: null,
       });
     }
   });
@@ -60,11 +63,11 @@ describe("handleSeedRequest", () => {
     const { handle } = setup("someone-else");
     expect(await (await handle("GET", "abodeo_label=Robin")).json()).toEqual({
       canSave: false,
-      savedAt: null,
+      seed: null,
     });
   });
 
-  it("saves for the allowed session and then reports when", async () => {
+  it("saves for the allowed session and then reports what the seed holds", async () => {
     const { handle, store } = setup();
     const saved = await handle("PUT", "abodeo_label=robin");
     expect(saved.status).toBe(200);
@@ -76,7 +79,13 @@ describe("handleSeedRequest", () => {
     expect(store.saves).toEqual(["demo-user"]);
     expect(await (await handle("GET", "abodeo_label=robin")).json()).toEqual({
       canSave: true,
-      savedAt: "2026-11-13T10:00:00.000Z",
+      seed: {
+        savedAt: "2026-11-13T10:00:00.000Z",
+        projectCount: 2,
+        peopleCount: 3,
+        imageCount: 4,
+        appointmentCount: 2,
+      },
     });
   });
 
@@ -110,5 +119,71 @@ describe("handleSeedRequest", () => {
   it("accepts only GET and PUT", async () => {
     const { handle } = setup();
     expect((await handle("POST", "abodeo_label=Robin")).status).toBe(405);
+  });
+});
+
+describe("handleSeedCalendarRequest", () => {
+  const due = "abodeo_demo_calendar=1";
+
+  function setup(userId: string | null = "demo-user") {
+    const store = createMemoryDemoSeedStore("demo-user");
+    const restores: { userId: string; count: number }[] = [];
+    const handle = (cookie?: string, method = "POST") =>
+      handleSeedCalendarRequest(
+        new Request(`http://localhost:5173${accountSeedCalendarPath}`, {
+          method,
+          headers: cookie ? { Cookie: cookie } : {},
+        }),
+        {
+          readSessionUserId: async () => userId ?? undefined,
+          store,
+          restoreAppointments: async (restoredFor, appointments) => {
+            restores.push({ userId: restoredFor, count: appointments.length });
+          },
+          reportFailure: () => {},
+        },
+      );
+    return { store, restores, handle };
+  }
+
+  it("puts the seed's appointments back when /demo left it due, and marks it done", async () => {
+    const { store, restores, handle } = setup();
+    await store.save("demo-user", [
+      {
+        projectId: "p1",
+        event: {
+          summary: "Visit",
+          description: "",
+          start: { date: "2026-12-01" },
+          end: { date: "2026-12-02" },
+        },
+      },
+    ]);
+    const response = await handle(`abodeo_label=Acme; ${due}`);
+    expect(await response.json()).toEqual({ restored: true });
+    expect(restores).toEqual([{ userId: "demo-user", count: 1 }]);
+    // The cookie is removed, at the path it was set for.
+    const cookie = response.headers.get("Set-Cookie") ?? "";
+    expect(cookie).toContain("abodeo_demo_calendar=1; Max-Age=0");
+    expect(cookie).toContain(`Path=${accountSeedCalendarPath}`);
+  });
+
+  it("leaves the calendar alone when it is not due, such as on going back", async () => {
+    const { restores, handle } = setup();
+    const response = await handle("abodeo_label=Acme");
+    expect(await response.json()).toEqual({ restored: false });
+    expect(response.headers.get("Set-Cookie")).toBeNull();
+    expect(restores).toEqual([]);
+  });
+
+  it("does nothing for another account", async () => {
+    const { restores, handle } = setup("someone-else");
+    expect(await (await handle(due)).json()).toEqual({ restored: false });
+    expect(restores).toEqual([]);
+  });
+
+  it("refuses a visitor who is not signed in, and other methods", async () => {
+    expect((await setup(null).handle(due)).status).toBe(401);
+    expect((await setup().handle(due, "GET")).status).toBe(405);
   });
 });

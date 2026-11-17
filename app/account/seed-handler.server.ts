@@ -1,7 +1,11 @@
-// The demo seed endpoint (AD #138 Demo Entry And Seed): GET says whether the
-// seed control shows and when the seed was saved, PUT saves it. Only the demo
-// account under one of Robin's own labels may save. The label is a cookie the
-// browser sets itself, so this is a convenience for Robin, not a lock.
+// The demo seed endpoints (AD #138 Demo Entry And Seed).
+// - accountSeedPath: GET says whether the seed control shows and what the
+//   saved seed holds, PUT saves it. Only the demo account under one of Robin's
+//   own labels may save. The label is a cookie the browser sets itself, so
+//   this is a convenience for Robin, not a lock.
+// - accountSeedCalendarPath: POST puts the seed's appointments back in the
+//   calendar, once after a new visitor's /demo, which leaves a cookie to say
+//   that it is due.
 import {
   accountStoreTimeout,
   readErrorCode,
@@ -11,6 +15,8 @@ import {
   type ReadSessionUserId,
 } from "./account-profile.server";
 import type { SeedAppointment } from "../calendar/demo-seed-appointments.server";
+import type { SeedCalendarResponse, SeedStatusResponse } from "./account-api";
+import { clearCalendarDueCookie, isCalendarDue } from "./demo-sign-in.server";
 import {
   SeedTooLargeError,
   type DemoSeedStore,
@@ -76,13 +82,13 @@ export async function handleSeedRequest(
       timeout,
     );
     if (request.method === "GET") {
-      const savedAt = canSave
-        ? await withTimeout(store.readSavedAt(), timeout)
+      const seed = canSave
+        ? await withTimeout(store.readSaved(), timeout)
         : null;
       return respondWithJson(200, {
         canSave,
-        savedAt: savedAt?.toISOString() ?? null,
-      });
+        seed,
+      } satisfies SeedStatusResponse);
     }
     if (!canSave) return respondWithError(403, "not_allowed");
     const projectIds = await withTimeout(store.readProjectIds(userId), timeout);
@@ -96,6 +102,66 @@ export async function handleSeedRequest(
     if (error instanceof SeedTooLargeError) {
       return respondWithError(413, "seed_too_large");
     }
+    reportFailure(readErrorCode(error));
+    return respondWithError(503, "unavailable");
+  }
+}
+
+export type SeedCalendarDependencies = {
+  readSessionUserId: ReadSessionUserId;
+  store: Pick<DemoSeedStore, "isDemoAccount" | "readAppointments">;
+  // Puts the calendar back to the appointments. Reports its own failures.
+  restoreAppointments: (
+    userId: string,
+    appointments: SeedAppointment[],
+  ) => Promise<void>;
+  timeout?: number;
+  reportFailure?: (code: string | undefined) => void;
+};
+
+// Puts the demo account's calendar back to the seed, if a new visitor's /demo
+// left it due, and marks it done so that a later request (such as Back to the
+// welcome screen) leaves the visitor's own appointments alone.
+export async function handleSeedCalendarRequest(
+  request: Request,
+  {
+    readSessionUserId,
+    store,
+    restoreAppointments,
+    timeout = accountStoreTimeout,
+    reportFailure = reportSeedFailure,
+  }: SeedCalendarDependencies,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return respondWithError(405, "method_not_allowed");
+  }
+  try {
+    const userId = await withTimeout(
+      readSessionUserId(request.headers),
+      timeout,
+    );
+    if (userId === undefined) return respondWithError(401, "not_signed_in");
+    const restored =
+      isCalendarDue(request.headers) &&
+      (await withTimeout(store.isDemoAccount(userId), timeout));
+    if (restored) {
+      // Google can be slow, so it has its own limits rather than this one.
+      await restoreAppointments(
+        userId,
+        await withTimeout(store.readAppointments(), timeout),
+      );
+    }
+    const response = respondWithJson(200, {
+      restored,
+    } satisfies SeedCalendarResponse);
+    if (restored) {
+      response.headers.append(
+        "Set-Cookie",
+        clearCalendarDueCookie(new URL(request.url).protocol === "https:"),
+      );
+    }
+    return response;
+  } catch (error) {
     reportFailure(readErrorCode(error));
     return respondWithError(503, "unavailable");
   }

@@ -307,8 +307,11 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 
 ### Demo sign-in (AD #138)
 - `/demo` signs in as the demo account (`abodeodemo@gmail.com`, which must have signed in with
-  Google once) and opens the projects page. Only `?label=NAME` is read from the address. Any
-  other query is ignored, so the address cannot choose another account.
+  Google once). A new visitor (a browser with no `abodeo_visitor` cookie) is sent to the welcome
+  screen at `/?demo` and reaches the projects page through Get Started, which does not open the
+  Add project form for them. A returning visitor is sent to the projects page. Only `?label=NAME`
+  is read from the address. Any other query is ignored, so the address cannot choose another
+  account.
 - The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent to the
   whole site, as `/demo` and `/api` both read it). Sign-in, visit and site visit records store the label and the word
   (`visitor_word`). With no label in the address, the word is the label. Visits under different
@@ -320,17 +323,27 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   account's projects (not in the Bin), people and the projects' images (details and both files) as
   the seed, replacing any earlier seed. The save is refused, and the old seed kept, if an image's
   original is over 1 MiB or the images are over 4 MiB together (`maxSeedImageBytes`,
-  `maxSeedTotalBytes`; provisional).
+  `maxSeedTotalBytes`; provisional). The control shows when the seed was saved and what it holds
+  (projects, people, images and appointments), so that a save that kept less than expected is
+  seen at once.
 - A new visitor (a browser with no `abodeo_visitor` cookie) opening `/demo` first resets the demo
   account to the saved seed, in one transaction: all its projects (including the Bin), images and
   people are replaced by the seed's, however the last visitor left them. A returning visitor finds
   the account as it was left. With no seed saved, nothing is reset.
 - The seed also holds the appointments of its projects, copied from the demo account's Abodeo
   calendar in Google when the seed is saved, using the stored Calendar access (none are kept without
-  it; a Google failure fails the save). A new visitor's reset then deletes that whole calendar, with
-  every earlier visitor's events, and adds the seed's events to a new one. Without stored access the
-  calendar is left alone. A Google failure during a reset is logged and the visitor still gets in.
-  Making a calendar can take several seconds.
+  it; a Google failure fails the save). An event still being added when the seed is saved is not
+  in it: the first event after a reset has to make the calendar, which takes several seconds, so
+  check the appointment count the control shows.
+- `/demo` does not wait for Google. After a new visitor's reset it sets the cookie
+  `abodeo_demo_calendar`, and the welcome screen then posts to `/api/account/seed/calendar` in
+  the background. That request, for the demo account with the cookie only, deletes the whole
+  calendar, with every earlier visitor's events, adds the seed's events to a new one, and clears
+  the cookie, so that going back to the welcome screen does not do it again. It takes about 9
+  seconds, most of it Google making the calendar (measured: database reset about 0.5 s, deleting
+  the calendar 1.4 s, making one 7 s, adding an event 0.4 s). A visitor who opens a project in
+  that time may see appointments not yet put back. Without stored access the calendar is left
+  alone. A Google failure is logged and changes nothing the visitor sees.
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
 - Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
@@ -352,10 +365,10 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   consent screen asking for offline access, and Google's return to `/api/calendar/callback` saves
   the token and shows "Calendar access is stored for the demo account." Storing again replaces
   it. To remove the access, delete the row, or withdraw the permission in the demo Google account.
-- Google ends a refresh token after 7 days while the app's Audience is "Testing" (see Setting it
-  up from scratch), after six months unused, or when the permission is withdrawn. Appointments
-  in the demo then show as unavailable until Robin stores the access again. Publishing the app
-  ("In production") removes the 7-day limit.
+- The Google app's Audience is "In production" (see Setting it up from scratch), so Google does
+  not end the refresh token after 7 days, as it does in "Testing". It still ends after six months
+  unused, or when the permission is withdrawn. Appointments in the demo then show as unavailable
+  until Robin stores the access again.
 - Run `db/demo-calendar-access.sql` v1.138.3 in Neon for each account store before deploying: it
   adds the `demo_calendar_access` table. Without it nothing is stored, and every account works as
   before.
@@ -468,10 +481,11 @@ output. The production address is https://abodeo-kappa.vercel.app.
     4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
        `.../auth/userinfo.profile`, `openid` and `.../auth/calendar.app.created`, then Update,
        then Save. All four are non-sensitive.
-    5. Audience: stay in Testing, with Robin as a test user, until production is ready. While
-       in Testing, the demo account's stored Calendar access ends after 7 days. Testing
-       allows 100 test users over the app's lifetime. Google says only test users can sign in, but
-       an account not on the list did so during testing, so do not rely on it.
+    5. Audience: Robin's app is "In production" (published). A new app starts in Testing, where
+       the demo account's stored Calendar access ends after 7 days, so publish it before
+       relying on the demo. Testing allows 100 test users over the app's lifetime. Google says
+       only test users can sign in, but an account not on the list did so during testing, so do
+       not rely on it.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs
        `https://abodeo-kappa.vercel.app/api/auth/callback/google`,
        `http://localhost:5173/api/auth/callback/google`,
