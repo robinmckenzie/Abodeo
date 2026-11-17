@@ -122,6 +122,38 @@ describe("restoreSeedAppointments", () => {
     ).toBe(true);
   });
 
+  it("puts an appointment with a rule on the coming date, not the saved one", async () => {
+    const { fake, dependencies } = await setup();
+    fake.calendar.calendars.set("calendar-0", { summary: "A", events: [] });
+    fake.store.links.set(userId, "calendar-0");
+    const brunch = {
+      ...seedEvent,
+      event: {
+        ...seedEvent.event,
+        summary: "Brunch",
+        start: { dateTime: "2026-11-22T10:00:00", timeZone: "Europe/London" },
+        end: { dateTime: "2026-11-22T12:30:00", timeZone: "Europe/London" },
+      },
+      rule: { weekday: 0, nth: 1 },
+    };
+    // Thursday 3 December 2026: the next Sunday is the 6th.
+    const thursday = Date.parse("2026-12-03T09:00:00Z");
+    await restoreSeedAppointments(
+      { ...dependencies, now: () => thursday },
+      userId,
+      [brunch],
+    );
+    const [event] = fake.calendar.calendars.get("calendar-0")!.events;
+    expect(event.start).toEqual({
+      dateTime: "2026-12-06T10:00:00",
+      timeZone: "Europe/London",
+    });
+    expect(event.end).toEqual({
+      dateTime: "2026-12-06T12:30:00",
+      timeZone: "Europe/London",
+    });
+  });
+
   it("leaves an empty calendar when the seed has no appointments", async () => {
     const { fake, dependencies, addEvent } = await setup();
     fake.calendar.calendars.set("calendar-0", { summary: "A", events: [] });

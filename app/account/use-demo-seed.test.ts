@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   describeSeed,
   seedFailedMessage,
+  seedPastDateMessage,
   seedTooLargeMessage,
   useDemoSeed,
 } from "./use-demo-seed";
@@ -78,6 +79,21 @@ describe("useDemoSeed", () => {
     await waitFor(() => expect(result.current.canSave).toBe(true));
     await act(() => result.current.save());
     expect(result.current.message).toBe(seedTooLargeMessage);
+  });
+
+  it("says so when a date has passed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_path: string, init?: RequestInit) =>
+        init?.method === "PUT"
+          ? new Response("{}", { status: 422 })
+          : new Response(JSON.stringify({ canSave: true, seed: null })),
+      ),
+    );
+    const { result } = renderHook(() => useDemoSeed(async () => true));
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    await act(() => result.current.save());
+    expect(result.current.message).toBe(seedPastDateMessage);
   });
 
   it("does not save when the page is not ready to be left", async () => {

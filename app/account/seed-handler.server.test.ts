@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { accountSeedCalendarPath, accountSeedPath } from "./account-api";
-import { SeedTooLargeError } from "./demo-seed-store.server";
+import { SeedPastDateError, SeedTooLargeError } from "./demo-seed-store.server";
 import {
   handleSeedCalendarRequest,
   handleSeedRequest,
@@ -114,6 +114,16 @@ describe("handleSeedRequest", () => {
     const response = await handle("PUT", "abodeo_label=robin");
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: "seed_too_large" });
+  });
+
+  it("answers 422 when a date has passed, without a failure report", async () => {
+    const { handle, store } = setup();
+    store.save = async () => {
+      throw new SeedPastDateError();
+    };
+    const response = await handle("PUT", "abodeo_label=robin");
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "seed_past_date" });
   });
 
   it("accepts only GET and PUT", async () => {

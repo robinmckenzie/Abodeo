@@ -12,11 +12,20 @@ import {
 } from "../projects/transaction.server";
 import type { SeedAppointment } from "../calendar/demo-seed-appointments.server";
 import {
+  ruleForDate,
+  ruleForEvent,
+  dateFromRule,
+  type DateRule,
+} from "./demo-seed-dates";
+import {
   demoAccountEmail,
   maxSeedImageBytes,
   maxSeedTotalBytes,
   type SeedSaveResponse,
 } from "./account-api";
+
+// Re-exported, so that callers need one import for the seed's errors.
+export { SeedPastDateError } from "./demo-seed-dates";
 
 // The images are too big to keep in the seed. Nothing was saved.
 export class SeedTooLargeError extends Error {
@@ -47,8 +56,27 @@ export type DemoSeedStore = {
   reset(userId: string): Promise<boolean>;
 };
 
+type SavedProject = { id: string; data: unknown; dueRule?: DateRule };
+
+function readDueDate(data: unknown) {
+  const { dueDate } = (data ?? {}) as { dueDate?: unknown };
+  return typeof dueDate === "string" ? dueDate : undefined;
+}
+
+// The seed's projects with each due date worked out again from now, or as
+// saved if the project has no rule (a seed saved before dates moved).
+function moveDueDates(projects: SavedProject[], now: number) {
+  return projects.map(({ id, data, dueRule }) => ({
+    id,
+    data: dueRule
+      ? { ...(data as object), dueDate: dateFromRule(dueRule, now) }
+      : data,
+  }));
+}
+
 export function createDemoSeedStore(
   database: TransactionalDatabase,
+  now: () => number = Date.now,
 ): DemoSeedStore {
   return {
     async isDemoAccount(userId) {
@@ -119,7 +147,19 @@ export function createDemoSeedStore(
         ) {
           throw new SeedTooLargeError();
         }
-        const projects = rows.map(({ id, data }) => ({ id, data }));
+        // A due date or start that has passed throws SeedPastDateError.
+        const saveTime = now();
+        const projects = rows.map(({ id: rawId, data }): SavedProject => {
+          const id = String(rawId);
+          const dueDate = readDueDate(data);
+          return dueDate === undefined
+            ? { id, data }
+            : { id, data, dueRule: ruleForDate(dueDate, saveTime) };
+        });
+        const movingAppointments = appointments.map((appointment) => ({
+          ...appointment,
+          rule: ruleForEvent(appointment.event, saveTime),
+        }));
         const people = JSON.parse(
           serialisePeople(await readAccountPeople(client, userId)),
         );
@@ -133,7 +173,7 @@ export function createDemoSeedStore(
           [
             JSON.stringify(projects),
             JSON.stringify(people),
-            JSON.stringify(appointments),
+            JSON.stringify(movingAppointments),
           ],
         );
         await client.query("delete from demo_seed_image", []);
@@ -167,16 +207,20 @@ export function createDemoSeedStore(
 
     reset: (userId) =>
       inTransaction(database, async (client) => {
-        const found = await client.query("select 1 from demo_seed", []);
+        const found = await client.query("select projects from demo_seed", []);
         if (found.rows.length === 0) return false;
+        const projects = moveDueDates(
+          found.rows[0].projects as SavedProject[],
+          now(),
+        );
         await lockAccountPeople(client, userId);
         // Removing a project removes its images and their files.
         await client.query("delete from project where user_id = $1", [userId]);
         await client.query(
           `insert into project (user_id, id, data)
            select $1, e->>'id', e->'data'
-           from demo_seed, jsonb_array_elements(projects) e`,
-          [userId],
+           from jsonb_array_elements($2::jsonb) e`,
+          [userId, JSON.stringify(projects)],
         );
         await client.query(
           `insert into project_image

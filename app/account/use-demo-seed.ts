@@ -23,6 +23,9 @@ export const seedFailedMessage =
 export const seedTooLargeMessage =
   "The demo seed was not saved: its images are too big. Use smaller or fewer images.";
 
+export const seedPastDateMessage =
+  "The demo seed was not saved: a due date or an appointment has already passed. Move it to a coming date, then save again.";
+
 function count(number: number, one: string, many = `${one}s`) {
   return `${number} ${number === 1 ? one : many}`;
 }
@@ -63,6 +66,7 @@ export function useDemoSeed(onBeforeSave: () => Promise<boolean>): DemoSeed {
       if (!(await onBeforeSave())) return;
       const saved = await saveSeed();
       if (saved === "too-large") setMessage(seedTooLargeMessage);
+      else if (saved === "past-date") setMessage(seedPastDateMessage);
       else if (saved) setStatus({ canSave: true, seed: saved });
       else setMessage(seedFailedMessage);
     } finally {

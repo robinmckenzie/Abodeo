@@ -334,6 +334,16 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   calendar in Google when the seed is saved, using the stored Calendar access (none are kept without
   it; a Google failure fails the save). An event still being added when the seed is saved is not
   in it, so check the appointment count the control shows.
+- The seed's dates move with the day. Saving turns each project due date and each appointment
+  start into a rule: a weekday and a count (`app/account/demo-seed-dates.ts`), such as "the 2nd
+  Saturday whose start is still ahead". A reset works the rule out again from the new visitor's
+  today, so a seeded Sunday brunch at 10:00 is the next Sunday at 10:00 whenever `/demo` is
+  opened, and never a time already past. An appointment keeps its time of day and length, and one
+  with a time zone is sent as wall time and zone. A due date counts until the end of its day (UTC).
+  A save is refused (422, "a due date or an appointment has already passed") if a due date or a
+  start has passed, so author dates that are still ahead on the day of saving, such as the coming
+  Sunday, the coming Saturday and a date two weeks on. A seed saved before this change has no
+  rules and keeps its fixed dates. No SQL change: rules are stored in the seed's JSON.
 - `/demo` does not wait for Google. After a new visitor's reset it sets the cookie
   `abodeo_demo_calendar`, and the welcome screen then posts to `/api/account/seed/calendar` in
   the background. That request, for the demo account with the cookie only, deletes every event

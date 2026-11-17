@@ -47,6 +47,7 @@ export type AccountErrorCode =
   | "not_allowed"
   | "invalid_request"
   | "seed_too_large"
+  | "seed_past_date"
   | "method_not_allowed"
   | "unavailable";
 

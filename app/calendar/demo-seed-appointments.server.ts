@@ -8,14 +8,21 @@ import {
   insertAbodeoEvent,
   type CalendarDependencies,
 } from "./calendar-handler.server";
+import { moveEvent, type DateRule } from "../account/demo-seed-dates";
 import { readCalendarAccess } from "./demo-calendar-access.server";
 import {
   GoogleCalendarError,
   type CalendarEvent,
 } from "./google-calendar.server";
 
-// An appointment of the seed: the event, which names its project.
-export type SeedAppointment = { projectId: string; event: CalendarEvent };
+// An appointment of the seed: the event, which names its project. The rule
+// (set when the seed is saved) moves its date to the coming one on each reset;
+// without one, the event keeps its date.
+export type SeedAppointment = {
+  projectId: string;
+  event: CalendarEvent;
+  rule?: DateRule;
+};
 
 export type SeedAppointmentDependencies = Pick<
   CalendarDependencies,
@@ -118,11 +125,13 @@ export async function restoreSeedAppointments(
     calendar,
     store,
     timeout = accountStoreTimeout,
+    now = Date.now,
     reportFailure = reportSeedAppointmentFailure,
   } = dependencies;
   try {
     const accessToken = await readStoredToken(dependencies, userId);
     if (accessToken === undefined) return;
+    const restoredAt = now();
     const calendarId = await store.readCalendarId(userId);
     if (calendarId !== undefined) {
       const events = await calendar.listEvents(accessToken, calendarId);
@@ -133,12 +142,12 @@ export async function restoreSeedAppointments(
       );
     }
     // One after another: with no calendar yet, the first makes it.
-    for (const { event } of appointments) {
+    for (const { event, rule } of appointments) {
       await insertAbodeoEvent({
         accessToken,
         userId,
         timeZone: null,
-        event,
+        event: rule ? moveEvent(event, rule, restoredAt) : event,
         store,
         calendar,
         timeout,

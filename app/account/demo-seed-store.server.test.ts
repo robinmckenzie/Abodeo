@@ -3,16 +3,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDemoSeedStore,
+  SeedPastDateError,
   SeedTooLargeError,
 } from "./demo-seed-store.server";
 import type { TransactionalDatabase } from "../projects/transaction.server";
 
+// Tuesday 17 November 2026, 14:00 UTC.
+const tuesday = () => Date.parse("2026-11-17T14:00:00Z");
+
 // Stands in for Postgres, understanding only this store's statements.
 function createFakeSeedDatabase() {
-  const projectRows = [
+  const projectRows: { id: string; data: Record<string, unknown> }[] = [
     { id: "p1", data: { name: "Apples" } },
     { id: "p2", data: { name: "Bread" } },
   ];
+  let insertedProjects = "";
   let seed: {
     projects: string;
     people: string;
@@ -27,8 +32,11 @@ function createFakeSeedDatabase() {
   const query = async (text: string, values: unknown[]) => {
     const sql = text.replace(/\s+/g, " ").trim();
     if (/^(begin|commit|rollback|set local)/.test(sql)) return { rows: [] };
-    if (sql.startsWith("select 1 from demo_seed")) {
-      return { rows: seed ? [{}] : [] };
+    if (sql.startsWith("select projects from demo_seed")) {
+      return { rows: seed ? [{ projects: JSON.parse(seed.projects) }] : [] };
+    }
+    if (sql.startsWith("insert into project (user_id, id, data)")) {
+      insertedProjects = values[1] as string;
     }
     if (
       /^(delete from project|insert into project|insert into account_people|select pg_advisory)/.test(
@@ -107,6 +115,7 @@ function createFakeSeedDatabase() {
     events,
     statements,
     readSeed: () => seed,
+    insertedProjects: () => JSON.parse(insertedProjects),
     imageCopies: () => imageCopies,
   };
 }
@@ -138,7 +147,7 @@ describe("createDemoSeedStore", () => {
 
   it("saves the appointments with the seed, and reads them back", async () => {
     const { database } = createFakeSeedDatabase();
-    const store = createDemoSeedStore(database);
+    const store = createDemoSeedStore(database, tuesday);
     expect(await store.readAppointments()).toEqual([]);
     const appointments = [
       {
@@ -153,7 +162,9 @@ describe("createDemoSeedStore", () => {
     ];
     const saved = await store.save("demo-user", appointments);
     expect(saved.appointmentCount).toBe(1);
-    expect(await store.readAppointments()).toEqual(appointments);
+    expect(await store.readAppointments()).toEqual([
+      { ...appointments[0], rule: { weekday: 2, nth: 3 } },
+    ]);
     expect(await store.readProjectIds("demo-user")).toEqual(["p1", "p2"]);
   });
 
@@ -199,6 +210,60 @@ describe("createDemoSeedStore", () => {
     await expect(
       createDemoSeedStore(database).save("demo-user", []),
     ).rejects.toBeInstanceOf(SeedTooLargeError);
+  });
+
+  describe("dates that move", () => {
+    it("saves a due date as a weekday and a count, keeping the data", async () => {
+      const { database, projectRows, readSeed } = createFakeSeedDatabase();
+      projectRows[0].data = { name: "Brunch", dueDate: "2026-11-22" };
+      await createDemoSeedStore(database, tuesday).save("demo-user", []);
+      expect(JSON.parse(readSeed()!.projects)).toEqual([
+        {
+          id: "p1",
+          data: { name: "Brunch", dueDate: "2026-11-22" },
+          dueRule: { weekday: 0, nth: 1 },
+        },
+        { id: "p2", data: { name: "Bread" } },
+      ]);
+    });
+
+    it("refuses a due date that has passed, saving nothing", async () => {
+      const { database, projectRows, readSeed } = createFakeSeedDatabase();
+      projectRows[0].data = { dueDate: "2026-11-16" };
+      await expect(
+        createDemoSeedStore(database, tuesday).save("demo-user", []),
+      ).rejects.toBeInstanceOf(SeedPastDateError);
+      expect(readSeed()).toBeNull();
+    });
+
+    it("refuses an appointment whose start has passed", async () => {
+      const { database } = createFakeSeedDatabase();
+      const past = {
+        projectId: "p1",
+        event: {
+          summary: "Brunch",
+          description: "",
+          start: { dateTime: "2026-11-17T10:00:00Z" },
+          end: { dateTime: "2026-11-17T11:00:00Z" },
+        },
+      };
+      await expect(
+        createDemoSeedStore(database, tuesday).save("demo-user", [past]),
+      ).rejects.toBeInstanceOf(SeedPastDateError);
+    });
+
+    it("works the due date out again from the day of the reset", async () => {
+      const { database, projectRows, insertedProjects } =
+        createFakeSeedDatabase();
+      projectRows[0].data = { name: "Brunch", dueDate: "2026-11-22" };
+      await createDemoSeedStore(database, tuesday).save("demo-user", []);
+      const thursday = () => Date.parse("2026-12-03T09:00:00Z");
+      await createDemoSeedStore(database, thursday).reset("demo-user");
+      expect(insertedProjects()).toEqual([
+        { id: "p1", data: { name: "Brunch", dueDate: "2026-12-06" } },
+        { id: "p2", data: { name: "Bread" } },
+      ]);
+    });
   });
 
   describe("reset", () => {

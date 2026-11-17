@@ -231,16 +231,17 @@ export async function requestSeedCalendar(fetchFn: Fetch = fetch) {
 }
 
 // Saves the demo account's projects, people and images as the seed. Gives
-// "too-large" if its images are over the limits, or undefined if it could not
-// be saved.
+// "too-large" if its images are over the limits, "past-date" if a due date or
+// an appointment start has passed, or undefined if it could not be saved.
 export async function saveSeed(
   fetchFn: Fetch = fetch,
-): Promise<SeedSaveResponse | "too-large" | undefined> {
+): Promise<SeedSaveResponse | "too-large" | "past-date" | undefined> {
   try {
     const response = await sendRequest(fetchFn, accountSeedPath, {
       method: "PUT",
     });
     if (response.status === 413) return "too-large";
+    if (response.status === 422) return "past-date";
     return readSavedSeed(response.ok ? await response.json() : undefined);
   } catch {
     return undefined;

@@ -18,6 +18,7 @@ import type { SeedAppointment } from "../calendar/demo-seed-appointments.server"
 import type { SeedCalendarResponse, SeedStatusResponse } from "./account-api";
 import { clearCalendarDueCookie, isCalendarDue } from "./demo-sign-in.server";
 import {
+  SeedPastDateError,
   SeedTooLargeError,
   type DemoSeedStore,
 } from "./demo-seed-store.server";
@@ -101,6 +102,9 @@ export async function handleSeedRequest(
   } catch (error) {
     if (error instanceof SeedTooLargeError) {
       return respondWithError(413, "seed_too_large");
+    }
+    if (error instanceof SeedPastDateError) {
+      return respondWithError(422, "seed_past_date");
     }
     reportFailure(readErrorCode(error));
     return respondWithError(503, "unavailable");
