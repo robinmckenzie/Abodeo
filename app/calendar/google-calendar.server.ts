@@ -63,13 +63,19 @@ export type GoogleCalendar = {
     calendarId: string,
     event: CalendarEvent,
   ): Promise<CalendarEventRecord | "not-found">;
-  // Every event in the calendar whose private property has the value,
-  // earliest first. Rejects if Google does not give them all.
+  // Every event in the calendar whose private property has the value, or
+  // every event if no property is given, earliest first. Rejects if Google
+  // does not give them all.
   listEvents(
     accessToken: string,
     calendarId: string,
-    property: { name: string; value: string },
+    property?: { name: string; value: string },
   ): Promise<CalendarEventRecord[]>;
+  deleteEvent(
+    accessToken: string,
+    calendarId: string,
+    eventId: string,
+  ): Promise<void>;
   deleteCalendar(accessToken: string, calendarId: string): Promise<void>;
 };
 
@@ -174,6 +180,8 @@ export function createGoogleCalendar(
   };
   const calendarPath = (calendarId: string) =>
     `/calendars/${encodeURIComponent(calendarId)}`;
+  const eventPath = (calendarId: string, eventId: string) =>
+    `${calendarPath(calendarId)}/events/${encodeURIComponent(eventId)}`;
 
   return {
     async insertCalendar(accessToken, { summary, timeZone }) {
@@ -202,12 +210,14 @@ export function createGoogleCalendar(
       if (!created) throw new GoogleCalendarError("google_no_event_id");
       return created;
     },
-    async listEvents(accessToken, calendarId, { name, value }) {
+    async listEvents(accessToken, calendarId, property) {
       const events: CalendarEventRecord[] = [];
       let pageToken: string | undefined;
       for (let page = 0; page < maxEventPages; page += 1) {
         const query = new URLSearchParams({
-          privateExtendedProperty: `${name}=${value}`,
+          ...(property
+            ? { privateExtendedProperty: `${property.name}=${property.value}` }
+            : {}),
           singleEvents: "true",
           orderBy: "startTime",
           maxResults: "250",
@@ -236,6 +246,14 @@ export function createGoogleCalendar(
         pageToken = next;
       }
       throw new GoogleCalendarError("google_too_many_pages");
+    },
+    async deleteEvent(accessToken, calendarId, eventId) {
+      const response = await send(
+        accessToken,
+        eventPath(calendarId, eventId),
+        "DELETE",
+      );
+      if (!response.ok) throw await fail(response);
     },
     async deleteCalendar(accessToken, calendarId) {
       const response = await send(

@@ -112,11 +112,21 @@ describe("createAccountAuth", () => {
     await after({ userId: "ada" }, undefined);
 
     expect(recordSignIn.mock.calls).toEqual([
-      ["ada", "Andrew B"],
-      ["ada", "Andrew B"],
-      ["ada", ""],
-      ["ada", ""],
+      ["ada", "Andrew B", ""],
+      ["ada", "Andrew B", ""],
+      ["ada", "", ""],
+      ["ada", "", ""],
     ]);
+  });
+
+  it("records a demo sign-in with the label and word it captured", async () => {
+    const recordSignIn = vi.fn<HistoryStore["recordSignIn"]>(async () => {});
+    const hooks = buildDatabaseHooks(
+      { recordSignIn, recordActivity: async () => {} },
+      { demoUsage: { label: "Acme", word: "qwertyui" } },
+    );
+    await hooks.session.create.after({ userId: "demo" }, undefined);
+    expect(recordSignIn.mock.calls).toEqual([["demo", "Acme", "qwertyui"]]);
   });
 
   it("lets sign-in complete when its history entry cannot be written", async () => {

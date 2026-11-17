@@ -6,6 +6,7 @@ import {
 } from "./calendar-grant.server";
 import type { CalendarDependencies } from "./calendar-handler.server";
 import type { CalendarStore } from "./calendar-store.server";
+import type { DemoCalendarAccessStore } from "./demo-calendar-access.server";
 import type {
   CalendarEventRecord,
   GoogleCalendar,
@@ -14,6 +15,9 @@ import { GoogleCalendarError } from "./google-calendar.server";
 
 export const testAccessToken = "access-token-never-kept";
 export const testIdToken = "id-token-never-kept";
+export const testRefreshToken = "refresh-token-kept-only-encrypted";
+// The access token Google gives for the stored refresh token.
+export const testRefreshedToken = "access-token-from-stored-access";
 export const testSecret = "test-secret-that-is-long-enough-for-better-auth";
 
 // Google's Calendar, holding calendars and their events in memory.
@@ -29,6 +33,7 @@ export function createMemoryGoogleCalendar() {
     insertCalendar?: string;
     insertEvent?: string;
     listEvents?: string;
+    deleteEvent?: string;
     deleteCalendar?: string;
   } = {};
   const fail = (method: keyof typeof failures) => {
@@ -52,7 +57,7 @@ export function createMemoryGoogleCalendar() {
       found.events.push(record);
       return record;
     },
-    async listEvents(accessToken, calendarId, { name, value }) {
+    async listEvents(accessToken, calendarId, property) {
       tokensUsed.push(accessToken);
       fail("listEvents");
       const found = calendars.get(calendarId);
@@ -60,8 +65,20 @@ export function createMemoryGoogleCalendar() {
       const sortKey = (event: CalendarEventRecord) =>
         "date" in event.start ? event.start.date : event.start.dateTime;
       return found.events
-        .filter((event) => event.extendedProperties?.private[name] === value)
+        .filter(
+          (event) =>
+            !property ||
+            event.extendedProperties?.private[property.name] === property.value,
+        )
         .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+    },
+    async deleteEvent(accessToken, calendarId, eventId) {
+      tokensUsed.push(accessToken);
+      fail("deleteEvent");
+      const found = calendars.get(calendarId)?.events;
+      const index = found?.findIndex(({ id }) => id === eventId) ?? -1;
+      if (!found || index < 0) throw new GoogleCalendarError("google_404");
+      found.splice(index, 1);
     },
     async deleteCalendar(accessToken, calendarId) {
       tokensUsed.push(accessToken);
@@ -111,6 +128,25 @@ export function createMemoryCalendarStore() {
   return { store, googleAccounts, links, written, hooks };
 }
 
+// The demo account's stored access, in memory.
+export function createMemoryDemoAccessStore() {
+  const saved: { userId?: string; token?: string; at?: Date } = {};
+  const hooks: { fail?: Error } = {};
+  const store: DemoCalendarAccessStore = {
+    async readRefreshToken(userId) {
+      if (hooks.fail) throw hooks.fail;
+      return saved.userId === userId ? saved.token : undefined;
+    },
+    async save(userId, encryptedRefreshToken) {
+      saved.userId = userId;
+      saved.token = encryptedRefreshToken;
+      saved.at = new Date("2026-11-13T10:00:00.000Z");
+    },
+    readSavedAt: async () => saved.at ?? null,
+  };
+  return { store, saved, hooks };
+}
+
 // Google's grant, answering as a successful consent would.
 export function createFakeCalendarGoogle() {
   const answer: { tokens: CalendarTokens; subject: string | undefined } = {
@@ -123,13 +159,30 @@ export function createFakeCalendarGoogle() {
     subject: "google-sub-1",
   };
   const exchanges: { code: string; codeVerifier: string }[] = [];
+  // The refresh tokens Google was given, and whether it refuses them.
+  const refreshes: string[] = [];
+  const refresh: { fail?: boolean } = {};
   const google: CalendarGoogle = {
-    createAuthorizationURL: async ({ state, codeVerifier, loginHint }) => {
+    createAuthorizationURL: async ({
+      state,
+      codeVerifier,
+      loginHint,
+      storeAccess,
+    }) => {
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.searchParams.set("state", state);
       url.searchParams.set("test_verifier", codeVerifier);
       url.searchParams.set("login_hint", loginHint);
+      if (storeAccess) url.searchParams.set("access_type", "offline");
       return url;
+    },
+    refreshAccessToken: async (refreshToken) => {
+      refreshes.push(refreshToken);
+      if (refresh.fail) throw new Error("invalid_grant");
+      return {
+        accessToken: testRefreshedToken,
+        accessTokenExpiresAt: undefined,
+      };
     },
     exchangeCode: async (input) => {
       exchanges.push(input);
@@ -138,13 +191,16 @@ export function createFakeCalendarGoogle() {
     readIdTokenSubject: async (idToken) =>
       idToken === testIdToken ? answer.subject : undefined,
   };
-  return { google, answer, exchanges };
+  return { google, answer, exchanges, refreshes, refresh };
 }
 
 export function createFakeCalendarDependencies() {
   const google = createFakeCalendarGoogle();
   const calendar = createMemoryGoogleCalendar();
   const store = createMemoryCalendarStore();
+  const demoAccess = createMemoryDemoAccessStore();
+  // Who may store the demo account's access: nobody, until a test says.
+  const demoManagers = new Set<string>();
   // The accounts' projects, as "userId/projectId".
   const projects = new Set<string>();
   const dependencies: CalendarDependencies = {
@@ -153,8 +209,20 @@ export function createFakeCalendarDependencies() {
     google: google.google,
     calendar: calendar.calendar,
     store: store.store,
+    demoAccess: {
+      store: demoAccess.store,
+      canManage: async (_headers, userId) => demoManagers.has(userId),
+    },
     hasProject: async (userId, projectId) =>
       projects.has(`${userId}/${projectId}`),
   };
-  return { dependencies, google, calendar, store, projects };
+  return {
+    dependencies,
+    google,
+    calendar,
+    store,
+    demoAccess,
+    demoManagers,
+    projects,
+  };
 }

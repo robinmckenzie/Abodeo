@@ -9,6 +9,10 @@
 // - POST calendarAppointmentsPath adds one.
 // Like the projects endpoints, each names the account the page works for.
 // Neither the token nor Google's response bodies are logged.
+// The demo account's token comes from its stored access when the cookie has
+// none (AD #138 Demo Entry And Seed), and that account is never told to go
+// through Google: where another would be, it is told appointments are
+// unavailable.
 import {
   accountStoreTimeout,
   respondWithError,
@@ -31,7 +35,10 @@ import {
   normaliseTimeZone,
   type CalendarRequestDependencies,
 } from "./calendar-handler.server";
-import { readCalendarToken } from "./calendar-token.server";
+import {
+  readCalendarAccess,
+  type CalendarAccess,
+} from "./demo-calendar-access.server";
 import {
   GoogleCalendarError,
   type CalendarEvent,
@@ -90,6 +97,7 @@ export async function handleAppointmentRequest(
     store,
     calendar,
     secret,
+    demoAccess,
     hasProject,
     now = Date.now,
     timeout = accountStoreTimeout,
@@ -122,17 +130,38 @@ export async function handleAppointmentRequest(
       return respondWithJson(account.status, { error: account.error });
     }
     const { userId } = account;
-    const token = await readCalendarToken(
-      request.headers.get("Cookie"),
-      secret,
+    const access = await readCalendarAccess({
+      cookieHeader: request.headers.get("Cookie"),
       userId,
-      now(),
-    );
+      secret,
+      isSecure: dependencies.isSecure,
+      google: dependencies.google,
+      store: demoAccess.store,
+      now: now(),
+      timeout,
+      reportFailure,
+    });
+    const response = await answer(userId, access);
+    // Keeps a token just got from stored access for the requests that follow.
+    if (access.cookie) response.headers.append("Set-Cookie", access.cookie);
+    return response;
+  } catch (error) {
+    reportFailure("request", readFailureCode(error));
+    return respondWithError(503, "unavailable");
+  }
 
+  async function answer(
+    userId: string,
+    { token, hasStoredAccess }: CalendarAccess,
+  ) {
     if (isConnection) {
-      return respondWithJson(200, {
-        ready: token !== undefined && !token.isNearExpiry,
-      } satisfies ConnectionResponse);
+      const ready = token !== undefined && !token.isNearExpiry;
+      // Not ready sends the page through Google, which stored access never
+      // needs.
+      if (!ready && hasStoredAccess) {
+        return respondWithError(503, "unavailable");
+      }
+      return respondWithJson(200, { ready } satisfies ConnectionResponse);
     }
 
     if (!isWrite) {
@@ -147,16 +176,21 @@ export async function handleAppointmentRequest(
         store.readCalendarId(userId),
         timeout,
       );
-      const answer = (body: AppointmentsResponse) => respondWithJson(200, body);
+      const respond = (body: AppointmentsResponse) =>
+        respondWithJson(200, body);
       const needsGrant = () =>
-        answer({
-          status: "needs-grant",
-          connectedBefore: calendarId !== undefined,
-        });
+        respond(
+          hasStoredAccess
+            ? { status: "unavailable" }
+            : {
+                status: "needs-grant",
+                connectedBefore: calendarId !== undefined,
+              },
+        );
       if (!token) return needsGrant();
       // No Abodeo calendar yet: there genuinely are no appointments.
       if (calendarId === undefined) {
-        return answer({ status: "ok", appointments: [] });
+        return respond({ status: "ok", appointments: [] });
       }
       try {
         const events = await calendar.listEvents(
@@ -164,15 +198,15 @@ export async function handleAppointmentRequest(
           calendarId,
           { name: appointmentProjectProperty, value: projectId },
         );
-        return answer({
+        return respond({
           status: "ok",
           appointments: events.map(toAppointment),
         });
       } catch (error) {
-        if (isTokenRefused(error)) return needsGrant();
+        if (isTokenRefused(error) && !hasStoredAccess) return needsGrant();
         // Never an empty list: a 404 can also mean no access to the calendar.
         reportFailure("list", readFailureCode(error));
-        return answer({ status: "unavailable" });
+        return respond({ status: "unavailable" });
       }
     }
 
@@ -208,7 +242,11 @@ export async function handleAppointmentRequest(
     if (!(await withTimeout(hasProject(userId, projectId), timeout))) {
       return respondWithJson(404, { error: "not_found" });
     }
-    if (!token) return respondWithJson(401, { error: "token_expired" });
+    if (!token) {
+      return hasStoredAccess
+        ? respondWithJson(503, { error: "unavailable" })
+        : respondWithJson(401, { error: "token_expired" });
+    }
     const value = fields.value;
     const placeTime = (wallTime: string) => ({
       dateTime: `${wallTime}:00`,
@@ -236,14 +274,11 @@ export async function handleAppointmentRequest(
       });
       return respondWithJson(200, { appointment: toAppointment(created) });
     } catch (error) {
-      if (isTokenRefused(error)) {
+      if (isTokenRefused(error) && !hasStoredAccess) {
         return respondWithJson(401, { error: "token_expired" });
       }
       reportFailure("create", readFailureCode(error));
       return respondWithJson(503, { error: "unavailable" });
     }
-  } catch (error) {
-    reportFailure("request", readFailureCode(error));
-    return respondWithError(503, "unavailable");
   }
 }

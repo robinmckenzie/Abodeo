@@ -21,6 +21,12 @@ import {
   type CalendarDependencies,
 } from "../calendar/calendar-handler.server";
 import { createCalendarStore } from "../calendar/calendar-store.server";
+import { createDemoCalendarAccessStore } from "../calendar/demo-calendar-access.server";
+import {
+  collectSeedAppointments,
+  restoreSeedAppointments,
+  type SeedAppointmentDependencies,
+} from "../calendar/demo-seed-appointments.server";
 import { createGoogleCalendar } from "../calendar/google-calendar.server";
 import {
   handleImagesRequest,
@@ -49,6 +55,8 @@ import {
 
 import {
   accountActivityPath,
+  accountSeedCalendarPath,
+  accountSeedPath,
   siteVisitPath,
   accountProfilePath,
   accountReturnPath,
@@ -82,12 +90,26 @@ import {
   handleSiteVisitRequest,
   type VisitDependencies,
 } from "./site-visit.server";
-import { readVisitAlertSettings } from "./visit-alert.server";
+import { respondWithDemoSignIn } from "./demo-sign-in.server";
+import {
+  readIgnoredLabels,
+  readVisitAlertSettings,
+} from "./visit-alert.server";
+import {
+  createDemoSeedStore,
+  type DemoSeedStore,
+} from "./demo-seed-store.server";
+import {
+  canManageDemo,
+  handleSeedCalendarRequest,
+  handleSeedRequest,
+} from "./seed-handler.server";
 
 // What one request needs: Better Auth, the profile, history and project,
 // people and image stores, the Calendar test, and a way to let go of them.
 export type AccountRuntime = {
   handleAuthRequest(request: Request): Promise<Response>;
+  handleDemoRequest(request: Request): Promise<Response>;
   readSessionUserId: ReadSessionUserId;
   profiles: ProfileStore;
   history: HistoryStore;
@@ -95,7 +117,12 @@ export type AccountRuntime = {
   projects: ProjectStore;
   people: PeopleStore;
   images: ImageStore;
+  seed: DemoSeedStore;
+  // Robin's own labels, which show the seed control (AD #138).
+  ignoredLabels: string[];
   calendar: CalendarDependencies;
+  // What the demo seed's appointments need (AD #138).
+  seedAppointments: SeedAppointmentDependencies;
   // What this request's sign-in callback learned from Google, if anything.
   signIn: SignInCapture;
   // Closes the database connections, once the response is ready.
@@ -124,10 +151,32 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
   listenForPoolErrors(pool);
   const history = createHistoryStore(pool);
   const projects = createProjectStore(pool);
+  const seed = createDemoSeedStore(pool);
   const signIn: SignInCapture = {};
   const auth = createAccountAuth(config, pool, history, signIn);
+  const ignoredLabels = readIgnoredLabels(process.env);
+  const calendarDependencies: CalendarDependencies = {
+    secret: config.secret,
+    isSecure: config.baseUrl.startsWith("https:"),
+    google: createCalendarGoogle(config),
+    calendar: createGoogleCalendar(),
+    store: createCalendarStore(pool),
+    demoAccess: {
+      store: createDemoCalendarAccessStore(pool),
+      canManage: (headers, userId) =>
+        canManageDemo(headers, userId, { store: seed, ignoredLabels }),
+    },
+    hasProject: async (userId, projectId) =>
+      (await projects.read(userId, projectId)).kind !== "not-found",
+  };
+  const seedAppointments: SeedAppointmentDependencies = calendarDependencies;
   return {
     handleAuthRequest: (request) => auth.handler(request),
+    handleDemoRequest: (request) =>
+      // The calendar is put back afterwards, when the welcome screen asks.
+      respondWithDemoSignIn(request, auth, signIn, (userId) =>
+        seed.reset(userId),
+      ),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
     profiles: createProfileStore(pool),
@@ -139,15 +188,10 @@ export function openNeonAccountRuntime(config: AccountConfig): AccountRuntime {
     projects,
     people: createPeopleStore(pool),
     images: createImageStore(pool),
-    calendar: {
-      secret: config.secret,
-      isSecure: config.baseUrl.startsWith("https:"),
-      google: createCalendarGoogle(config),
-      calendar: createGoogleCalendar(),
-      store: createCalendarStore(pool),
-      hasProject: async (userId, projectId) =>
-        (await projects.read(userId, projectId)).kind !== "not-found",
-    },
+    seed,
+    ignoredLabels,
+    calendar: calendarDependencies,
+    seedAppointments,
     signIn,
     close: () => pool.end(),
   };
@@ -229,6 +273,8 @@ export function createAccountRequestHandler(
     const isProfile = pathname === accountProfilePath;
     const isActivity = pathname === accountActivityPath;
     const isSiteVisit = pathname === siteVisitPath;
+    const isSeed = pathname === accountSeedPath;
+    const isSeedCalendar = pathname === accountSeedCalendarPath;
     const isCalendar = isCalendarPath(pathname);
     const isAppointments = isAppointmentPath(pathname);
     const isImages = isImagesPath(pathname);
@@ -237,6 +283,8 @@ export function createAccountRequestHandler(
     if (
       !isProfile &&
       !isActivity &&
+      !isSeed &&
+      !isSeedCalendar &&
       !isSiteVisit &&
       !isCalendar &&
       !isAppointments &&
@@ -276,6 +324,31 @@ export function createAccountRequestHandler(
       return isCalendar ? respondCalendarUnavailable(request) : fail();
     }
     try {
+      if (isSeed) {
+        return await handleSeedRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.seed,
+          ignoredLabels: runtime.ignoredLabels,
+          collectAppointments: (userId, projectIds) =>
+            collectSeedAppointments(
+              runtime.seedAppointments,
+              userId,
+              projectIds,
+            ),
+        });
+      }
+      if (isSeedCalendar) {
+        return await handleSeedCalendarRequest(request, {
+          readSessionUserId: runtime.readSessionUserId,
+          store: runtime.seed,
+          restoreAppointments: (userId, appointments) =>
+            restoreSeedAppointments(
+              runtime.seedAppointments,
+              userId,
+              appointments,
+            ),
+        });
+      }
       if (isAppointments) {
         return await handleAppointmentRequest(request, {
           ...runtime.calendar,
@@ -368,6 +441,29 @@ export function createAccountRequestHandler(
   };
 }
 
+// The /demo address: signs in as the demo account. Like the account API, it
+// is unavailable where sign-in is not configured.
+export function createDemoRequestHandler(
+  openRuntime: () => AccountRuntime | undefined,
+  reportFailure: (code: string | undefined) => void = reportAuthFailure,
+) {
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== "GET") return new Response(null, { status: 405 });
+    const runtime = openRuntime();
+    if (!runtime) return new Response(null, { status: 503 });
+    try {
+      return await runtime.handleDemoRequest(request);
+    } catch (error) {
+      reportFailure(readErrorCode(error));
+      return new Response(null, { status: 503 });
+    } finally {
+      await withTimeout(runtime.close(), accountCloseTimeout).catch(
+        () => undefined,
+      );
+    }
+  };
+}
+
 export function createAccountRequestHandlerFromEnvironment(
   env: Record<string, string | undefined>,
   isDevelopmentServer: boolean,
@@ -380,6 +476,15 @@ export function createAccountRequestHandlerFromEnvironment(
 }
 
 let serverHandler: ((request: Request) => Promise<Response>) | undefined;
+let demoHandler: ((request: Request) => Promise<Response>) | undefined;
+
+export function handleDemoRequest(request: Request) {
+  const config = readAccountConfig(process.env, import.meta.env.DEV);
+  demoHandler ??= createDemoRequestHandler(() =>
+    config ? openNeonAccountRuntime(config) : undefined,
+  );
+  return demoHandler(request);
+}
 
 // Settings are read once per server instance, on its first account request.
 export function handleAccountRequest(request: Request) {

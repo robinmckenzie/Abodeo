@@ -9,9 +9,15 @@ import {
   useCalendarTest,
   type CalendarTest,
 } from "../calendar/use-calendar-test";
-import { normalisePreferredName, preferredNameMaxLength } from "./account-api";
+import { useDemoCalendarAccess } from "../calendar/use-demo-calendar-access";
+import {
+  demoAccountEmail,
+  normalisePreferredName,
+  preferredNameMaxLength,
+} from "./account-api";
 import { chooseDisplayName } from "./account-display";
 import { useActivityReport } from "./use-activity-report";
+import { describeSeed, useDemoSeed } from "./use-demo-seed";
 import type { Account, AccountView, ProfileSaveResult } from "./use-account";
 
 const saveMessages: Record<ProfileSaveResult, string> = {
@@ -92,7 +98,11 @@ export function AccountControl({
       {calendar.result && (
         <p
           className={`account-message calendar-message-${calendar.result}`}
-          role={calendar.result === "created" ? "status" : "alert"}
+          role={
+            calendar.result === "created" || calendar.result === "stored"
+              ? "status"
+              : "alert"
+          }
         >
           {calendarMessages[calendar.result]}
           {/* The link waits for the account, so that it opens the right one. */}
@@ -116,6 +126,7 @@ export function AccountControl({
           calendar={calendar}
           view={view}
           panelId={panelId}
+          onBeforeSeedSave={onBeforeLeave}
           onClose={() => setIsOpen(false)}
         />
       )}
@@ -128,14 +139,20 @@ function AccountPanel({
   calendar,
   view,
   panelId,
+  onBeforeSeedSave,
   onClose,
 }: {
   account: Account;
   calendar: CalendarTest;
   view: SignedIn;
   panelId: string;
+  onBeforeSeedSave: () => Promise<boolean>;
   onClose: () => void;
 }) {
+  const seed = useDemoSeed(onBeforeSeedSave);
+  // The demo account's visitors are never sent to Google (AD #138), which
+  // the Calendar test would do. Its appointments use stored access instead.
+  const isDemoAccount = view.email === demoAccountEmail;
   const [draft, setDraft] = useState(view.preferredName ?? "");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -217,19 +234,49 @@ function AccountPanel({
           Your preferred name is unavailable at the moment.
         </p>
       )}
-      <h2>Google Calendar</h2>
-      <p className="account-hint">
-        Checks that Abodeo can add appointments to a separate Abodeo calendar in
-        your Google account. Google asks for your permission first.
-      </p>
-      <button
-        type="button"
-        className="button-secondary button-small account-calendar-test"
-        disabled={account.isLeaving || calendar.isLeaving}
-        onClick={calendar.createTestAppointment}
-      >
-        Create test appointment
-      </button>
+      {!isDemoAccount && (
+        <>
+          <h2>Google Calendar</h2>
+          <p className="account-hint">
+            Checks that Abodeo can add appointments to a separate Abodeo
+            calendar in your Google account. Google asks for your permission
+            first.
+          </p>
+          <button
+            type="button"
+            className="button-secondary button-small account-calendar-test"
+            disabled={account.isLeaving || calendar.isLeaving}
+            onClick={calendar.createTestAppointment}
+          >
+            Create test appointment
+          </button>
+        </>
+      )}
+      {seed.canSave && (
+        <>
+          <h2>Demo seed</h2>
+          <p className="account-hint">
+            Saves this account&rsquo;s projects, people, images and
+            appointments as the seed for new demo visitors. It replaces the seed saved before.
+          </p>
+          <button
+            type="button"
+            className="button-secondary button-small account-seed-save"
+            disabled={seed.isSaving || account.isLeaving}
+            onClick={() => void seed.save()}
+          >
+            Save as demo seed
+          </button>
+          <p className="account-save-message" role="status">
+            {seed.message ??
+              (seed.seed ? describeSeed(seed.seed) : "No seed saved yet.")}
+          </p>
+          <DemoCalendarAccess
+            onBeforeLeave={onBeforeSeedSave}
+            isDisabled={account.isLeaving}
+          />
+        </>
+      )}
       <h2>What Abodeo keeps about you</h2>
       <ul>
         <li>The permanent ID that Google gives your account.</li>
@@ -241,6 +288,12 @@ function AccountPanel({
         <li>
           The ID of your Abodeo calendar in Google Calendar, if one was made.
         </li>
+        {isDemoAccount && (
+          <li>
+            Access to this demo account&rsquo;s Abodeo calendar in Google
+            Calendar, so that its appointments work without a Google sign-in.
+          </li>
+        )}
         <li>A sign-in record for each browser you use.</li>
         <li>Your projects and their tasks.</li>
         <li>
@@ -262,5 +315,41 @@ function AccountPanel({
         Sign out
       </button>
     </section>
+  );
+}
+
+// Robin's control that stores the demo account's Calendar access, shown with
+// the demo seed control. Storing goes through Google's consent screen.
+function DemoCalendarAccess({
+  onBeforeLeave,
+  isDisabled,
+}: {
+  onBeforeLeave: () => Promise<boolean>;
+  isDisabled: boolean;
+}) {
+  const access = useDemoCalendarAccess(onBeforeLeave);
+  return (
+    <>
+      <h2>Demo calendar</h2>
+      <p className="account-hint">
+        Stores this account&rsquo;s Google Calendar access, so that demo
+        visitors see and add appointments without signing in to Google. Google
+        asks for your permission first.
+      </p>
+      <button
+        type="button"
+        className="button-secondary button-small account-seed-save"
+        disabled={isDisabled || access.isLeaving}
+        onClick={() => void access.store()}
+      >
+        Store Calendar access
+      </button>
+      <p className="account-save-message" role="status">
+        {access.message ??
+          (access.savedAt
+            ? `Stored ${new Date(access.savedAt).toLocaleString()}.`
+            : "Not stored yet.")}
+      </p>
+    </>
   );
 }

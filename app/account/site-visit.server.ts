@@ -14,6 +14,7 @@ import {
   withTimeout,
 } from "./account-profile.server";
 import { readLabel } from "./usage-label.server";
+import { readVisitorWord } from "./visitor-word.server";
 import {
   defaultCooldownMinutes,
   defaultHourlyLimit,
@@ -23,6 +24,8 @@ import {
 
 export type Visit = {
   label: string;
+  // The visitor's random word (AD #138), or "".
+  word: string;
   welcome: boolean;
   isBot: boolean;
   country: string;
@@ -107,10 +110,11 @@ export function createVisitStore(database: HistoryDatabase): VisitStore {
         }
         await client.query(
           `insert into site_visit
-             (visited_at, label, welcome, is_bot, country, city, emailed)
-           values (clock_timestamp(), $1, $2, $3, $4, $5, $6)`,
+             (visited_at, label, visitor_word, welcome, is_bot, country, city, emailed)
+           values (clock_timestamp(), $1, $2, $3, $4, $5, $6, $7)`,
           [
             visit.label,
+            visit.word,
             visit.welcome,
             visit.isBot,
             visit.country,
@@ -179,6 +183,7 @@ export async function handleSiteVisitRequest(
   }
   const visit: Visit = {
     label: readLabel(request.headers),
+    word: readVisitorWord(request.headers),
     welcome: await readWelcome(request),
     isBot: isbot(request.headers.get("User-Agent") ?? ""),
     ...readVisitPlace(request.headers),

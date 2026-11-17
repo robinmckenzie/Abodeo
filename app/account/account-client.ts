@@ -5,10 +5,14 @@ import {
   accountActivityPath,
   siteVisitPath,
   accountProfilePath,
+  accountSeedCalendarPath,
+  accountSeedPath,
   accountStatusPath,
   authBasePath,
   type AccountProfileResponse,
   type AccountStatusResponse,
+  type SeedSaveResponse,
+  type SeedStatusResponse,
 } from "./account-api";
 
 export const requestTimeout = 8000;
@@ -183,4 +187,63 @@ export async function reportVisit(welcome: boolean, fetchFn: Fetch = fetch) {
     keepalive: true,
   });
   if (!response.ok) throw new Error("The visit was not recorded.");
+}
+
+// The saved seed in a response, or undefined if it is not one.
+function readSavedSeed(value: unknown): SeedSaveResponse | undefined {
+  const saved = isRecord(value) ? (value as Partial<SeedSaveResponse>) : {};
+  return typeof saved.savedAt === "string" &&
+    typeof saved.projectCount === "number" &&
+    typeof saved.peopleCount === "number" &&
+    typeof saved.imageCount === "number" &&
+    typeof saved.appointmentCount === "number"
+    ? (saved as SeedSaveResponse)
+    : undefined;
+}
+
+// Whether the demo seed control shows, and what the saved seed holds
+// (AD #138). Anything that goes wrong hides the control.
+export async function loadSeedStatus(
+  fetchFn: Fetch = fetch,
+): Promise<SeedStatusResponse> {
+  try {
+    const response = await sendRequest(fetchFn, accountSeedPath);
+    const body: unknown = response.ok ? await response.json() : undefined;
+    const status = isRecord(body) ? (body as Partial<SeedStatusResponse>) : {};
+    return {
+      canSave: status.canSave === true,
+      seed: readSavedSeed(status.seed) ?? null,
+    };
+  } catch {
+    return { canSave: false, seed: null };
+  }
+}
+
+// Asks the server to put the demo's calendar back to the seed, after a new
+// visitor's /demo. It waits for Google, which can take ten seconds, so it has
+// no time limit, and keepalive lets it finish if the visitor leaves the page.
+export async function requestSeedCalendar(fetchFn: Fetch = fetch) {
+  await fetchFn(accountSeedCalendarPath, {
+    method: "POST",
+    credentials: "same-origin",
+    keepalive: true,
+  });
+}
+
+// Saves the demo account's projects, people and images as the seed. Gives
+// "too-large" if its images are over the limits, "past-date" if a due date or
+// an appointment start has passed, or undefined if it could not be saved.
+export async function saveSeed(
+  fetchFn: Fetch = fetch,
+): Promise<SeedSaveResponse | "too-large" | "past-date" | undefined> {
+  try {
+    const response = await sendRequest(fetchFn, accountSeedPath, {
+      method: "PUT",
+    });
+    if (response.status === 413) return "too-large";
+    if (response.status === 422) return "past-date";
+    return readSavedSeed(response.ok ? await response.json() : undefined);
+  } catch {
+    return undefined;
+  }
 }

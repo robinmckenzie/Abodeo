@@ -4,6 +4,9 @@
 export const calendarBasePath = "/api/calendar";
 export const calendarTestAppointmentPath = `${calendarBasePath}/test-appointment`;
 export const calendarCallbackPath = `${calendarBasePath}/callback`;
+// The demo account's stored Calendar access (AD #138 Demo Entry And Seed):
+// when it was stored, and Robin's grant that stores it.
+export const calendarDemoAccessPath = `${calendarBasePath}/demo-access`;
 
 // Google returns the browser to the dashboard with ?calendar=<result>.
 export const calendarResultParameter = "calendar";
@@ -13,6 +16,8 @@ export const calendarResults = [
   // Google's permission was given for a project's appointments (AD #70 Add
   // Appointments To Projects), where nothing is created yet.
   "connected",
+  // Robin's grant for the demo account was stored (AD #138).
+  "stored",
   "denied",
   "wrong-account",
   "failed",
@@ -22,6 +27,10 @@ export type CalendarResult = (typeof calendarResults)[number];
 
 // The start endpoint's answer: Google's address to go to.
 export type CalendarStartResponse = { url: string };
+
+// When the demo account's Calendar access was stored, as an ISO time, or null
+// if none is.
+export type DemoAccessResponse = { savedAt: string | null };
 
 // The result in the address, or undefined if there is none or it is not one
 // of calendarResults.

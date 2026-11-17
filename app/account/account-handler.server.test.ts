@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createMemoryDemoSeedStore } from "./test-demo-seed.server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventEmitter } from "node:events";
@@ -6,6 +7,7 @@ import { EventEmitter } from "node:events";
 import type { SignInCapture } from "./account-auth.server";
 import {
   createAccountRequestHandler,
+  createDemoRequestHandler,
   listenForPoolErrors,
   type AccountRuntime,
 } from "./account-handler.server";
@@ -86,6 +88,9 @@ function createTestHandler() {
   const calendar = createFakeCalendarDependencies();
   const projectStore = createMemoryProjectStore();
   const runtime: AccountRuntime = {
+    handleDemoRequest: async () => new Response(null),
+    seed: createMemoryDemoSeedStore(),
+    ignoredLabels: [],
     handleAuthRequest: (request) => auth.handler(request),
     readSessionUserId: async (headers) =>
       (await auth.api.getSession({ headers }))?.user.id,
@@ -96,6 +101,7 @@ function createTestHandler() {
     people: createMemoryPeopleStore(),
     images: createMemoryImageStore().store,
     calendar: calendar.dependencies,
+    seedAppointments: calendar.dependencies,
     signIn: {},
     close,
   };
@@ -169,6 +175,9 @@ describe("createAccountRequestHandler", () => {
     try {
       const handle = createAccountRequestHandler(
         () => ({
+          handleDemoRequest: async () => new Response(null),
+          seed: createMemoryDemoSeedStore(),
+          ignoredLabels: [],
           handleAuthRequest: () => new Promise(() => {}),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -178,6 +187,7 @@ describe("createAccountRequestHandler", () => {
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
+          seedAppointments: createFakeCalendarDependencies().dependencies,
           signIn: {},
           close: async () => {},
         }),
@@ -202,6 +212,9 @@ describe("createAccountRequestHandler", () => {
   it("returns the browser to the dashboard when Better Auth answers Google's return with an error", async () => {
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => new Response(null, { status: 500 }),
         readSessionUserId: async () => undefined,
         profiles: createMemoryProfileStore().store,
@@ -211,6 +224,7 @@ describe("createAccountRequestHandler", () => {
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
+        seedAppointments: createFakeCalendarDependencies().dependencies,
         signIn: {},
         close: async () => {},
       }),
@@ -642,7 +656,14 @@ describe("createAccountRequestHandler", () => {
 
     expect(response.status).toBe(204);
     expect(visits).toEqual([
-      { label: "Andrew", welcome: true, isBot: false, country: "", city: "" },
+      {
+        label: "Andrew",
+        word: "",
+        welcome: true,
+        isBot: false,
+        country: "",
+        city: "",
+      },
     ]);
   });
 
@@ -682,6 +703,9 @@ describe("createAccountRequestHandler", () => {
     const reportFailure = vi.fn();
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => {
           throw Object.assign(new Error("postgres://secret refused"), {
             code: "ECONNREFUSED",
@@ -695,6 +719,7 @@ describe("createAccountRequestHandler", () => {
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
+        seedAppointments: createFakeCalendarDependencies().dependencies,
         signIn: {},
         close: async () => {},
       }),
@@ -714,6 +739,9 @@ describe("createAccountRequestHandler", () => {
     try {
       const handle = createAccountRequestHandler(
         () => ({
+          handleDemoRequest: async () => new Response(null),
+          seed: createMemoryDemoSeedStore(),
+          ignoredLabels: [],
           handleAuthRequest: async () => Response.json(null),
           readSessionUserId: async () => undefined,
           profiles: createMemoryProfileStore().store,
@@ -723,6 +751,7 @@ describe("createAccountRequestHandler", () => {
           people: createMemoryPeopleStore(),
           images: createMemoryImageStore().store,
           calendar: createFakeCalendarDependencies().dependencies,
+          seedAppointments: createFakeCalendarDependencies().dependencies,
           signIn: {},
           close: () => new Promise(() => {}),
         }),
@@ -809,6 +838,9 @@ describe("Google's return to sign-in", () => {
     const signIn: SignInCapture = {};
     const handle = createAccountRequestHandler(
       () => ({
+        handleDemoRequest: async () => new Response(null),
+        seed: createMemoryDemoSeedStore(),
+        ignoredLabels: [],
         handleAuthRequest: async () => {
           Object.assign(signIn, capture);
           return answer;
@@ -821,6 +853,7 @@ describe("Google's return to sign-in", () => {
         people: createMemoryPeopleStore(),
         images: createMemoryImageStore().store,
         calendar: createFakeCalendarDependencies().dependencies,
+        seedAppointments: createFakeCalendarDependencies().dependencies,
         signIn,
         close: async () => {},
       }),
@@ -895,5 +928,21 @@ describe("Google's return to sign-in", () => {
       `${testBaseUrl}/dashboard?error=unavailable`,
     );
     expect(readTokenCookie(response)).toBeUndefined();
+  });
+});
+
+describe("createDemoRequestHandler", () => {
+  it("answers 503 when sign-in is not configured", async () => {
+    const handle = createDemoRequestHandler(() => undefined);
+    const response = await handle(new Request(`${testBaseUrl}/demo`));
+    expect(response.status).toBe(503);
+  });
+
+  it("refuses a method other than GET", async () => {
+    const handle = createDemoRequestHandler(() => undefined);
+    const response = await handle(
+      new Request(`${testBaseUrl}/demo`, { method: "POST" }),
+    );
+    expect(response.status).toBe(405);
   });
 });

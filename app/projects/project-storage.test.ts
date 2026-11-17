@@ -4,6 +4,7 @@ import {
   createProject,
   deleteStoredProject,
   hasProjectsScript,
+  isWelcomeRequested,
   listOwnProjects,
   removeAccountHint,
   removeProjectsIfUnchanged,
@@ -238,6 +239,14 @@ describe("hasProjectsScript", () => {
     history.replaceState(null, "", "/?welcome");
     runScript();
     expect(isMarked()).toBe(false);
+  });
+
+  it("does not mark the page for a new demo visitor's arrival", async () => {
+    await createProject(fields);
+    history.replaceState(null, "", "/?demo");
+    runScript();
+    expect(isMarked()).toBe(false);
+    expect(isWelcomeRequested("?demo")).toBe(true);
   });
 
   it("does nothing when storage cannot be used", () => {

@@ -4,9 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { handleAppointmentRequest } from "./appointment-handler.server";
 import type { CalendarRequestDependencies } from "./calendar-handler.server";
 import { createCalendarTokenCookie } from "./calendar-token.server";
+import { saveDemoCalendarAccess } from "./demo-calendar-access.server";
 import {
   createFakeCalendarDependencies,
   testAccessToken,
+  testRefreshedToken,
+  testRefreshToken,
   testSecret,
 } from "./test-calendar.server";
 
@@ -409,5 +412,118 @@ describe("secrets", () => {
       testAccessToken,
     );
     log.mockRestore();
+  });
+});
+
+// AD #138 Demo Entry And Seed: the demo account's visitors never go through
+// Google, so its token comes from the access Robin stored.
+describe("an account with stored access", () => {
+  async function setUpStored() {
+    const test = setUp();
+    await saveDemoCalendarAccess(
+      test.demoAccess.store,
+      testSecret,
+      "user-1",
+      testRefreshToken,
+    );
+    return test;
+  }
+
+  const connection = (test: TestSetUp) =>
+    handleAppointmentRequest(
+      get("/api/calendar/connection"),
+      test.dependencies,
+    );
+
+  it("lists and adds with no token cookie, using a token from Google", async () => {
+    const test = await setUpStored();
+
+    const added = await add(test, timed);
+    const listed = await handleAppointmentRequest(
+      get("/api/calendar/appointments?projectId=p-1"),
+      test.dependencies,
+    );
+
+    expect(added.status).toBe(200);
+    expect(((await listed.json()) as Listed).appointments).toHaveLength(1);
+    expect(test.google.refreshes).toEqual([testRefreshToken, testRefreshToken]);
+    expect(new Set(test.calendar.tokensUsed)).toEqual(
+      new Set([testRefreshedToken]),
+    );
+    // The token is kept for the requests that follow, never shown.
+    for (const response of [added, listed]) {
+      const setCookie = response.headers.get("Set-Cookie") ?? "";
+      expect(setCookie).toContain("abodeo_calendar_token=");
+      expect(setCookie).toContain("HttpOnly");
+      expect(setCookie).not.toContain(testRefreshedToken);
+    }
+  });
+
+  it("is ready to open the form, and then needs Google no more while the cookie lasts", async () => {
+    const test = await setUpStored();
+
+    const first = await connection(test);
+    const cookie = (first.headers.get("Set-Cookie") ?? "").split(";")[0];
+    const second = await handleAppointmentRequest(
+      get("/api/calendar/connection", { cookie }),
+      test.dependencies,
+    );
+
+    expect(await first.json()).toEqual({ ready: true });
+    expect(await second.json()).toEqual({ ready: true });
+    expect(second.headers.get("Set-Cookie")).toBeNull();
+    expect(test.google.refreshes).toHaveLength(1);
+  });
+
+  it("never asks for a grant when Google will not give a token", async () => {
+    const test = await setUpStored();
+    test.google.refresh.fail = true;
+    test.store.links.set("user-1", "calendar-1");
+
+    const listed = await list(test, "p-1");
+    const added = await add(test, timed);
+
+    expect(listed.body).toEqual({ status: "unavailable" });
+    expect(added.status).toBe(503);
+    expect(await added.json()).toEqual({ error: "unavailable" });
+    expect((await connection(test)).status).toBe(503);
+    expect(test.calendar.calendars.size).toBe(0);
+  });
+
+  it("never asks for a grant when Google refuses the token it gave", async () => {
+    const test = await setUpStored();
+    test.store.links.set("user-1", "calendar-1");
+    test.calendar.failures.listEvents = "google_401";
+    test.calendar.failures.insertEvent = "google_401";
+
+    expect((await list(test, "p-1")).body).toEqual({ status: "unavailable" });
+    expect((await add(test, timed)).status).toBe(503);
+  });
+
+  it("leaves every other account as it was", async () => {
+    const test = await setUpStored();
+    test.session.userId = "user-2";
+    const options = { account: "user-2" };
+
+    const listed = await handleAppointmentRequest(
+      get("/api/calendar/appointments?projectId=p-1", options),
+      test.dependencies,
+    );
+    const ready = await handleAppointmentRequest(
+      get("/api/calendar/connection", options),
+      test.dependencies,
+    );
+    const added = await handleAppointmentRequest(
+      post(timed, options),
+      test.dependencies,
+    );
+
+    expect(await listed.json()).toEqual({
+      status: "needs-grant",
+      connectedBefore: false,
+    });
+    expect(await ready.json()).toEqual({ ready: false });
+    expect(await added.json()).toEqual({ error: "token_expired" });
+    expect(test.google.refreshes).toEqual([]);
   });
 });

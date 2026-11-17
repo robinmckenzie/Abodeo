@@ -78,7 +78,8 @@ received at the first sign-in, which later sign-ins do not refresh. Then the pre
 set (`user_profile`), and one session row per signed-in browser, deleted on sign-out. Google's
 tokens, the profile photo, and the IP address and browser details of a sign-in are never stored:
 their columns exist because Better Auth expects them, and are always empty. Tests in
-`app/account/` check this. The Calendar test adds the ID of the account's Abodeo calendar
+`app/account/` check this. The one exception is the demo account's Calendar refresh token, in
+`demo_calendar_access` (see [Demo sign-in](#demo-sign-in-ad-138)). The Calendar test adds the ID of the account's Abodeo calendar
 (`calendar_link`), once one has been made. The sign-in history adds `account_sign_in` and
 `account_visit`, both with the usage label (see [Usage labels](#usage-labels)). The account's
 projects and their tasks are in `project`. The images added to its projects are in
@@ -304,6 +305,84 @@ valid label. A record that spans a period, as a visit does, belongs to one label
   database, before the new code is deployed. It adds the columns and replaces the visit index.
 - If the label cannot be read or saved, the app works and the record has an empty label.
 
+### Demo sign-in (AD #138)
+- `/demo` signs in as the demo account (`abodeodemo@gmail.com`, which must have signed in with
+  Google once). A new visitor (a browser with no `abodeo_visitor` cookie) is sent to the welcome
+  screen at `/?demo` and reaches the projects page through Get Started, which opens the Add
+  project form as for any new visitor, with the seeded projects listed. A returning visitor is sent to the projects page. Only `?label=NAME`
+  is read from the address. Any other query is ignored, so the address cannot choose another
+  account.
+- The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent to the
+  whole site, as `/demo` and `/api` both read it). Sign-in, visit and site visit records store the label and the word
+  (`visitor_word`). With no label in the address, the word is the label. Visits under different
+  labels from one browser share a word. It works within one browser on one device.
+- Run `db/visitor-word.sql` v1.138.0 in Neon for each account store before deploying: it adds
+  the `visitor_word` columns, and without them sign-in and visit records fail.
+- Robin saves the demo seed from the "Demo seed" section of the account panel, which shows only
+  in a demo session whose label is one of `VISIT_ALERT_IGNORE_LABELS`. It saves the demo
+  account's projects (not in the Bin), people and the projects' images (details and both files) as
+  the seed, replacing any earlier seed. The save is refused, and the old seed kept, if an image's
+  original is over 1 MiB or the images are over 4 MiB together (`maxSeedImageBytes`,
+  `maxSeedTotalBytes`; provisional). The control shows when the seed was saved and what it holds
+  (projects, people, images and appointments), so that a save that kept less than expected is
+  seen at once.
+- A new visitor (a browser with no `abodeo_visitor` cookie) opening `/demo` first resets the demo
+  account to the saved seed, in one transaction: all its projects (including the Bin), images and
+  people are replaced by the seed's, however the last visitor left them. A returning visitor finds
+  the account as it was left. With no seed saved, nothing is reset.
+- The seed also holds the appointments of its projects, copied from the demo account's Abodeo
+  calendar in Google when the seed is saved, using the stored Calendar access (none are kept without
+  it; a Google failure fails the save). An event still being added when the seed is saved is not
+  in it, so check the appointment count the control shows.
+- The seed's dates move with the day. Saving turns each project due date and each appointment
+  start into a rule: a weekday and a count (`app/account/demo-seed-dates.ts`), such as "the 2nd
+  Saturday whose start is still ahead". A reset works the rule out again from the new visitor's
+  today, so a seeded Sunday brunch at 10:00 is the next Sunday at 10:00 whenever `/demo` is
+  opened, and never a time already past. An appointment keeps its time of day and length, and one
+  with a time zone is sent as wall time and zone. A due date counts until the end of its day (UTC).
+  A save is refused (422, "a due date or an appointment has already passed") if a due date or a
+  start has passed, so author dates that are still ahead on the day of saving, such as the coming
+  Sunday, the coming Saturday and a date two weeks on. A seed saved before this change has no
+  rules and keeps its fixed dates. No SQL change: rules are stored in the seed's JSON.
+- `/demo` does not wait for Google. After a new visitor's reset it sets the cookie
+  `abodeo_demo_calendar`, and the welcome screen then posts to `/api/account/seed/calendar` in
+  the background. That request, for the demo account with the cookie only, deletes every event
+  in the calendar, the earlier visitors' among them, adds the seed's events, and clears the
+  cookie, so that going back to the welcome screen does not do it again. The calendar itself is
+  kept, because Google takes about 7 seconds to make one; it is made only if the account has
+  none. The request takes a little over a second (measured: 1.1 to 1.3 s with one or two events
+  to delete and one to add; it was 9.5 s when the calendar was deleted and made again). A
+  visitor who opens a project in that time may see appointments not yet put back. Without stored
+  access the calendar is left alone. A Google failure is logged and changes nothing the visitor sees.
+- Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
+  `demo_seed` table, and without it the control stays hidden.
+- Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds
+  the `demo_seed_image` table, and without it saving the seed fails.
+- Run `db/demo-seed-appointments.sql` v1.138.4 in Neon for each account store before deploying: it
+  adds the `appointments` column to `demo_seed`, and without it saving the seed and `/demo` for a
+  new visitor fail.
+- A demo visitor is never sent to Google. Abodeo stores Calendar access for the demo account, and
+  for no other: Google's refresh token, encrypted with `BETTER_AUTH_SECRET`, in the one row of
+  `demo_calendar_access`. When the demo account's token cookie is missing or near its end,
+  `/api/calendar/connection` and `/api/calendar/appointments` get a new access token from Google
+  with it and set the usual token cookie. With stored access the account is never told to
+  connect: if Google gives no token or refuses it, appointments are reported as unavailable. The
+  account panel does not offer the demo account "Create test appointment", which goes to Google.
+- Robin stores the access once per database, as it is encrypted with that database's secret:
+  sign in with Google as the demo account, open `/demo?label=` with one of his own labels, and
+  press "Store Calendar access" under "Demo calendar" in the account panel (shown with the Demo
+  seed control). It posts to `/api/calendar/demo-access`, which sends the browser to Google's
+  consent screen asking for offline access, and Google's return to `/api/calendar/callback` saves
+  the token and shows "Calendar access is stored for the demo account." Storing again replaces
+  it. To remove the access, delete the row, or withdraw the permission in the demo Google account.
+- The Google app's Audience is "In production" (see Setting it up from scratch), so Google does
+  not end the refresh token after 7 days, as it does in "Testing". It still ends after six months
+  unused, or when the permission is withdrawn. Appointments in the demo then show as unavailable
+  until Robin stores the access again.
+- Run `db/demo-calendar-access.sql` v1.138.3 in Neon for each account store before deploying: it
+  adds the `demo_calendar_access` table. Without it nothing is stored, and every account works as
+  before.
+
 ### Visits before sign-in
 
 AD #94 Log Visits Before Sign-In. Each browser tab that opens the app reports one visit to
@@ -342,12 +421,14 @@ Calendar (AD #10 Prove Calendar Access). The code is in `app/calendar/`.
   `openid` and `calendar.app.created`,
   which lets it make its own calendars and manage their events, and nothing else in the person's
   Google Calendar. Google classes it as non-sensitive. It suggests the signed-in Google account
-  and asks for an online token, so Google issues no refresh token.
+  and asks for an online token, so Google issues no refresh token. (Only Robin's grant for the
+  demo account asks for one: see [Demo sign-in](#demo-sign-in-ad-138).)
 - The state and PKCE verifier are kept for 10 minutes in an `HttpOnly` cookie for `/api/calendar`
   only, encrypted with `BETTER_AUTH_SECRET`. Better Auth's tables and endpoints are not used.
 - Google returns to `/api/calendar/callback`, which checks the cookie, the session and that the
   permission was ticked, refuses a Google account other than the signed-in one, and exchanges the
-  code for a token. The token is never saved in the database or logged. It is used for the test
+  code for a token. The token is never saved in the database (but for the demo account's) or
+  logged. It is used for the test
   and kept for up to an hour in the cookie described under
   [Project appointments](#project-appointments).
 - The appointment, "Abodeo test appointment", is at the next whole hour for 30 minutes, in a
@@ -410,9 +491,11 @@ output. The production address is https://abodeo-kappa.vercel.app.
     4. Data Access: Add or remove scopes, tick only `.../auth/userinfo.email`,
        `.../auth/userinfo.profile`, `openid` and `.../auth/calendar.app.created`, then Update,
        then Save. All four are non-sensitive.
-    5. Audience: stay in Testing, with Robin as a test user, until production is ready. Testing
-       allows 100 test users over the app's lifetime. Google says only test users can sign in, but
-       an account not on the list did so during testing, so do not rely on it.
+    5. Audience: Robin's app is "In production" (published). A new app starts in Testing, where
+       the demo account's stored Calendar access ends after 7 days, so publish it before
+       relying on the demo. Testing allows 100 test users over the app's lifetime. Google says
+       only test users can sign in, but an account not on the list did so during testing, so do
+       not rely on it.
     6. Clients: create an OAuth client of type Web application, with the redirect URIs
        `https://abodeo-kappa.vercel.app/api/auth/callback/google`,
        `http://localhost:5173/api/auth/callback/google`,

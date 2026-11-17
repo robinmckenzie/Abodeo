@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   formatVisitAlert,
+  readIgnoredLabels,
   readVisitAlertSettings,
   sendVisitAlert,
   type VisitAlert,
@@ -51,6 +52,18 @@ describe("readVisitAlertSettings", () => {
         VISIT_ALERT_IGNORE_LABELS: " Robin, Test ,, ",
       })?.ignoredLabels,
     ).toEqual(["robin", "test"]);
+  });
+});
+
+describe("readIgnoredLabels", () => {
+  it("reads the labels without Resend being set up", () => {
+    expect(
+      readIgnoredLabels({ VISIT_ALERT_IGNORE_LABELS: " Robin, Test " }),
+    ).toEqual(["robin", "test"]);
+  });
+
+  it("is empty when none are set", () => {
+    expect(readIgnoredLabels({})).toEqual([]);
   });
 });
 

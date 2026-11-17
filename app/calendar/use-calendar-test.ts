@@ -17,6 +17,7 @@ import {
 export const calendarMessages: Record<CalendarResult, string> = {
   created: "Test appointment created in your Abodeo calendar.",
   connected: "Google Calendar is connected.",
+  stored: "Calendar access is stored for the demo account.",
   denied: "Calendar access was not given, so no appointment was created.",
   "wrong-account":
     "Choose the Google account you signed in with. No appointment was created.",
@@ -42,8 +43,11 @@ function readBrowserTimeZone() {
 
 // Google's address for the Calendar permission. The server decides what
 // Google is asked for.
-export async function requestCalendarAddress(fetchFn: typeof fetch = fetch) {
-  const response = await fetchFn(calendarTestAppointmentPath, {
+export async function requestCalendarAddress(
+  fetchFn: typeof fetch = fetch,
+  path: string = calendarTestAppointmentPath,
+) {
+  const response = await fetchFn(path, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },

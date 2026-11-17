@@ -4,8 +4,12 @@
 // - GET calendarCallbackPath is where Google returns the browser. It checks
 //   the grant, adds the test appointment and returns the browser to the
 //   dashboard with the result.
+// - calendarDemoAccessPath (AD #138 Demo Entry And Seed) says when the demo
+//   account's Calendar access was stored (GET) and starts Robin's grant that
+//   stores it (POST), which returns through the same callback.
 // Google's token is used only inside one callback and is never saved or
-// logged. Logs carry short failure codes only.
+// logged, except the demo account's (see demo-calendar-access.server.ts).
+// Logs carry short failure codes only.
 import { accountReturnPath } from "../account/account-api";
 import {
   accountStoreTimeout,
@@ -23,10 +27,12 @@ import {
 } from "./appointments-api";
 import {
   calendarCallbackPath,
+  calendarDemoAccessPath,
   calendarResultParameter,
   calendarTestAppointmentPath,
   type CalendarResult,
   type CalendarStartResponse,
+  type DemoAccessResponse,
 } from "./calendar-api";
 import {
   calendarScope,
@@ -35,8 +41,15 @@ import {
   startCalendarGrant,
   type CalendarGoogle,
 } from "./calendar-grant.server";
-import { createCalendarTokenCookie } from "./calendar-token.server";
+import {
+  createCalendarTokenCookie,
+  unknownTokenLifetime,
+} from "./calendar-token.server";
 import type { CalendarStore } from "./calendar-store.server";
+import {
+  saveDemoCalendarAccess,
+  type DemoCalendarAccess,
+} from "./demo-calendar-access.server";
 import {
   GoogleCalendarError,
   googleCalendarTimeout,
@@ -66,7 +79,6 @@ const testAppointmentDescription =
   "Made by Abodeo's Calendar test, to check that Abodeo can add appointments to your Abodeo calendar. You can delete it.";
 const testAppointmentLength = 30 * 60 * 1000;
 const hour = 60 * 60 * 1000;
-const unknownTokenLifetime = 30 * 60 * 1000;
 
 // What the endpoints need once sign-in is configured.
 export type CalendarDependencies = {
@@ -77,6 +89,8 @@ export type CalendarDependencies = {
   google: CalendarGoogle;
   calendar: GoogleCalendar;
   store: CalendarStore;
+  // The demo account's stored access, and who may store it.
+  demoAccess: DemoCalendarAccess;
   // Whether the account has the project, which may be one this version
   // cannot read.
   hasProject(userId: string, projectId: string): Promise<boolean>;
@@ -329,6 +343,83 @@ async function handleStart(
   }
 }
 
+// The demo account's stored access: when it was stored, and Robin's grant
+// that stores it. The grant asks Google for a refresh token, and the callback
+// saves it.
+async function handleDemoAccess(
+  request: Request,
+  dependencies: CalendarRequestDependencies,
+) {
+  const {
+    readSessionUserId,
+    store,
+    demoAccess,
+    now = Date.now,
+    timeout = accountStoreTimeout,
+    reportFailure = reportCalendarFailure,
+  } = dependencies;
+  const isStart = request.method === "POST";
+  if (request.method !== "GET" && !isStart) {
+    return respondWithError(405, "method_not_allowed");
+  }
+  // As for the other grants: a form on another site cannot send JSON.
+  if (
+    isStart &&
+    !request.headers.get("Content-Type")?.startsWith("application/json")
+  ) {
+    return respondWithError(400, "invalid_request");
+  }
+  try {
+    const userId = await withTimeout(
+      readSessionUserId(request.headers),
+      timeout,
+    );
+    if (userId === undefined) return respondWithError(401, "not_signed_in");
+    if (
+      !(await withTimeout(
+        demoAccess.canManage(request.headers, userId),
+        timeout,
+      ))
+    ) {
+      return respondWithError(403, "not_allowed");
+    }
+    if (!isStart) {
+      const savedAt = await withTimeout(
+        demoAccess.store.readSavedAt(),
+        timeout,
+      );
+      return respondWithJson(200, {
+        savedAt: savedAt?.toISOString() ?? null,
+      } satisfies DemoAccessResponse);
+    }
+    const googleAccountId = await withTimeout(
+      store.readGoogleAccountId(userId),
+      timeout,
+    );
+    if (googleAccountId === undefined) {
+      reportFailure("demo_access", "no_google_account");
+      return respondWithError(503, "unavailable");
+    }
+    const { url, cookie } = await startCalendarGrant(dependencies.google, {
+      secret: dependencies.secret,
+      isSecure: dependencies.isSecure,
+      userId,
+      googleAccountId,
+      timeZone: null,
+      storeAccess: true,
+      now: now(),
+    });
+    const response = respondWithJson(200, {
+      url,
+    } satisfies CalendarStartResponse);
+    response.headers.append("Set-Cookie", cookie);
+    return response;
+  } catch (error) {
+    reportFailure("demo_access", readFailureCode(error));
+    return respondWithError(503, "unavailable");
+  }
+}
+
 // Returns the browser to the dashboard with the result, at the project if
 // the grant was for one (opening its new appointment form only after a
 // success). The cookies are set on the way.
@@ -366,6 +457,7 @@ async function handleCallback(
     google,
     calendar,
     secret,
+    demoAccess,
     now = Date.now,
     timeout = accountStoreTimeout,
     reportFailure = reportCalendarFailure,
@@ -456,7 +548,32 @@ async function handleCallback(
       userId,
       expiresAt: tokens.accessTokenExpiresAt ?? now() + unknownTokenLifetime,
       now: now(),
+      isStored: grant.storeAccess,
     });
+    // Robin's grant for the demo account: Google's refresh token is stored,
+    // for that account only, and nothing is added to the calendar.
+    if (grant.storeAccess) {
+      stage = "store";
+      if (!tokens.refreshToken) return failAt(stage, "refresh_token_missing");
+      if (
+        !(await withTimeout(
+          demoAccess.canManage(request.headers, userId),
+          timeout,
+        ))
+      ) {
+        return failAt(stage, "not_allowed");
+      }
+      await withTimeout(
+        saveDemoCalendarAccess(
+          demoAccess.store,
+          secret,
+          userId,
+          tokens.refreshToken,
+        ),
+        timeout,
+      );
+      return finish("stored", tokenCookie);
+    }
     // A grant for a project only connects: the project page adds the
     // appointments.
     if (target) return finish("connected", tokenCookie);
@@ -489,6 +606,9 @@ export function handleCalendarRequest(
   if (pathname === calendarCallbackPath) {
     return handleCallback(request, dependencies);
   }
+  if (pathname === calendarDemoAccessPath) {
+    return handleDemoAccess(request, dependencies);
+  }
   return Promise.resolve(
     new Response(null, {
       status: 404,
@@ -500,7 +620,8 @@ export function handleCalendarRequest(
 export function isCalendarPath(pathname: string) {
   return (
     pathname === calendarTestAppointmentPath ||
-    pathname === calendarCallbackPath
+    pathname === calendarCallbackPath ||
+    pathname === calendarDemoAccessPath
   );
 }
 
