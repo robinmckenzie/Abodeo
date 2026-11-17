@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import type { Route } from "./+types/home";
-import { isDemoArrival } from "../account/account-api";
 import { requestSeedCalendarOnArrival } from "../account/demo-arrival";
 import { FadeTuningPanel } from "../fade-tuning-panel";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
@@ -82,13 +81,10 @@ export default function Home() {
           held at its pressed size until the fade's snapshot is taken, so that
           it springs back from that size as the screen fades. A click that
           opens a new tab or window does not leave this screen, so it is not
-          held. A new demo visitor is shown the seeded projects, so the Add
-          project form is not opened for them. */}
+          held. */}
       <Link
         to="/dashboard"
-        state={
-          isDemoArrival(location.search) ? undefined : { openAddProject: true }
-        }
+        state={{ openAddProject: true }}
         className={isReleased ? "get-started is-released" : "get-started"}
         prefetch="render"
         viewTransition

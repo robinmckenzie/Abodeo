@@ -105,16 +105,15 @@ describe("Home", () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it("welcomes a new demo visitor, asks for the calendar and leaves the Add project form closed", async () => {
+  it("welcomes a new demo visitor, asks for the calendar and opens the Add project form as for anyone", async () => {
     saveProject();
-    renderHome("/?demo", NavigationProbe);
+    renderHome("/?demo");
     expect(document.documentElement.hasAttribute("data-has-projects")).toBe(
       false,
     );
     expect(requestSeedCalendarOnArrival).toHaveBeenCalledWith("?demo");
     fireEvent.click(screen.getByRole("link", { name: "Get Started" }));
-    expect(await screen.findByText(/Arrived by/)).toBeTruthy();
-    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    expect(await screen.findByRole("textbox", { name: "Title" })).toBeTruthy();
   });
 
   it("does not count tuning settings as saved projects", () => {

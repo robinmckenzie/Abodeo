@@ -308,8 +308,8 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 ### Demo sign-in (AD #138)
 - `/demo` signs in as the demo account (`abodeodemo@gmail.com`, which must have signed in with
   Google once). A new visitor (a browser with no `abodeo_visitor` cookie) is sent to the welcome
-  screen at `/?demo` and reaches the projects page through Get Started, which does not open the
-  Add project form for them. A returning visitor is sent to the projects page. Only `?label=NAME`
+  screen at `/?demo` and reaches the projects page through Get Started, which opens the Add
+  project form as for any new visitor, with the seeded projects listed. A returning visitor is sent to the projects page. Only `?label=NAME`
   is read from the address. Any other query is ignored, so the address cannot choose another
   account.
 - The first `/demo` in a browser gives it a random word (cookie `abodeo_visitor`, sent to the

@@ -15,8 +15,8 @@ export const accountSeedPath = "/api/account/seed";
 export const accountSeedCalendarPath = "/api/account/seed/calendar";
 
 // Where /demo sends a new visitor: the welcome screen, marked as a demo
-// arrival so that it shows whatever the browser holds, asks for the calendar
-// to be put back, and leaves the Add project form closed.
+// arrival so that it shows whatever the browser holds and asks for the
+// calendar to be put back.
 export const demoArrivalParameter = "demo";
 export const demoArrivalPath = `/?${demoArrivalParameter}`;
 
