@@ -113,6 +113,32 @@ describe("ruleForEvent and moveEvent (appointments)", () => {
     });
   });
 
+  it("counts a change of clocks: a winter-saved London 10:00 Sunday has passed at 10:30 BST", () => {
+    const event: CalendarEvent = {
+      ...brunch,
+      start: {
+        dateTime: "2026-11-22T10:00:00+00:00",
+        timeZone: "Europe/London",
+      },
+      end: { dateTime: "2026-11-22T12:30:00+00:00", timeZone: "Europe/London" },
+    };
+    // Sunday 4 April 2027, 10:30 BST (09:30 UTC): the 10:00 start is gone.
+    const now = Date.parse("2027-04-04T09:30:00Z");
+    const rule = ruleForEvent(
+      {
+        ...event,
+        start: { ...event.start, dateTime: "2027-04-04T10:00:00+01:00" },
+      },
+      Date.parse("2027-04-04T08:00:00Z"),
+    );
+    expect(rule).toEqual({ weekday: sunday, nth: 1 });
+    const moved = moveEvent(event, { weekday: sunday, nth: 1 }, now);
+    expect(moved.start).toEqual({
+      dateTime: "2027-04-11T10:00:00",
+      timeZone: "Europe/London",
+    });
+  });
+
   it("keeps the offset when there is no zone name", () => {
     const event: CalendarEvent = {
       ...brunch,

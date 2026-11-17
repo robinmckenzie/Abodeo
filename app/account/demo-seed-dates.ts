@@ -51,9 +51,45 @@ function dueDateStartsAt(date: string) {
   return Date.parse(`${date}${wholeDay}`) + dayMs - 1;
 }
 
+// The instant of a wall time in a named zone, with the zone's offset on that
+// date, so that a change of clocks between the saved day and another day is
+// counted.
+function zonedInstant(date: string, time: string, timeZone: string) {
+  const wall = Date.parse(`${date}T${time}Z`);
+  const offsetAt = (instant: number) => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+        .formatToParts(new Date(instant))
+        .map((part) => [part.type, part.value]),
+    );
+    const shown = Date.parse(
+      `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`,
+    );
+    return shown - Math.floor(instant / 1000) * 1000;
+  };
+  const first = wall - offsetAt(wall);
+  return wall - offsetAt(first);
+}
+
 function eventStartsAt(start: EventTime): { date: string; startsAt: StartsAt } {
   if ("date" in start) return { date: start.date, startsAt: dueDateStartsAt };
   const { date, time, offset = "Z" } = parseDateTime(start.dateTime);
+  if (start.timeZone) {
+    const timeZone = start.timeZone;
+    return {
+      date,
+      startsAt: (other) => zonedInstant(other, time, timeZone),
+    };
+  }
   return {
     date,
     startsAt: (other) => Date.parse(`${other}T${time}${offset}`),

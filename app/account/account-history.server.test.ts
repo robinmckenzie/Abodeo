@@ -66,14 +66,14 @@ describe("createHistoryStore", () => {
     const calls = query.mock.calls;
     expect(calls[0][0]).toBe("begin");
     expect(calls[1][0]).toContain("pg_advisory_xact_lock");
-    expect(calls[1][1]).toEqual(["ada", "Andrew"]);
+    expect(calls[1][1]).toEqual(["ada", "Andrew", ""]);
     const [text, values] = calls[2];
-    expect(values).toEqual(["ada", "Andrew", visitGapMinutes]);
+    expect(values).toEqual(["ada", "Andrew", visitGapMinutes, ""]);
     expect(text).toContain(
       "update account_visit set last_active_at = clock_timestamp()",
     );
     expect(text).not.toContain("now()");
-    expect(text).toContain("user_id = $1 and label = $2");
+    expect(text).toContain("user_id = $1 and label = $2 and visitor_word = $4");
     expect(text).toContain("make_interval(mins => $3)");
     expect(text).not.toMatch(/ip|agent|device/i);
     expect(calls[3][0]).toBe("commit");
@@ -103,8 +103,8 @@ describe("createHistoryStore", () => {
       text.includes("pg_advisory_xact_lock"),
     );
     expect(locks.map(([, values]) => values)).toEqual([
-      ["ada", "Andrew"],
-      ["ada", "Robin"],
+      ["ada", "Andrew", ""],
+      ["ada", "Robin", ""],
     ]);
     const updates = query.mock.calls.filter(([text]) =>
       text.startsWith("update"),
@@ -112,6 +112,28 @@ describe("createHistoryStore", () => {
     expect(updates.map(([, values]) => values?.[1])).toEqual([
       "Andrew",
       "Robin",
+    ]);
+  });
+
+  it("keeps two visitors who share an account and label apart, by their words", async () => {
+    const { database, query } = createFakeDatabase();
+    const history = createHistoryStore(database);
+    await history.recordActivity("ada", "Acme", "firstwrd");
+    await history.recordActivity("ada", "Acme", "secondwd");
+
+    const updates = query.mock.calls.filter(([text]) =>
+      text.startsWith("update"),
+    );
+    expect(updates.map(([, values]) => values?.[3])).toEqual([
+      "firstwrd",
+      "secondwd",
+    ]);
+    const locks = query.mock.calls.filter(([text]) =>
+      text.includes("pg_advisory_xact_lock"),
+    );
+    expect(locks.map(([, values]) => values?.[2])).toEqual([
+      "firstwrd",
+      "secondwd",
     ]);
   });
 
