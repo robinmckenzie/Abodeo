@@ -28,3 +28,12 @@ request handling together.
 `due-date.ts` and `appointments-api.ts` each implement date validation,
 parsing, padding and day arithmetic. Share date-only validation and arithmetic
 in a neutral module, and keep appointment wall-time handling separate.
+
+## Demo seed due dates use UTC, not the visitor's day
+
+`demo-seed-dates.ts` works out a due date's weekday count from today in UTC
+(AD #138 Demo Entry And Seed). For a visitor east of UTC, between local
+midnight and the UTC date change, a reset can give a due date that is already
+yesterday for them, and a save of such a date is accepted. Have the browser
+send its time zone or local date on save and on `/demo`, and work the dates
+out from it.
