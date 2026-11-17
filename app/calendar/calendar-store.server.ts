@@ -9,9 +9,6 @@ export type CalendarStore = {
   // Saves the account's first calendar, unless another test saved one first.
   // True if this one was saved.
   saveFirstCalendarId(userId: string, calendarId: string): Promise<boolean>;
-  // Forgets the account's calendar, so that the next appointment makes a new
-  // one (the demo's reset, AD #138).
-  forgetCalendarId(userId: string): Promise<void>;
   // Replaces a calendar that no longer exists, unless another test replaced
   // it first. True if this one was saved.
   replaceCalendarId(
@@ -56,11 +53,6 @@ export function createCalendarStore(database: Queryable): CalendarStore {
         [userId, calendarId],
       );
       return rowCount === 1;
-    },
-    async forgetCalendarId(userId) {
-      await database.query("delete from calendar_link where user_id = $1", [
-        userId,
-      ]);
     },
     async replaceCalendarId(userId, deletedId, calendarId) {
       const { rowCount } = await database.query(

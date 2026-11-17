@@ -178,6 +178,31 @@ describe("createGoogleCalendar", () => {
     expect(missing.message).not.toContain("secret");
   });
 
+  it("lists every event when no property is given", async () => {
+    const fetchFn = fakeFetch(Response.json({ items: [] }));
+    const calendar = createGoogleCalendar(fetchFn as typeof fetch);
+
+    await calendar.listEvents("token", "id");
+
+    expect(
+      new URL(fetchFn.mock.calls[0][0]).searchParams.has(
+        "privateExtendedProperty",
+      ),
+    ).toBe(false);
+  });
+
+  it("deletes an event", async () => {
+    const fetchFn = fakeFetch(new Response(null, { status: 204 }));
+    const calendar = createGoogleCalendar(fetchFn as typeof fetch);
+
+    await calendar.deleteEvent("token", "a@b", "event 1");
+
+    expect(fetchFn.mock.calls[0][0]).toBe(
+      "https://www.googleapis.com/calendar/v3/calendars/a%40b/events/event%201",
+    );
+    expect(fetchFn.mock.calls[0][1].method).toBe("DELETE");
+  });
+
   it("deletes a calendar", async () => {
     const fetchFn = fakeFetch(new Response(null, { status: 204 }));
     const calendar = createGoogleCalendar(fetchFn as typeof fetch);

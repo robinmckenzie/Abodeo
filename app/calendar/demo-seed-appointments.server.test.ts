@@ -105,38 +105,39 @@ describe("restoreSeedAppointments", () => {
     },
   };
 
-  it("deletes the old calendar and adds the seed's events to a new one", async () => {
+  it("deletes every earlier event and adds the seed's, keeping the calendar", async () => {
     const { fake, dependencies, addEvent } = await setup();
     fake.calendar.calendars.set("calendar-0", { summary: "A", events: [] });
     fake.store.links.set(userId, "calendar-0");
     await addEvent("p1", "A visitor's own event");
+    await addEvent("a-project-the-reset-removed", "Another visitor's event");
     await restoreSeedAppointments(dependencies, userId, [seedEvent]);
-    expect(fake.calendar.calendars.has("calendar-0")).toBe(false);
-    const newId = fake.store.links.get(userId)!;
-    expect(newId).not.toBe("calendar-0");
+    expect(fake.store.links.get(userId)).toBe("calendar-0");
+    expect(fake.calendar.calendars.size).toBe(1);
     expect(
-      fake.calendar.calendars.get(newId)!.events.map((e) => e.summary),
+      fake.calendar.calendars.get("calendar-0")!.events.map((e) => e.summary),
     ).toEqual(["Tasting"]);
     expect(
       fake.calendar.tokensUsed.every((t) => t === testRefreshedToken),
     ).toBe(true);
   });
 
-  it("leaves no calendar when the seed has no appointments", async () => {
-    const { fake, dependencies } = await setup();
+  it("leaves an empty calendar when the seed has no appointments", async () => {
+    const { fake, dependencies, addEvent } = await setup();
     fake.calendar.calendars.set("calendar-0", { summary: "A", events: [] });
     fake.store.links.set(userId, "calendar-0");
+    await addEvent("p1", "A visitor's own event");
     await restoreSeedAppointments(dependencies, userId, []);
-    expect(fake.calendar.calendars.size).toBe(0);
-    expect(fake.store.links.has(userId)).toBe(false);
+    expect(fake.store.links.get(userId)).toBe("calendar-0");
+    expect(fake.calendar.calendars.get("calendar-0")!.events).toEqual([]);
   });
 
-  it("carries on when the old calendar is already gone", async () => {
+  it("makes the calendar with the first seed event when there is none yet", async () => {
     const { fake, dependencies } = await setup();
-    fake.store.links.set(userId, "calendar-0");
-    fake.calendar.failures.deleteCalendar = "google_404";
-    await restoreSeedAppointments(dependencies, userId, [seedEvent]);
+    await restoreSeedAppointments(dependencies, userId, [seedEvent, seedEvent]);
     expect(fake.calendar.calendars.size).toBe(1);
+    const madeId = fake.store.links.get(userId)!;
+    expect(fake.calendar.calendars.get(madeId)!.events).toHaveLength(2);
   });
 
   it("does nothing when no access is stored", async () => {
@@ -149,8 +150,11 @@ describe("restoreSeedAppointments", () => {
   });
 
   it("reports a Google failure and does not throw", async () => {
-    const { fake, dependencies, failures } = await setup();
-    fake.calendar.failures.insertCalendar = "google_500";
+    const { fake, dependencies, failures, addEvent } = await setup();
+    fake.calendar.calendars.set("calendar-0", { summary: "A", events: [] });
+    fake.store.links.set(userId, "calendar-0");
+    await addEvent("p1", "A visitor's own event");
+    fake.calendar.failures.deleteEvent = "google_500";
     await restoreSeedAppointments(dependencies, userId, [seedEvent]);
     expect(failures).toEqual(["restore:google_500"]);
   });

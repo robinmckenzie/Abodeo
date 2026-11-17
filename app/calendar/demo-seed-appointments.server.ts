@@ -104,10 +104,11 @@ export async function collectSeedAppointments(
   return appointments;
 }
 
-// Puts the account's calendar back to the seed: the whole calendar, with
-// every earlier visitor's events, is deleted, and the seed's events are added
-// to a new one. Does nothing without stored access. A failure is reported and
-// not thrown: the visitor still gets in, and the database is already reset.
+// Puts the account's calendar back to the seed: every event in it, the
+// earlier visitors' among them, is deleted, and the seed's events are added.
+// The calendar itself is kept, as Google takes about 7 seconds to make one.
+// Does nothing without stored access. A failure is reported and not thrown:
+// the visitor still gets in, and the database is already reset.
 export async function restoreSeedAppointments(
   dependencies: SeedAppointmentDependencies,
   userId: string,
@@ -124,17 +125,14 @@ export async function restoreSeedAppointments(
     if (accessToken === undefined) return;
     const calendarId = await store.readCalendarId(userId);
     if (calendarId !== undefined) {
-      try {
-        await calendar.deleteCalendar(accessToken, calendarId);
-      } catch (error) {
-        // Already gone is what was wanted.
-        if (!(error instanceof GoogleCalendarError)) throw error;
-        if (error.code !== "google_404" && error.code !== "google_410") {
-          throw error;
-        }
-      }
-      await store.forgetCalendarId(userId);
+      const events = await calendar.listEvents(accessToken, calendarId);
+      await Promise.all(
+        events.map(({ id }) =>
+          calendar.deleteEvent(accessToken, calendarId, id),
+        ),
+      );
     }
+    // One after another: with no calendar yet, the first makes it.
     for (const { event } of appointments) {
       await insertAbodeoEvent({
         accessToken,

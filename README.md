@@ -333,17 +333,17 @@ valid label. A record that spans a period, as a visit does, belongs to one label
 - The seed also holds the appointments of its projects, copied from the demo account's Abodeo
   calendar in Google when the seed is saved, using the stored Calendar access (none are kept without
   it; a Google failure fails the save). An event still being added when the seed is saved is not
-  in it: the first event after a reset has to make the calendar, which takes several seconds, so
-  check the appointment count the control shows.
+  in it, so check the appointment count the control shows.
 - `/demo` does not wait for Google. After a new visitor's reset it sets the cookie
   `abodeo_demo_calendar`, and the welcome screen then posts to `/api/account/seed/calendar` in
-  the background. That request, for the demo account with the cookie only, deletes the whole
-  calendar, with every earlier visitor's events, adds the seed's events to a new one, and clears
-  the cookie, so that going back to the welcome screen does not do it again. It takes about 9
-  seconds, most of it Google making the calendar (measured: database reset about 0.5 s, deleting
-  the calendar 1.4 s, making one 7 s, adding an event 0.4 s). A visitor who opens a project in
-  that time may see appointments not yet put back. Without stored access the calendar is left
-  alone. A Google failure is logged and changes nothing the visitor sees.
+  the background. That request, for the demo account with the cookie only, deletes every event
+  in the calendar, the earlier visitors' among them, adds the seed's events, and clears the
+  cookie, so that going back to the welcome screen does not do it again. The calendar itself is
+  kept, because Google takes about 7 seconds to make one; it is made only if the account has
+  none. The request takes a little over a second (measured: 1.1 to 1.3 s with one or two events
+  to delete and one to add; it was 9.5 s when the calendar was deleted and made again). A
+  visitor who opens a project in that time may see appointments not yet put back. Without stored
+  access the calendar is left alone. A Google failure is logged and changes nothing the visitor sees.
 - Run `db/demo-seed.sql` v1.138.1 in Neon for each account store before deploying: it adds the
   `demo_seed` table, and without it the control stays hidden.
 - Run `db/demo-seed-images.sql` v1.138.2 in Neon for each account store before deploying: it adds

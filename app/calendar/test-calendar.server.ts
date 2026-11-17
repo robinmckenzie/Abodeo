@@ -33,6 +33,7 @@ export function createMemoryGoogleCalendar() {
     insertCalendar?: string;
     insertEvent?: string;
     listEvents?: string;
+    deleteEvent?: string;
     deleteCalendar?: string;
   } = {};
   const fail = (method: keyof typeof failures) => {
@@ -56,7 +57,7 @@ export function createMemoryGoogleCalendar() {
       found.events.push(record);
       return record;
     },
-    async listEvents(accessToken, calendarId, { name, value }) {
+    async listEvents(accessToken, calendarId, property) {
       tokensUsed.push(accessToken);
       fail("listEvents");
       const found = calendars.get(calendarId);
@@ -64,8 +65,20 @@ export function createMemoryGoogleCalendar() {
       const sortKey = (event: CalendarEventRecord) =>
         "date" in event.start ? event.start.date : event.start.dateTime;
       return found.events
-        .filter((event) => event.extendedProperties?.private[name] === value)
+        .filter(
+          (event) =>
+            !property ||
+            event.extendedProperties?.private[property.name] === property.value,
+        )
         .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+    },
+    async deleteEvent(accessToken, calendarId, eventId) {
+      tokensUsed.push(accessToken);
+      fail("deleteEvent");
+      const found = calendars.get(calendarId)?.events;
+      const index = found?.findIndex(({ id }) => id === eventId) ?? -1;
+      if (!found || index < 0) throw new GoogleCalendarError("google_404");
+      found.splice(index, 1);
     },
     async deleteCalendar(accessToken, calendarId) {
       tokensUsed.push(accessToken);
@@ -102,10 +115,6 @@ export function createMemoryCalendarStore() {
       if (links.has(userId)) return false;
       links.set(userId, calendarId);
       return true;
-    },
-    async forgetCalendarId(userId) {
-      check();
-      links.delete(userId);
     },
     async replaceCalendarId(userId, deletedId, calendarId) {
       check();
