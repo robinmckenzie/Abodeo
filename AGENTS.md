@@ -13,7 +13,7 @@ Abodeo is an app for managing tasks and projects around the home.
 - Planning, building or reviewing anything (what not to cover): [prototype scope](docs/agents/prototype-scope.md)
 - Writing code or handling credentials: [code conventions](docs/agents/code-conventions.md)
 - Touching the database, `db/` or README queries: [saved data](docs/agents/saved-data.md)
-- Reviewing, validating or handing over: [reviews and validation](docs/agents/reviews-and-validation.md)
+- Reviewing, validating or writing the implementation summary: [reviews and validation](docs/agents/reviews-and-validation.md)
 - Planning work that may relate to a known idea or tech debt: [future considerations](docs/agents/future-considerations.md)
 
 ## Agent skills
