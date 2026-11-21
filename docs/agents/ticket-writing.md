@@ -8,7 +8,7 @@
 - When asked to stub or draft a ticket, write only that ticket. Do not modify files or other tickets unless explicitly authorised.
 - A draft ticket needs to be coherent enough to be agreed, not to settle every implementation detail. Distinguish product decisions needed before agreement, provisional or tunable defaults, questions for investigation, and product questions that investigation exposes, which are brought back for a decision.
 - After drafting or substantially revising a DRAFT ticket, review the ticket and relevant code only when the change is complex, ambiguous or high-risk. Record any review in a signed ticket comment.
-- When handing over a drafted or revised ticket for review, separately summarise:
+- When presenting a drafted or revised ticket to Robin for review, separately summarise:
     - what it leaves out of scope, whether stated explicitly or left out by omission;
     - any assumptions made while drafting;
     - earlier decisions or existing behaviour it changes, naming the ticket and what it decided, and any conflict with `AGENTS.md` or `docs/agents/`.
