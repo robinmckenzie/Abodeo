@@ -100,6 +100,7 @@ import {
   type ProjectsView,
 } from "../projects/use-projects";
 import { useBarThumbnails } from "../projects/use-bar-thumbnails";
+import { useTour } from "../tour/tour";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Dashboard - Abodeo" },
@@ -717,32 +718,46 @@ export default function Dashboard() {
     void saverRef.current?.saveNow();
   };
 
-  // Pressing Get Started opens the Add project form as the crossfade to the
+  // Pressing Get Started opens the Add project form, or for a new demo
+  // visitor starts the tour (AD #139 Demo Tour), as the crossfade to the
   // dashboard ends, or straight away where there is no crossfade. The
-  // request is then removed, so that a reload does not open it again.
+  // request is then removed, so that a reload or Back does not repeat it.
   const location = useLocation();
   const navigate = useNavigate();
   const isTransitioning = useViewTransitionState("/dashboard");
-  const isAddProjectDue =
-    (location.state as { openAddProject?: boolean } | null)?.openAddProject ===
-      true && !isTransitioning;
+  const request = isTransitioning
+    ? null
+    : (location.state as {
+        openAddProject?: boolean;
+        startTour?: boolean;
+      } | null);
+  const isAddProjectDue = request?.openAddProject === true;
+  const isTourDue = request?.startTour === true;
   const [handledRequest, setHandledRequest] = useState<string | null>(null);
-  if (isAddProjectDue && handledRequest !== location.key) {
+  // The tour waits for the projects and people to load, then runs until the
+  // visitor finishes or skips it.
+  const [tour, setTour] = useState<"none" | "waiting" | "running">("none");
+  if ((isAddProjectDue || isTourDue) && handledRequest !== location.key) {
     setHandledRequest(location.key);
-    setOpen({
-      key: createOpeningKey(),
-      id: null,
-      newId: crypto.randomUUID(),
-      values: newProjectFields,
-      message: null,
-      barHeight: 0,
-    });
+    if (isTourDue) {
+      setTour("waiting");
+    } else {
+      setOpen({
+        key: createOpeningKey(),
+        id: null,
+        newId: crypto.randomUUID(),
+        values: newProjectFields,
+        message: null,
+        barHeight: 0,
+      });
+    }
   }
   useEffect(() => {
-    if (isAddProjectDue) {
+    if (isAddProjectDue || isTourDue) {
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [isAddProjectDue, location.pathname, navigate]);
+  }, [isAddProjectDue, isTourDue, location.pathname, navigate]);
+  useTour(tour === "running", () => setTour("none"));
 
   const changeOpenProject = (changes: Partial<ProjectFields>) => {
     if (!open || open.isLoading) return;
@@ -1006,6 +1021,7 @@ export default function Dashboard() {
     reloadPeopleRef.current = people.reload;
   });
   const readyPeople = people.view.status === "ready" ? people.view : null;
+  if (tour === "waiting" && isShowingList && readyPeople) setTour("running");
 
   const moveProjects = async (key: string, projects: Project[]) => {
     if (view.kind !== "account") return;

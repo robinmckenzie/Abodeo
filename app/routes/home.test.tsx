@@ -103,9 +103,15 @@ describe("Home", () => {
     const title = await screen.findByRole("textbox", { name: "Title" });
     expect(document.activeElement).toBe(title);
     expect(localStorage.length).toBe(0);
+    expect(screen.queryByRole("button", { name: "Skip tour" })).toBeNull();
   });
 
-  it("welcomes a new demo visitor, asks for the calendar and opens the Add project form as for anyone", async () => {
+  it("welcomes a new demo visitor, asks for the calendar and starts the tour on Get Started, not the Add project form", async () => {
+    // Sign-in is not set up, so the projects load from the browser.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ configured: false })),
+    );
     saveProject();
     renderHome("/?demo");
     expect(document.documentElement.hasAttribute("data-has-projects")).toBe(
@@ -113,7 +119,11 @@ describe("Home", () => {
     );
     expect(requestSeedCalendarOnArrival).toHaveBeenCalledWith("?demo");
     fireEvent.click(screen.getByRole("link", { name: "Get Started" }));
-    expect(await screen.findByRole("textbox", { name: "Title" })).toBeTruthy();
+    expect(await screen.findByText("Your projects")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Skip tour" })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Skip tour" }));
+    expect(screen.queryByText("Your projects")).toBeNull();
   });
 
   it("does not count tuning settings as saved projects", () => {
