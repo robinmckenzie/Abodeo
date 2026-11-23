@@ -821,6 +821,22 @@ describe("Dashboard", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(document.activeElement).toBe(titleField());
   });
+
+  it("starts the tour over the projects list when arriving from a demo Get Started, and not again on a reload", async () => {
+    await renderDashboard({ startTour: true });
+    expect(await screen.findByText("Your projects")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("list", { name: "Projects" })
+        .classList.contains("driver-active-element"),
+    ).toBe(true);
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Skip tour" }));
+    expect(screen.queryByText("Your projects")).toBeNull();
+    cleanup();
+    await renderDashboard();
+    expect(screen.queryByText("Your projects")).toBeNull();
+  });
 });
 
 describe("Dashboard due dates", () => {
