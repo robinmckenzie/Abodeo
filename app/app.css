@@ -2919,6 +2919,14 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   font-size: 0.85rem;
 }
 
+/* Inside the project's window, the bubble sits within the highlighted area,
+   which driver.js makes unclickable along with everything in it. The bubble
+   stays clickable; its buttons are disabled while the tour acts. */
+.driver-no-interaction .driver-popover.tour-popover,
+.driver-no-interaction .driver-popover.tour-popover * {
+  pointer-events: auto !important;
+}
+
 .tour-popover .tour-skip {
   margin-right: auto;
   border-color: transparent;
