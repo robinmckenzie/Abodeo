@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { Driver } from "driver.js";
 
 import { startTour } from "./tour";
+import type { TourActionContext } from "./tour-project";
 import type { TourStep } from "./tour-steps";
 
 const steps: TourStep[] = [
@@ -99,5 +100,93 @@ describe("startTour", () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(tour.isActive()).toBe(false);
     expect(document.querySelector(".driver-popover")).toBeNull();
+  });
+
+  describe("a step that acts in the project's window", () => {
+    let finishAction: () => void;
+    const action = vi.fn(async ({ show }: TourActionContext) => {
+      const window = document.createElement("div");
+      window.className = "project-window";
+      window.innerHTML =
+        '<button type="button" class="project-form-close">Close</button>';
+      window.querySelector("button")!.addEventListener("click", () =>
+        window.remove(),
+      );
+      document.body.append(window);
+      show();
+      await new Promise<void>((resolve) => (finishAction = resolve));
+    });
+    const actingSteps: TourStep[] = [
+      steps[0],
+      {
+        id: "w",
+        name: "W",
+        element: ".project-window",
+        isInWindow: true,
+        title: "In the window",
+        description: "Acting.",
+        action,
+      },
+      steps[2],
+    ];
+    const isAvailable = (name: string) =>
+      !screen.getByRole<HTMLButtonElement>("button", { name }).disabled;
+    const projectWindow = () => document.querySelector(".project-window");
+
+    afterEach(() => {
+      action.mockClear();
+    });
+
+    async function reachActingStep() {
+      tour = startTour(onEnd, actingSteps);
+      await pressAndSee("Next", "In the window");
+      expect(projectWindow()?.classList.contains("driver-active-element")).toBe(
+        true,
+      );
+    }
+
+    async function finish() {
+      finishAction();
+      await waitFor(() => expect(isAvailable("Next")).toBe(true));
+    }
+
+    it("makes Next, Back, Skip tour and the keys unavailable while it acts, and gives them back after", async () => {
+      await reachActingStep();
+      expect(isAvailable("Next")).toBe(false);
+      expect(isAvailable("Back")).toBe(false);
+      expect(isAvailable("Skip tour")).toBe(false);
+      fireEvent.keyUp(window, { key: "Escape" });
+      fireEvent.keyUp(window, { key: "ArrowLeft" });
+      expect(tour!.isActive()).toBe(true);
+      expect(readTitle()).toBe("In the window");
+      await finish();
+      expect(isAvailable("Back")).toBe(true);
+      expect(isAvailable("Skip tour")).toBe(true);
+    });
+
+    it("closes the window on Back, and does not act again or reopen it on Next", async () => {
+      await reachActingStep();
+      await finish();
+      await pressAndSee("Back", "Area A");
+      expect(projectWindow()).toBeNull();
+      expect(isAvailable("Back")).toBe(false);
+      await pressAndSee("Next", "In the window");
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(projectWindow()).toBeNull();
+      expect(isAvailable("Next")).toBe(true);
+    });
+
+    it("closes the window going on to a step outside it, and stops an action under way when the tour ends", async () => {
+      await reachActingStep();
+      await finish();
+      await pressAndSee("Next", "Closing");
+      expect(projectWindow()).toBeNull();
+      tour!.destroy();
+      tour = startTour(onEnd, actingSteps);
+      await pressAndSee("Next", "In the window");
+      const { signal } = action.mock.calls[1][0];
+      tour.destroy();
+      expect(signal.aborted).toBe(true);
+    });
   });
 });

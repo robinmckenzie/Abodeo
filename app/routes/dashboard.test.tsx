@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
@@ -25,6 +26,7 @@ import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
+import { tourPace } from "../tour/tour-page";
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
 beforeAll(() => {
@@ -836,6 +838,72 @@ describe("Dashboard", () => {
     cleanup();
     await renderDashboard();
     expect(screen.queryByText("Your projects")).toBeNull();
+  });
+
+  describe("the tour's project step", () => {
+    const pace = { ...tourPace };
+    beforeEach(() => {
+      Object.assign(tourPace, { typing: 0, settling: 0 });
+    });
+    afterEach(() => {
+      Object.assign(tourPace, pace);
+    });
+
+    const button = (name: string) =>
+      screen.getByRole<HTMLButtonElement>("button", { name });
+    // The bubble is a dialog too, so the window is found by its class.
+    const projectWindow = () => document.querySelector(".project-window");
+
+    async function pressAndWait(name: string, title: string) {
+      fireEvent.click(button(name));
+      await waitFor(
+        () => {
+          // Not getByText or getByRole, which are slow to run each time
+          // the tour types a character.
+          expect(
+            document.querySelector(".driver-popover-title")?.textContent,
+          ).toBe(title);
+          expect(
+            document.querySelector<HTMLButtonElement>(
+              ".driver-popover-next-btn",
+            )?.disabled,
+          ).toBe(false);
+        },
+        { timeout: 3000 },
+      );
+    }
+
+    it("adds the tour's project with three tasks, and not again after Back and Next", async () => {
+      savePeople("Andy", "Boris");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+
+      await pressAndWait("Next", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      expect(savedProjects()).toHaveLength(1);
+      const [project] = savedProjects();
+      expect(project).toMatchObject({
+        title: "Bake for the street party",
+        notes: "Something sweet for Saturday.",
+        assignee: "andy",
+      });
+      expect(
+        project.tasks.map((task: { title: string }) => task.title),
+      ).toEqual([
+        "Buy flour and butter",
+        "Bake two trays of scones",
+        "Pack them in the tin",
+      ]);
+
+      await pressAndWait("Back", "Your projects");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Next", "Adding a project");
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+
+      await pressAndWait("Next", "People");
+      expect(bars()).toHaveLength(1);
+    });
   });
 });
 

@@ -2,6 +2,7 @@
 // Each has a short name, so that a step can be reported as, for example,
 // "step 3 of 6 (Calendar)".
 import { describeBinPeriod } from "../projects/delete-project";
+import { createTourProject, type TourActionContext } from "./tour-project";
 
 export type TourStep = {
   id: string;
@@ -14,6 +15,12 @@ export type TourStep = {
   title: string;
   // HTML, so that the closing step can hold links.
   description: string;
+  // Whether the area is in the project's window, which the tour closes on
+  // the way to a step that is not.
+  isInWindow?: boolean;
+  // What the tour does the first time the step is reached in a run. It
+  // shows the step itself, once the area it highlights is on the page.
+  action?: (context: TourActionContext) => Promise<void>;
 };
 
 const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
@@ -27,6 +34,17 @@ export const tourSteps: readonly TourStep[] = [
     title: "Your projects",
     description:
       "Everything on the go around the home, one bar each. These two are already under way, with photos of how they are getting on.",
+  },
+  {
+    id: "project",
+    name: "Your project",
+    element: ".project-window",
+    side: "left",
+    isInWindow: true,
+    title: "Adding a project",
+    description:
+      "Watch a project being added: a title, a few notes, who it is for, and a first task. Once it is created, it opens and takes two more tasks. Everything is saved as it goes.",
+    action: createTourProject,
   },
   {
     id: "people",
