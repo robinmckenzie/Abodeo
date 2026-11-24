@@ -873,6 +873,28 @@ describe("Dashboard", () => {
       );
     }
 
+    const peopleList = () => document.querySelector(".task-assignee-list");
+
+    // A press of a control the tour offers instead of Next, as the visitor
+    // would make it, waiting for the step it moves to.
+    async function clickAndWait(control: Element, title: string) {
+      expect(control.classList.contains("tour-clickable")).toBe(true);
+      fireEvent.click(control);
+      await waitFor(
+        () => {
+          expect(
+            document.querySelector(".driver-popover-title")?.textContent,
+          ).toBe(title);
+          expect(
+            document.querySelector<HTMLButtonElement>(
+              ".driver-popover-next-btn",
+            )?.disabled,
+          ).toBe(false);
+        },
+        { timeout: 3000 },
+      );
+    }
+
     const listTasks = () =>
       savedProjects()[0].tasks.map(
         (task: { title: string; assignee: string }) =>
@@ -901,6 +923,11 @@ describe("Dashboard", () => {
 
       await pressAndWait("Next", "Assigning a task");
       expect(projectWindow()).toBeTruthy();
+      expect(peopleList()).toBeTruthy();
+      expect(listTasks()).toEqual(["Buy flour and butter: unassigned"]);
+
+      await pressAndWait("Next", "Task assigned");
+      expect(peopleList()).toBeNull();
       expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
 
       await pressAndWait("Next", "More tasks");
@@ -945,7 +972,42 @@ describe("Dashboard", () => {
       await pressAndWait("Next", "Adding a project");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
+      expect(peopleList()).toBeNull();
+      await pressAndWait("Next", "Task assigned");
       expect(listTasks()).toEqual(["Buy flour and butter: unassigned"]);
+    });
+
+    it("goes on when the visitor presses Create, the new bar and Priya instead of Next, doing each once", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+
+      await clickAndWait(
+        document.querySelector('.project-window button[type="submit"]')!,
+        "Project created",
+      );
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+
+      await clickAndWait(bars()[0], "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(bars()).toHaveLength(1);
+
+      const priya = [
+        ...document.querySelectorAll(
+          ".task-assignee-list [role=menuitemradio]",
+        ),
+      ].find((option) => option.textContent?.startsWith("Priya"))!;
+      await clickAndWait(priya, "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+
+      await pressAndWait("Next", "More tasks");
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
+      ]);
     });
 
     it("Restart tour removes only the tour's projects and runs the tour again", async () => {

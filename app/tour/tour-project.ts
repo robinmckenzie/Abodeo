@@ -1,7 +1,7 @@
 // The demo tour's own project (AD #160 Tour Creates A Project), made as a
 // visitor would make it, one step at a time: the tour fills in Add project,
-// creates it, opens it to assign its first task, then adds and assigns two
-// more tasks.
+// creates it, opens it and the first task's list of people, chooses Priya,
+// then adds and assigns two more tasks.
 import {
   pause,
   pressEnter,
@@ -22,11 +22,16 @@ export const tourProject = {
 };
 
 // What a step's action is given: show puts the step's bubble on the page
-// (again, if the area it highlights has been replaced), and signal ends the
-// action when the tour ends.
+// (again, if the area it highlights has been replaced), signal ends the
+// action when the tour ends, and hurried ends its typing and pauses at once.
+// visitorActed is true when the visitor reached the step by pressing the
+// previous step's control (TourStep.clickable), so the action leaves out
+// what that press already did.
 export type TourActionContext = {
   show: () => void;
   signal: AbortSignal;
+  hurried?: AbortSignal;
+  visitorActed?: boolean;
 };
 
 const windowSelector = ".project-window";
@@ -42,25 +47,36 @@ export function findTourProjectBar() {
   ].find((bar) => bar.textContent?.includes(tourProject.title));
 }
 
+// Add project's Create button, which the visitor may press instead of Next.
+export function findCreateButton() {
+  return findInWindow<HTMLButtonElement>('button[type="submit"]') ?? undefined;
+}
+
 // Opens Add project and fills it in, but leaves Create to the next step.
-export async function fillInTourProject({ show, signal }: TourActionContext) {
+export async function fillInTourProject({
+  show,
+  signal,
+  hurried,
+}: TourActionContext) {
   document.querySelector<HTMLButtonElement>("button.add-project")?.click();
   const title = await waitUntil(
     () => findInWindow<HTMLInputElement>('input[name="title"]'),
     signal,
   );
   show();
-  await pause(tourPace.settling, signal);
-  await typeInto(title, tourProject.title, signal);
+  await pause(tourPace.settling, signal, hurried);
+  await typeInto(title, tourProject.title, signal, hurried);
   await typeInto(
     findInWindow<HTMLTextAreaElement>('textarea[name="notes"]')!,
     tourProject.notes,
     signal,
+    hurried,
   );
   await typeInto(
     findInWindow<HTMLTextAreaElement>('textarea[name="tasks"]')!,
     tourProject.firstTask.title,
     signal,
+    hurried,
   );
   // The project goes to the first person, after Unassigned.
   const assignees = document.querySelectorAll<HTMLInputElement>(
@@ -69,10 +85,14 @@ export async function fillInTourProject({ show, signal }: TourActionContext) {
   assignees[1]?.click();
 }
 
-// Presses Create, which closes the window once the project is saved, and
-// shows the step on the new project's bar.
-export async function createTourProject({ show, signal }: TourActionContext) {
-  findInWindow<HTMLButtonElement>('button[type="submit"]')?.click();
+// Presses Create, unless the visitor did, which closes the window once the
+// project is saved, and shows the step on the new project's bar.
+export async function createTourProject({
+  show,
+  signal,
+  visitorActed,
+}: TourActionContext) {
+  if (!visitorActed) findCreateButton()?.click();
   await waitUntil(
     () => !document.querySelector(windowSelector) && findTourProjectBar(),
     signal,
@@ -80,11 +100,17 @@ export async function createTourProject({ show, signal }: TourActionContext) {
   show();
 }
 
-// Opens the tour's project unless it is open, and waits until it can be
-// changed: an opened project is read-only until its latest copy has loaded,
-// and a change made before then would be lost.
-async function openTourProject({ show, signal }: TourActionContext) {
-  if (!document.querySelector(windowSelector)) {
+// Opens the tour's project unless it is open, or the visitor has clicked
+// its bar, and waits until it can be changed: an opened project is
+// read-only until its latest copy has loaded, and a change made before then
+// would be lost.
+async function openTourProject({
+  show,
+  signal,
+  hurried,
+  visitorActed,
+}: TourActionContext) {
+  if (!visitorActed && !document.querySelector(windowSelector)) {
     (await waitUntil(findTourProjectBar, signal)).click();
   }
   await waitUntil(
@@ -92,52 +118,111 @@ async function openTourProject({ show, signal }: TourActionContext) {
     signal,
   );
   show();
-  await pause(tourPace.settling, signal);
+  await pause(tourPace.settling, signal, hurried);
 }
 
-// Gives a task to a person, by name, through the task's own list of people.
-// If no one has that name, the list is closed and the task keeps its person.
-async function assignTask(
-  taskTitle: string,
-  person: string,
-  signal: AbortSignal,
-) {
-  const picker = await waitUntil(
-    () =>
-      findInWindow<HTMLButtonElement>(
-        `button[data-task-assignee][aria-label^="${taskTitle} is assigned to "]`,
-      ),
+// A task's button showing who it is assigned to, which opens its list.
+function findPicker(taskTitle: string) {
+  return findInWindow<HTMLButtonElement>(
+    `button[data-task-assignee][aria-label^="${taskTitle} is assigned to "]`,
+  );
+}
+
+const isOpen = (picker: HTMLButtonElement) =>
+  picker.getAttribute("aria-expanded") === "true";
+
+// The person's entry in the open list of people, if there is one.
+function findPersonOption(person: string) {
+  return [
+    ...document.querySelectorAll<HTMLButtonElement>(
+      ".task-assignee-list [role=menuitemradio]",
+    ),
+  ].find((option) => option.textContent?.startsWith(person));
+}
+
+// Opens a task's list of people, unless it is open, and waits for it.
+async function openPeopleList(taskTitle: string, signal: AbortSignal) {
+  const picker = await waitUntil(() => findPicker(taskTitle), signal);
+  if (!isOpen(picker)) picker.click();
+  await waitUntil(
+    () => document.querySelector(".task-assignee-list [role=menuitemradio]"),
     signal,
   );
-  picker.click();
-  const options = await waitUntil(() => {
-    const found = document.querySelectorAll<HTMLButtonElement>(
-      ".task-assignee-list [role=menuitemradio]",
-    );
-    return found.length > 0 && [...found];
-  }, signal);
-  await pause(tourPace.settling, signal);
-  const option = options.find((option) =>
-    option.textContent?.startsWith(person),
-  );
+  return picker;
+}
+
+// Chooses a person, by name, in the task's open list, and waits until the
+// task shows them. If no one has that name, the list is closed and the task
+// keeps its person.
+async function choosePerson(
+  picker: HTMLButtonElement,
+  person: string,
+  signal: AbortSignal,
+  hurried?: AbortSignal,
+) {
+  const option = findPersonOption(person);
   if (!option) {
     picker.click();
     return;
   }
   option.click();
   await waitUntil(() => picker.textContent === person, signal);
-  await pause(tourPace.settling, signal);
+  await pause(tourPace.settling, signal, hurried);
 }
 
-export async function assignFirstTourTask(context: TourActionContext) {
+// Gives a task to a person through the task's own list of people.
+async function assignTask(
+  taskTitle: string,
+  person: string,
+  signal: AbortSignal,
+  hurried?: AbortSignal,
+) {
+  const picker = await openPeopleList(taskTitle, signal);
+  await pause(tourPace.settling, signal, hurried);
+  await choosePerson(picker, person, signal, hurried);
+}
+
+// Priya's entry in the first task's open list, which the visitor may choose
+// instead of Next.
+export function findFirstTaskPerson() {
+  return findPersonOption(tourProject.firstTask.person);
+}
+
+// Opens the project and the first task's list of people, and leaves the list
+// open for the visitor to see. If the person is not there, it is closed.
+export async function openFirstTaskList(context: TourActionContext) {
   await openTourProject(context);
   const { title, person } = tourProject.firstTask;
-  await assignTask(title, person, context.signal);
+  const picker = await openPeopleList(title, context.signal);
+  if (!findPersonOption(person)) picker.click();
+}
+
+// Chooses the person in the first task's list, opening it again if the
+// press on Next closed it. If the visitor chose them, waits until the task
+// shows them.
+export async function chooseFirstTaskPerson({
+  show,
+  signal,
+  hurried,
+  visitorActed,
+}: TourActionContext) {
+  const { title, person } = tourProject.firstTask;
+  show();
+  const picker = await waitUntil(() => findPicker(title), signal);
+  if (visitorActed) {
+    await waitUntil(() => picker.textContent === person, signal);
+    return;
+  }
+  if (picker.textContent === person) return;
+  const wasOpen = isOpen(picker);
+  await openPeopleList(title, signal);
+  if (!wasOpen) await pause(tourPace.settling, signal, hurried);
+  await choosePerson(picker, person, signal, hurried);
 }
 
 // Adds both tasks at once, as two lines and one Enter, then assigns each.
 export async function addMoreTourTasks(context: TourActionContext) {
-  const { signal } = context;
+  const { signal, hurried } = context;
   await openTourProject(context);
   const taskBox = await waitUntil(
     () =>
@@ -151,12 +236,12 @@ export async function addMoreTourTasks(context: TourActionContext) {
     taskBox,
     tourProject.moreTasks.map((task) => task.title).join("\n"),
   );
-  await pause(tourPace.settling, signal);
+  await pause(tourPace.settling, signal, hurried);
   pressEnter(taskBox);
   // The box clears only once both tasks are saved.
   await waitUntil(() => taskBox.value === "", signal);
   for (const { title, person } of tourProject.moreTasks) {
-    await assignTask(title, person, signal);
+    await assignTask(title, person, signal, hurried);
   }
 }
 

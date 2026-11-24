@@ -4,10 +4,13 @@
 import { describeBinPeriod } from "../projects/delete-project";
 import {
   addMoreTourTasks,
-  assignFirstTourTask,
+  chooseFirstTaskPerson,
   createTourProject,
   fillInTourProject,
+  findCreateButton,
+  findFirstTaskPerson,
   findTourProjectBar,
+  openFirstTaskList,
   type TourActionContext,
 } from "./tour-project";
 
@@ -28,6 +31,10 @@ export type TourStep = {
   // What the tour does the first time the step is reached in a run. It
   // shows the step itself, once the area it highlights is on the page.
   action?: (context: TourActionContext) => Promise<void>;
+  // A control on the page that the visitor may press instead of Next, once
+  // the step's action has finished. It does its own job, and the press
+  // then moves on as Next would.
+  clickable?: string | (() => Element | undefined);
 };
 
 const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
@@ -50,8 +57,9 @@ export const tourSteps: readonly TourStep[] = [
     isInWindow: true,
     title: "Adding a project",
     description:
-      "A project starts with a title, a few notes, who it is for, and a first task. Next creates it.",
+      "A project starts with a title, a few notes, who it is for, and a first task. Press Create, or Next, to create it.",
     action: fillInTourProject,
+    clickable: findCreateButton,
   },
   {
     id: "project-created",
@@ -60,8 +68,9 @@ export const tourSteps: readonly TourStep[] = [
     side: "bottom",
     title: "Project created",
     description:
-      "That's the project created, with just the basics. To add more, such as tasks, people and appointments, click its bar to open it again.",
+      "That's the project created, with just the basics. To add more, such as tasks, people and appointments, click its bar to open it again. Try it, or press Next.",
     action: createTourProject,
+    clickable: findTourProjectBar,
   },
   {
     id: "assign-task",
@@ -71,8 +80,20 @@ export const tourSteps: readonly TourStep[] = [
     isInWindow: true,
     title: "Assigning a task",
     description:
-      "Each task can go to a different person. The first one goes to Priya.",
-    action: assignFirstTourTask,
+      "Each task can go to a different person, chosen from its own list of people. Choose Priya for the first one, or press Next.",
+    action: openFirstTaskList,
+    clickable: findFirstTaskPerson,
+  },
+  {
+    id: "task-assigned",
+    name: "Task assigned",
+    element: ".project-window",
+    side: "left",
+    isInWindow: true,
+    title: "Task assigned",
+    description:
+      "The first task is now Priya's, and its row says so. The project itself can still belong to someone else.",
+    action: chooseFirstTaskPerson,
   },
   {
     id: "more-tasks",

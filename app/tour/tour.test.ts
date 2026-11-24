@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { Driver } from "driver.js";
 
 import { startTour } from "./tour";
+import { pause } from "./tour-page";
 import type { TourActionContext } from "./tour-project";
 import type { TourStep } from "./tour-steps";
 
@@ -202,6 +203,87 @@ describe("startTour", () => {
       const { signal } = action.mock.calls[1][0];
       tour.destroy();
       expect(signal.aborted).toBe(true);
+    });
+  });
+
+  describe("hurrying and the visitor's own press", () => {
+    const hurriedAction = vi.fn(
+      async ({ show, signal, hurried }: TourActionContext) => {
+        show();
+        await pause(60_000, signal, hurried);
+      },
+    );
+    const nextAction = vi.fn(async ({ show }: TourActionContext) => show());
+    const clickSteps: TourStep[] = [
+      steps[0],
+      {
+        id: "p",
+        name: "P",
+        element: "#area-b",
+        title: "Press it",
+        description: "Acting.",
+        action: hurriedAction,
+        clickable: "#press-me",
+      },
+      {
+        id: "q",
+        name: "Q",
+        title: "Pressed",
+        description: "After.",
+        action: nextAction,
+      },
+    ];
+    const pressMe = () => document.getElementById("press-me")!;
+    const isNextAvailable = () =>
+      !screen.getByRole<HTMLButtonElement>("button", { name: "Next" })
+        .disabled;
+
+    beforeEach(() => {
+      document.getElementById("area-b")!.innerHTML =
+        '<button type="button" id="press-me">Create</button>';
+    });
+
+    afterEach(() => {
+      hurriedAction.mockClear();
+      nextAction.mockClear();
+    });
+
+    async function reachAndHurry() {
+      tour = startTour(onEnd, clickSteps);
+      await pressAndSee("Next", "Press it");
+      expect(isNextAvailable()).toBe(false);
+      expect(pressMe().classList.contains("tour-clickable")).toBe(false);
+      fireEvent.keyUp(window, { key: "ArrowRight" });
+      await waitFor(() => expect(isNextAvailable()).toBe(true));
+    }
+
+    it("ends the action's pauses on the right arrow key, without moving on", async () => {
+      await reachAndHurry();
+      expect(readTitle()).toBe("Press it");
+      expect(nextAction).not.toHaveBeenCalled();
+    });
+
+    it("once the action has finished, lets the visitor's press of the control count as Next", async () => {
+      const ownClick = vi.fn();
+      pressMe().addEventListener("click", ownClick);
+      await reachAndHurry();
+      expect(pressMe().classList.contains("tour-clickable")).toBe(true);
+      fireEvent.click(pressMe());
+      await waitFor(() => expect(readTitle()).toBe("Pressed"));
+      expect(ownClick).toHaveBeenCalledTimes(1);
+      expect(nextAction.mock.calls[0][0].visitorActed).toBe(true);
+      expect(pressMe().classList.contains("tour-clickable")).toBe(false);
+    });
+
+    it("takes the control back on Next, and does not offer it on a Back visit", async () => {
+      await reachAndHurry();
+      await pressAndSee("Next", "Pressed");
+      expect(nextAction.mock.calls[0][0].visitorActed).toBe(false);
+      expect(pressMe().classList.contains("tour-clickable")).toBe(false);
+      await pressAndSee("Back", "Press it");
+      expect(pressMe().classList.contains("tour-clickable")).toBe(false);
+      fireEvent.click(pressMe());
+      expect(readTitle()).toBe("Press it");
     });
   });
 });

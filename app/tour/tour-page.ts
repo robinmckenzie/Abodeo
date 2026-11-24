@@ -21,19 +21,31 @@ function checkRunning(signal: AbortSignal) {
   if (signal.aborted) throw new TourEnded();
 }
 
-// Waits a while, or until the tour ends.
-export function pause(ms: number, signal: AbortSignal) {
+// Waits a while, or until the tour ends. A pause ends at once when hurried
+// is aborted, as the visitor's right arrow key does.
+export function pause(ms: number, signal: AbortSignal, hurried?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     checkRunning(signal);
-    const ended = () => {
+    if (hurried?.aborted) {
+      resolve();
+      return;
+    }
+    const stop = () => {
       window.clearTimeout(timer);
+      signal.removeEventListener("abort", ended);
+      hurried?.removeEventListener("abort", hurry);
+    };
+    const ended = () => {
+      stop();
       reject(new TourEnded());
     };
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener("abort", ended);
+    const hurry = () => {
+      stop();
       resolve();
-    }, ms);
+    };
+    const timer = window.setTimeout(hurry, ms);
     signal.addEventListener("abort", ended, { once: true });
+    hurried?.addEventListener("abort", hurry, { once: true });
   });
 }
 
@@ -68,14 +80,21 @@ export function setFieldValue(
 }
 
 // Types text into a field one character at a time, after what it holds.
+// Once hurried, the rest goes in at once.
 export async function typeInto(
   field: HTMLInputElement | HTMLTextAreaElement,
   text: string,
   signal: AbortSignal,
+  hurried?: AbortSignal,
 ) {
   field.focus();
-  for (const character of text) {
-    await pause(tourPace.typing, signal);
+  const characters = [...text];
+  for (const [index, character] of characters.entries()) {
+    await pause(tourPace.typing, signal, hurried);
+    if (hurried?.aborted) {
+      setFieldValue(field, field.value + characters.slice(index).join(""));
+      return;
+    }
     setFieldValue(field, field.value + character);
   }
 }

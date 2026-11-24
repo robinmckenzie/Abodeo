@@ -21,7 +21,10 @@ import { tourSteps, type TourStep } from "./tour-steps";
 // a step before the first that acts closes the window and calls
 // removeProject, which deletes the tour's project, so that going on does it
 // all again (AD #160 Tour Creates A Project). While the tour acts, Next,
-// Back, "Skip tour" and the keys are unavailable (decision 28 on AD #139).
+// Back, "Skip tour" and the keys are unavailable (decision 28 on AD #139),
+// except that the right arrow key hurries it: typing and pauses end at once.
+// Once a step's action has finished, its clickable control, if any, can be
+// pressed instead of Next.
 export function startTour(
   onEnd: () => void,
   steps: readonly TourStep[] = tourSteps,
@@ -35,6 +38,10 @@ export function startTour(
   // as Back on the first step. driver.js builds a new bubble at every step.
   let buttons: HTMLButtonElement[] = [];
   let unavailable = new Set<HTMLButtonElement>();
+  // Ends the running action's typing and pauses at once.
+  let hurry = new AbortController();
+  // Takes back the control offered instead of Next, if any.
+  let withdrawClickable = () => {};
 
   // driver.js's own onDestroyed is not called if the tour ends before its
   // first highlight has finished moving into place, so the tour ends here.
@@ -57,9 +64,36 @@ export function startTour(
     showButtons();
   };
 
-  const move = async (to: number) => {
+  // Lets the visitor press the step's control instead of Next. The press
+  // does its own job first, such as Create saving the project, and the next
+  // step's action is told so, to leave that out.
+  const offerClickable = (at: number) => {
+    const { clickable } = steps[at];
+    const control =
+      typeof clickable === "function"
+        ? clickable()
+        : clickable && document.querySelector(clickable);
+    if (!control || at + 1 >= steps.length) return;
+    // Heard on the control itself, before React's own handler.
+    const pressed = () => {
+      withdrawClickable();
+      if (tour.getActiveIndex() === at) void move(at + 1, true);
+    };
+    control.classList.add("tour-clickable");
+    control.addEventListener("click", pressed);
+    withdrawClickable = () => {
+      control.classList.remove("tour-clickable");
+      control.removeEventListener("click", pressed);
+      withdrawClickable = () => {};
+    };
+  };
+
+  const move = async (to: number, visitorActed = false) => {
     const step = steps[to];
+    withdrawClickable();
+    hurry = new AbortController();
     setActing(true);
+    let acted = false;
     try {
       if (step.action && !ranActions.has(step.id)) {
         // The action closes or opens the window as it needs.
@@ -67,7 +101,10 @@ export function startTour(
         await step.action({
           show: () => tour.moveTo(to),
           signal: running.signal,
+          hurried: hurry.signal,
+          visitorActed,
         });
+        acted = true;
       } else {
         if (!step.isInWindow) await closeProjectWindow(running.signal);
         if (to < firstActing && ranActions.size > 0) {
@@ -79,9 +116,22 @@ export function startTour(
     } catch (error) {
       if (!(error instanceof TourEnded)) throw error;
     } finally {
-      if (!running.signal.aborted) setActing(false);
+      if (!running.signal.aborted) {
+        setActing(false);
+        if (acted) offerClickable(to);
+      }
     }
   };
+
+  // driver.js reads the arrow keys on keyup. The press is kept from it, as
+  // in a browser the hurried action can finish before driver.js hears the
+  // key, which it would then take as Next.
+  const hurryOnArrow = (event: KeyboardEvent) => {
+    if (!isActing || event.key !== "ArrowRight") return;
+    event.stopImmediatePropagation();
+    hurry.abort();
+  };
+  window.addEventListener("keyup", hurryOnArrow, true);
 
   const tour: Driver = driver({
     steps: steps.map((step) => ({
@@ -132,6 +182,8 @@ export function startTour(
   const destroy = tour.destroy;
   tour.destroy = () => {
     running.abort();
+    withdrawClickable();
+    window.removeEventListener("keyup", hurryOnArrow, true);
     destroy();
   };
   tour.drive();

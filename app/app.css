@@ -2940,6 +2940,15 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   pointer-events: auto !important;
 }
 
+/* A control the visitor may press instead of Next, such as Create, once the
+   step has finished acting (AD #160 Tour Creates A Project). */
+.driver-no-interaction.tour-clickable,
+.driver-no-interaction .tour-clickable,
+.driver-no-interaction .tour-clickable * {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
 .tour-popover .tour-skip {
   margin-right: auto;
   border-color: transparent;

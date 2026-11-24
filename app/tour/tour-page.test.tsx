@@ -3,6 +3,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 
 import {
+  pause,
   pressEnter,
   setFieldValue,
   TourEnded,
@@ -69,6 +70,38 @@ describe("typeInto", () => {
     running.abort();
     await expect(typing).rejects.toBeInstanceOf(TourEnded);
     expect(state()).toBe("B");
+  });
+
+  it("fills in the rest at once when hurried", async () => {
+    vi.useFakeTimers();
+    render(<Field />);
+    const hurry = new AbortController();
+    const typing = typeInto(
+      field(),
+      "Bake",
+      new AbortController().signal,
+      hurry.signal,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(tourPace.typing);
+    });
+    expect(state()).toBe("B");
+    await act(async () => {
+      hurry.abort();
+      await typing;
+    });
+    expect(state()).toBe("Bake");
+  });
+});
+
+describe("pause", () => {
+  it("ends at once when hurried, and straight away once hurried", async () => {
+    const hurry = new AbortController();
+    const running = new AbortController().signal;
+    const waiting = pause(60_000, running, hurry.signal);
+    hurry.abort();
+    await expect(waiting).resolves.toBeUndefined();
+    await expect(pause(60_000, running, hurry.signal)).resolves.toBeUndefined();
   });
 });
 
