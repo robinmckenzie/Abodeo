@@ -4,9 +4,15 @@
 // that leaves a screen with unsaved changes first lets that screen save them.
 import { Link, useNavigate } from "react-router";
 
+import { demoAccountEmail } from "./account/account-api";
 import { AccountControl } from "./account/account-control";
 import type { Account } from "./account/use-account";
-import { BinScreenIcon, PeopleIcon, ProjectsIcon } from "./ui/icons";
+import {
+  BinScreenIcon,
+  PeopleIcon,
+  ProjectsIcon,
+  RestartIcon,
+} from "./ui/icons";
 
 const screens = [
   { path: "/dashboard", name: "Projects", Icon: ProjectsIcon },
@@ -57,6 +63,12 @@ export function AppMenu({
   onLeaveFailed?: () => void;
 }) {
   const getClickHandler = useScreenLinkClick(onBeforeLeave);
+  const navigate = useNavigate();
+  // Restart tour deletes the tour's project and runs the tour again
+  // (AD #160 Tour Creates A Project), only in the demo account.
+  const isDemoAccount =
+    account.view.kind === "signed-in" &&
+    account.view.email === demoAccountEmail;
   const shownScreens = screens.filter(
     ({ path }) => path !== "/bin" || account.view.kind === "signed-in",
   );
@@ -84,6 +96,24 @@ export function AppMenu({
               </Link>
             </li>
           ))}
+          {isDemoAccount && (
+            <li>
+              <button
+                type="button"
+                className="app-menu-button"
+                onClick={async () => {
+                  if (await onBeforeLeave()) {
+                    void navigate("/dashboard", {
+                      state: { restartTour: true },
+                    });
+                  }
+                }}
+              >
+                <RestartIcon />
+                Restart tour
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
     </>

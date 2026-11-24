@@ -2482,7 +2482,8 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   list-style: none;
 }
 
-.app-menu-list a {
+.app-menu-list a,
+.app-menu-button {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -2492,7 +2493,18 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   text-decoration: none;
 }
 
-.app-menu-list a:hover {
+/* Restart tour (AD #160), a button that looks like the links above it. */
+.app-menu-button {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-menu-list a:hover,
+.app-menu-button:hover {
   background: var(--hover);
 }
 
@@ -2523,6 +2535,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .app-menu-list a:hover .screen-icon,
+.app-menu-button:hover .screen-icon,
 .app-menu-list a[aria-current="page"] .screen-icon {
   color: var(--ink);
 }

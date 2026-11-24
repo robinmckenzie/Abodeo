@@ -3,7 +3,7 @@
 // tour". The page is locked while it runs: a click on the dimmed page or the
 // highlighted area does nothing. Nothing about the tour is kept in the
 // browser.
-import { driver, type Driver } from "driver.js";
+import { driver, type DriveStep, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { useEffect, useRef } from "react";
 
@@ -15,17 +15,21 @@ import { tourSteps, type TourStep } from "./tour-steps";
 // finishing, skipping or Esc, but not by a call of the result's destroy.
 //
 // The tour makes its own moves between steps, so that it can act on the way:
-// closing the project's window when leaving a step in it, and running a
-// step's action the first time the step is reached. Back shows an earlier
-// step again but never undoes or repeats its action. While the tour acts,
-// Next, Back, "Skip tour" and the keys are unavailable (decision 28 on
-// AD #139).
+// running a step's action the first time the step is reached, and closing
+// the project's window on the way to a step outside it. Back to a step in
+// the middle shows it again but does not undo or repeat its action. Back to
+// a step before the first that acts closes the window and calls
+// removeProject, which deletes the tour's project, so that going on does it
+// all again (AD #160 Tour Creates A Project). While the tour acts, Next,
+// Back, "Skip tour" and the keys are unavailable (decision 28 on AD #139).
 export function startTour(
   onEnd: () => void,
   steps: readonly TourStep[] = tourSteps,
+  removeProject: () => Promise<void> = async () => {},
 ): Driver {
   const running = new AbortController();
   const ranActions = new Set<string>();
+  const firstActing = steps.findIndex((step) => step.action);
   let isActing = false;
   // The bubble's buttons, and those driver.js itself made unavailable, such
   // as Back on the first step. driver.js builds a new bubble at every step.
@@ -53,21 +57,24 @@ export function startTour(
     showButtons();
   };
 
-  const move = async (from: number, to: number) => {
+  const move = async (to: number) => {
     const step = steps[to];
     setActing(true);
     try {
-      if (steps[from].isInWindow && !step.isInWindow) {
-        await closeProjectWindow(running.signal);
-      }
       if (step.action && !ranActions.has(step.id)) {
+        // The action closes or opens the window as it needs.
         ranActions.add(step.id);
         await step.action({
           show: () => tour.moveTo(to),
           signal: running.signal,
         });
       } else {
-        tour.moveTo(to);
+        if (!step.isInWindow) await closeProjectWindow(running.signal);
+        if (to < firstActing && ranActions.size > 0) {
+          await removeProject();
+          ranActions.clear();
+        }
+        if (!running.signal.aborted) tour.moveTo(to);
       }
     } catch (error) {
       if (!(error instanceof TourEnded)) throw error;
@@ -78,7 +85,9 @@ export function startTour(
 
   const tour: Driver = driver({
     steps: steps.map((step) => ({
-      element: step.element,
+      // driver.js's own type wants a function to find something, but it
+      // centres the bubble when the function finds nothing.
+      element: step.element as DriveStep["element"],
       popover: {
         title: step.title,
         description: step.description,
@@ -109,12 +118,12 @@ export function startTour(
       const index = tour.getActiveIndex();
       if (index === undefined) return;
       if (index === steps.length - 1) end();
-      else void move(index, index + 1);
+      else void move(index + 1);
     },
     // Back, and the left arrow key.
     onPrevClick: () => {
       const index = tour.getActiveIndex();
-      if (index) void move(index, index - 1);
+      if (index) void move(index - 1);
     },
     // Esc.
     onDestroyStarted: end,
@@ -130,15 +139,26 @@ export function startTour(
 }
 
 // Runs the tour while isRunning is true, and calls onEnd when the visitor
-// ends it. Leaving the screen ends it without calling onEnd.
-export function useTour(isRunning: boolean, onEnd: () => void) {
+// ends it. Leaving the screen ends it without calling onEnd. removeProject
+// deletes the tour's project, for Back to the start.
+export function useTour(
+  isRunning: boolean,
+  onEnd: () => void,
+  removeProject: () => Promise<void>,
+) {
   const onEndRef = useRef(onEnd);
+  const removeProjectRef = useRef(removeProject);
   useEffect(() => {
     onEndRef.current = onEnd;
+    removeProjectRef.current = removeProject;
   });
   useEffect(() => {
     if (!isRunning) return;
-    const tour = startTour(() => onEndRef.current());
+    const tour = startTour(
+      () => onEndRef.current(),
+      tourSteps,
+      () => removeProjectRef.current(),
+    );
     return () => tour.destroy();
   }, [isRunning]);
 }

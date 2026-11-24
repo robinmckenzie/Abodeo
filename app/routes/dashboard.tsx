@@ -15,6 +15,7 @@ import { AssigneeTuningPanel } from "../projects/assignee-tuning-panel";
 import {
   binAccountProject,
   createAccountProject,
+  deleteAccountProjectPermanently,
   importProjects,
   openAccountProject,
   setPageLeaving,
@@ -101,6 +102,7 @@ import {
 } from "../projects/use-projects";
 import { useBarThumbnails } from "../projects/use-bar-thumbnails";
 import { useTour } from "../tour/tour";
+import { tourProject } from "../tour/tour-project";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Dashboard - Abodeo" },
@@ -730,17 +732,23 @@ export default function Dashboard() {
     : (location.state as {
         openAddProject?: boolean;
         startTour?: boolean;
+        // The app menu's Restart tour (AD #160 Tour Creates A Project).
+        restartTour?: boolean;
       } | null);
   const isAddProjectDue = request?.openAddProject === true;
-  const isTourDue = request?.startTour === true;
+  const isRestartDue = request?.restartTour === true;
+  const isTourDue = request?.startTour === true || isRestartDue;
   const [handledRequest, setHandledRequest] = useState<string | null>(null);
   // The tour waits for the projects and people to load, then runs until the
-  // visitor finishes or skips it.
-  const [tour, setTour] = useState<"none" | "waiting" | "running">("none");
+  // visitor finishes or skips it. A restart first removes the tour's
+  // project.
+  const [tour, setTour] = useState<
+    "none" | "restarting" | "waiting" | "running"
+  >("none");
   if ((isAddProjectDue || isTourDue) && handledRequest !== location.key) {
     setHandledRequest(location.key);
     if (isTourDue) {
-      setTour("waiting");
+      setTour(isRestartDue ? "restarting" : "waiting");
     } else {
       setOpen({
         key: createOpeningKey(),
@@ -757,7 +765,6 @@ export default function Dashboard() {
       navigate(location.pathname, { replace: true, state: null });
     }
   }, [isAddProjectDue, isTourDue, location.pathname, navigate]);
-  useTour(tour === "running", () => setTour("none"));
 
   const changeOpenProject = (changes: Partial<ProjectFields>) => {
     if (!open || open.isLoading) return;
@@ -1022,6 +1029,52 @@ export default function Dashboard() {
   });
   const readyPeople = people.view.status === "ready" ? people.view : null;
   if (tour === "waiting" && isShowingList && readyPeople) setTour("running");
+
+  // Deletes for good every project with the tour's title, for Back to the
+  // tour's start and for Restart tour. An account's project goes to the Bin
+  // and straight out of it, as only a binned project can be deleted for
+  // good. The Bin's count is left as it was, so that it does not rise and
+  // fall. A project that cannot be deleted is left.
+  const removeTourProjects = async () => {
+    const tourProjects = list.filter(
+      (project) => project.title === tourProject.title,
+    );
+    for (const { id } of tourProjects) {
+      if (view.kind === "browser") {
+        deleteStoredProject(id);
+        refreshProjects();
+      } else if (view.kind === "account") {
+        const binned = await whileSending(
+          binAccountProject(view.accountId, id),
+        );
+        if (!binned.ok) {
+          noteAccountFailure(binned.reason);
+          continue;
+        }
+        await whileSending(deleteAccountProjectPermanently(view.accountId, id));
+        source.removeProject(view.generation, id);
+      }
+    }
+  };
+  const removeTourProjectsRef = useRef(removeTourProjects);
+  useEffect(() => {
+    removeTourProjectsRef.current = removeTourProjects;
+  });
+  useEffect(() => {
+    if (tour !== "restarting" || !isShowingList) return;
+    let isCurrent = true;
+    void removeTourProjectsRef.current().then(() => {
+      if (isCurrent) setTour("waiting");
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [tour, isShowingList]);
+  useTour(
+    tour === "running",
+    () => setTour("none"),
+    () => removeTourProjectsRef.current(),
+  );
 
   const moveProjects = async (key: string, projects: Project[]) => {
     if (view.kind !== "account") return;

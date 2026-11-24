@@ -2,14 +2,21 @@
 // Each has a short name, so that a step can be reported as, for example,
 // "step 3 of 6 (Calendar)".
 import { describeBinPeriod } from "../projects/delete-project";
-import { createTourProject, type TourActionContext } from "./tour-project";
+import {
+  addMoreTourTasks,
+  assignFirstTourTask,
+  createTourProject,
+  fillInTourProject,
+  findTourProjectBar,
+  type TourActionContext,
+} from "./tour-project";
 
 export type TourStep = {
   id: string;
   name: string;
   // The area highlighted, as a CSS selector. Without one the bubble is
-  // centred on the dimmed page.
-  element?: string;
+  // centred on the dimmed page. A function finds it when the step is shown.
+  element?: string | (() => Element | undefined);
   // Which side of the area the bubble goes.
   side?: "top" | "right" | "bottom" | "left";
   title: string;
@@ -36,15 +43,47 @@ export const tourSteps: readonly TourStep[] = [
       "Everything on the go around the home, one bar each. These two are already under way, with photos of how they are getting on.",
   },
   {
-    id: "project",
-    name: "Your project",
+    id: "add-project",
+    name: "Adding a project",
     element: ".project-window",
     side: "left",
     isInWindow: true,
     title: "Adding a project",
     description:
-      "Watch a project being added: a title, a few notes, who it is for, and a first task. Once it is created, it opens and takes two more tasks. Everything is saved as it goes.",
+      "A project starts with a title, a few notes, who it is for, and a first task. Next creates it.",
+    action: fillInTourProject,
+  },
+  {
+    id: "project-created",
+    name: "Project created",
+    element: findTourProjectBar,
+    side: "bottom",
+    title: "Project created",
+    description:
+      "That's the project created, with just the basics. To add more, such as tasks, people and appointments, click its bar to open it again.",
     action: createTourProject,
+  },
+  {
+    id: "assign-task",
+    name: "Assigning a task",
+    element: ".project-window",
+    side: "left",
+    isInWindow: true,
+    title: "Assigning a task",
+    description:
+      "Each task can go to a different person. The first one goes to Priya.",
+    action: assignFirstTourTask,
+  },
+  {
+    id: "more-tasks",
+    name: "More tasks",
+    element: ".project-window",
+    side: "left",
+    isInWindow: true,
+    title: "More tasks",
+    description:
+      "Add tasks at any time, one per line, then choose who does each. Everything is saved as it goes.",
+    action: addMoreTourTasks,
   },
   {
     id: "people",

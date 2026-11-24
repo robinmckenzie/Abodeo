@@ -164,15 +164,30 @@ describe("startTour", () => {
       expect(isAvailable("Skip tour")).toBe(true);
     });
 
-    it("closes the window on Back, and does not act again or reopen it on Next", async () => {
-      await reachActingStep();
+    it("on Back to the start, closes the window and removes the project, and acts again on Next", async () => {
+      const removeProject = vi.fn(async () => {});
+      tour = startTour(onEnd, actingSteps, removeProject);
+      await pressAndSee("Next", "In the window");
       await finish();
       await pressAndSee("Back", "Area A");
       expect(projectWindow()).toBeNull();
+      expect(removeProject).toHaveBeenCalledTimes(1);
       expect(isAvailable("Back")).toBe(false);
       await pressAndSee("Next", "In the window");
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(projectWindow()).toBeTruthy();
+    });
+
+    it("does not act again or reopen the window on Back to an acting step from a later one", async () => {
+      const removeProject = vi.fn(async () => {});
+      tour = startTour(onEnd, actingSteps, removeProject);
+      await pressAndSee("Next", "In the window");
+      await finish();
+      await pressAndSee("Next", "Closing");
+      await pressAndSee("Back", "In the window");
       expect(action).toHaveBeenCalledTimes(1);
       expect(projectWindow()).toBeNull();
+      expect(removeProject).not.toHaveBeenCalled();
       expect(isAvailable("Next")).toBe(true);
     });
 

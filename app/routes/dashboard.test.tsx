@@ -873,36 +873,92 @@ describe("Dashboard", () => {
       );
     }
 
-    it("adds the tour's project with three tasks, and not again after Back and Next", async () => {
-      savePeople("Andy", "Boris");
+    const listTasks = () =>
+      savedProjects()[0].tasks.map(
+        (task: { title: string; assignee: string }) =>
+          `${task.title}: ${task.assignee}`,
+      );
+
+    it("fills in the tour's project, creates it on Next, then assigns its first task and adds and assigns two more", async () => {
+      savePeople("Sam", "Priya");
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
 
       await pressAndWait("Next", "Adding a project");
       expect(projectWindow()).toBeTruthy();
+      expect(titleField()).toHaveProperty("value", "Bake for the street party");
+      expect(savedProjects()).toHaveLength(0);
+
+      await pressAndWait("Next", "Project created");
+      expect(projectWindow()).toBeNull();
       expect(savedProjects()).toHaveLength(1);
-      const [project] = savedProjects();
-      expect(project).toMatchObject({
+      expect(savedProjects()[0]).toMatchObject({
         title: "Bake for the street party",
         notes: "Something sweet for Saturday.",
-        assignee: "andy",
+        assignee: "sam",
       });
-      expect(
-        project.tasks.map((task: { title: string }) => task.title),
-      ).toEqual([
-        "Buy flour and butter",
-        "Bake two trays of scones",
-        "Pack them in the tin",
+      expect(bars()[0].classList.contains("driver-active-element")).toBe(true);
+
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+
+      await pressAndWait("Next", "More tasks");
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
       ]);
 
-      await pressAndWait("Back", "Your projects");
+      await pressAndWait("Next", "People");
       expect(projectWindow()).toBeNull();
+      expect(bars()).toHaveLength(1);
+    });
+
+    it("removes the tour's project on Back to the start, and makes it again on Next", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Back", "Adding a project");
       expect(projectWindow()).toBeNull();
       expect(savedProjects()).toHaveLength(1);
+      await pressAndWait("Back", "Your projects");
+      expect(savedProjects()).toHaveLength(0);
+      expect(bars()).toHaveLength(0);
 
-      await pressAndWait("Next", "People");
-      expect(bars()).toHaveLength(1);
+      await pressAndWait("Next", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Next", "Project created");
+      expect(savedProjects()).toHaveLength(1);
+    });
+
+    it("leaves a task unassigned when no one has the name, and goes on", async () => {
+      savePeople("Andy");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      expect(listTasks()).toEqual(["Buy flour and butter: unassigned"]);
+    });
+
+    it("Restart tour removes only the tour's projects and runs the tour again", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard();
+      await addProject("Bake for the street party");
+      await addProject("Kitchen");
+      cleanup();
+      await renderDashboard({ restartTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      expect(savedProjects().map((project) => project.title)).toEqual([
+        "Kitchen",
+      ]);
     });
   });
 });
