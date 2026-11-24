@@ -275,6 +275,76 @@ describe("startTour", () => {
       expect(pressMe().classList.contains("tour-clickable")).toBe(false);
     });
 
+    const description = () =>
+      document.querySelector(".driver-popover-description")?.textContent;
+
+    it("shows a step's own wording when it is shown again, and offers its control again if it says so", async () => {
+      tour = startTour(
+        onEnd,
+        clickSteps.map((step) =>
+          step.id === "p"
+            ? { ...step, againDescription: "As left.", clickableAgain: true }
+            : step,
+        ),
+      );
+      await pressAndSee("Next", "Press it");
+      expect(description()).toBe("Acting.");
+      fireEvent.keyUp(window, { key: "ArrowRight" });
+      await waitFor(() => expect(isNextAvailable()).toBe(true));
+      await pressAndSee("Next", "Pressed");
+      await pressAndSee("Back", "Press it");
+      expect(description()).toBe("As left.");
+      expect(hurriedAction).toHaveBeenCalledTimes(1);
+      expect(pressMe().classList.contains("tour-clickable")).toBe(true);
+      fireEvent.click(pressMe());
+      await waitFor(() => expect(readTitle()).toBe("Pressed"));
+      expect(nextAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("acts again on a step shown again only while the next step has not acted", async () => {
+      const lastAction = vi.fn(async ({ show }: TourActionContext) => show());
+      tour = startTour(onEnd, [
+        ...clickSteps,
+        { id: "r", name: "R", title: "Last", description: "End.", action: lastAction },
+      ]);
+      await pressAndSee("Next", "Press it");
+      fireEvent.keyUp(window, { key: "ArrowRight" });
+      await waitFor(() => expect(isNextAvailable()).toBe(true));
+      await pressAndSee("Next", "Pressed");
+      await pressAndSee("Back", "Press it");
+      expect(hurriedAction).toHaveBeenCalledTimes(1);
+      await pressAndSee("Next", "Pressed");
+      expect(nextAction).toHaveBeenCalledTimes(2);
+      await pressAndSee("Next", "Last");
+      await pressAndSee("Back", "Pressed");
+      expect(nextAction).toHaveBeenCalledTimes(2);
+    });
+
+    it("stops a press anywhere but the control while it is offered, if the step says so", async () => {
+      const heard = vi.fn();
+      document.addEventListener("pointerdown", heard, true);
+      tour = startTour(
+        onEnd,
+        clickSteps.map((step) =>
+          step.id === "p" ? { ...step, clickableOnly: true } : step,
+        ),
+      );
+      await pressAndSee("Next", "Press it");
+      fireEvent.pointerDown(document.body);
+      expect(heard).toHaveBeenCalledTimes(1);
+      fireEvent.keyUp(window, { key: "ArrowRight" });
+      await waitFor(() => expect(isNextAvailable()).toBe(true));
+      fireEvent.pointerDown(document.body);
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Next" }));
+      expect(heard).toHaveBeenCalledTimes(1);
+      fireEvent.pointerDown(pressMe());
+      expect(heard).toHaveBeenCalledTimes(2);
+      await pressAndSee("Next", "Pressed");
+      fireEvent.pointerDown(document.body);
+      expect(heard).toHaveBeenCalledTimes(3);
+      document.removeEventListener("pointerdown", heard, true);
+    });
+
     it("takes the control back on Next, and does not offer it on a Back visit", async () => {
       await reachAndHurry();
       await pressAndSee("Next", "Pressed");

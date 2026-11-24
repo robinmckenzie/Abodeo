@@ -8,7 +8,7 @@ import "driver.js/dist/driver.css";
 import { useEffect, useRef } from "react";
 
 import { TourEnded } from "./tour-page";
-import { closeProjectWindow } from "./tour-project";
+import { closeProjectWindow, reopenTourProject } from "./tour-project";
 import { tourSteps, type TourStep } from "./tour-steps";
 
 // Starts the tour from its first step. onEnd is called once it ends, by
@@ -16,8 +16,12 @@ import { tourSteps, type TourStep } from "./tour-steps";
 //
 // The tour makes its own moves between steps, so that it can act on the way:
 // running a step's action the first time the step is reached, and closing
-// the project's window on the way to a step outside it. Back to a step in
-// the middle shows it again but does not undo or repeat its action. Back to
+// the project's window on the way to a step outside it. A step reached
+// again, by Back or by Next after going back, shows things as they were
+// left, in its own wording if it has one, and opens the tour's project
+// again if the step is in its window. It does not undo its action, and acts
+// again only if the next step's action has not run, since what it showed,
+// such as an open list, is not used up yet. Back to
 // a step before the first that acts closes the window and calls
 // removeProject, which deletes the tour's project, so that going on does it
 // all again (AD #160 Tour Creates A Project). While the tour acts, Next,
@@ -42,6 +46,8 @@ export function startTour(
   let hurry = new AbortController();
   // Takes back the control offered instead of Next, if any.
   let withdrawClickable = () => {};
+  // The step being shown again without acting, for its own wording.
+  let shownAgain: number | undefined;
 
   // driver.js's own onDestroyed is not called if the tour ends before its
   // first highlight has finished moving into place, so the tour ends here.
@@ -68,7 +74,7 @@ export function startTour(
   // does its own job first, such as Create saving the project, and the next
   // step's action is told so, to leave that out.
   const offerClickable = (at: number) => {
-    const { clickable } = steps[at];
+    const { clickable, clickableOnly } = steps[at];
     const control =
       typeof clickable === "function"
         ? clickable()
@@ -79,11 +85,21 @@ export function startTour(
       withdrawClickable();
       if (tour.getActiveIndex() === at) void move(at + 1, true);
     };
+    // Heard at the window before the page's own handlers, such as the list
+    // of people closing on a press outside it. The bubble's buttons act on
+    // the click, which goes on as usual.
+    const keepPage = (event: PointerEvent) => {
+      if (!control.contains(event.target as Node)) {
+        event.stopImmediatePropagation();
+      }
+    };
     control.classList.add("tour-clickable");
     control.addEventListener("click", pressed);
+    if (clickableOnly) window.addEventListener("pointerdown", keepPage, true);
     withdrawClickable = () => {
       control.classList.remove("tour-clickable");
       control.removeEventListener("click", pressed);
+      window.removeEventListener("pointerdown", keepPage, true);
       withdrawClickable = () => {};
     };
   };
@@ -93,9 +109,13 @@ export function startTour(
     withdrawClickable();
     hurry = new AbortController();
     setActing(true);
+    shownAgain = undefined;
     let acted = false;
+    let isShownAgain = false;
+    const next = steps[to + 1];
+    const actsAgain = next?.action !== undefined && !ranActions.has(next.id);
     try {
-      if (step.action && !ranActions.has(step.id)) {
+      if (step.action && (!ranActions.has(step.id) || actsAgain)) {
         // The action closes or opens the window as it needs.
         ranActions.add(step.id);
         await step.action({
@@ -107,10 +127,13 @@ export function startTour(
         acted = true;
       } else {
         if (!step.isInWindow) await closeProjectWindow(running.signal);
+        else await reopenTourProject(running.signal, visitorActed);
         if (to < firstActing && ranActions.size > 0) {
           await removeProject();
           ranActions.clear();
         }
+        isShownAgain = step.action !== undefined;
+        if (isShownAgain) shownAgain = to;
         if (!running.signal.aborted) tour.moveTo(to);
       }
     } catch (error) {
@@ -118,7 +141,9 @@ export function startTour(
     } finally {
       if (!running.signal.aborted) {
         setActing(false);
-        if (acted) offerClickable(to);
+        if (acted || (isShownAgain && step.clickableAgain)) {
+          offerClickable(to);
+        }
       }
     }
   };
@@ -160,6 +185,10 @@ export function startTour(
       skip.addEventListener("click", end);
       popover.footer.prepend(skip);
       buttons = [popover.previousButton, popover.nextButton, skip];
+      const again = shownAgain === undefined ? undefined : steps[shownAgain];
+      if (again?.againDescription && tour.getActiveIndex() === shownAgain) {
+        popover.description.innerHTML = again.againDescription;
+      }
       unavailable = new Set(buttons.filter((button) => button.disabled));
       showButtons();
     },

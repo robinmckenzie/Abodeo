@@ -953,7 +953,7 @@ describe("Dashboard", () => {
       await pressAndWait("Back", "Project created");
       expect(projectWindow()).toBeNull();
       await pressAndWait("Back", "Adding a project");
-      expect(projectWindow()).toBeNull();
+      expect(projectWindow()).toBeTruthy();
       expect(savedProjects()).toHaveLength(1);
       await pressAndWait("Back", "Your projects");
       expect(savedProjects()).toHaveLength(0);
@@ -963,6 +963,92 @@ describe("Dashboard", () => {
       expect(projectWindow()).toBeTruthy();
       await pressAndWait("Next", "Project created");
       expect(savedProjects()).toHaveLength(1);
+    });
+
+    const description = () =>
+      document.querySelector(".driver-popover-description")?.textContent;
+    const findPerson = (name: string) =>
+      [
+        ...document.querySelectorAll(
+          ".task-assignee-list [role=menuitemradio]",
+        ),
+      ].find((option) => option.textContent?.startsWith(name));
+
+    it("shows the project open as it was left on steps shown again, in their own wording", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      expect(description()).toContain("Press Create");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      expect(description()).toContain("Choose Priya");
+      await pressAndWait("Next", "Task assigned");
+      await pressAndWait("Next", "More tasks");
+      await pressAndWait("Next", "People");
+      expect(projectWindow()).toBeNull();
+
+      await pressAndWait("Back", "More tasks");
+      expect(
+        projectWindow()?.classList.contains("driver-active-element"),
+      ).toBe(true);
+      await pressAndWait("Back", "Task assigned");
+      await pressAndWait("Back", "Assigning a task");
+      expect(description()).toContain("Priya was chosen");
+      expect(peopleList()).toBeNull();
+
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Back", "Project created");
+      await clickAndWait(bars()[0], "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+
+      await pressAndWait("Back", "Project created");
+      await pressAndWait("Back", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      expect(titleField()).toHaveProperty("value", "Bake for the street party");
+      expect(description()).toContain("now that it is created");
+      await pressAndWait("Next", "Project created");
+      expect(savedProjects()).toHaveLength(1);
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
+      ]);
+    }, 20_000);
+
+    it("keeps the list of people open on a press anywhere but Priya, and Next then chooses her", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      fireEvent.pointerDown(findPerson("Sam")!);
+      fireEvent.pointerDown(document.body);
+      fireEvent.pointerDown(button("Next"));
+      expect(peopleList()).toBeTruthy();
+      await pressAndWait("Next", "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+    });
+
+    it("acts again on a step whose list was not used, after going back before it", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(peopleList()).toBeTruthy();
+      expect(description()).toContain("Choose Priya");
+      await clickAndWait(findPerson("Priya")!, "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
     });
 
     it("leaves a task unassigned when no one has the name, and goes on", async () => {

@@ -121,6 +121,23 @@ async function openTourProject({
   await pause(tourPace.settling, signal, hurried);
 }
 
+// Opens the tour's project again as it was left, for a step in its window
+// shown again without acting, unless a window is open or the project is not
+// in the list. If the visitor clicked its bar, only waits for it.
+export async function reopenTourProject(
+  signal: AbortSignal,
+  visitorActed = false,
+) {
+  if (document.querySelector(windowSelector)) return;
+  const bar = findTourProjectBar();
+  if (!bar) return;
+  if (!visitorActed) bar.click();
+  await waitUntil(
+    () => findInWindow(".project-form-body:not(.is-read-only)"),
+    signal,
+  );
+}
+
 // A task's button showing who it is assigned to, which opens its list.
 function findPicker(taskTitle: string) {
   return findInWindow<HTMLButtonElement>(

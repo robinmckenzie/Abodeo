@@ -35,6 +35,15 @@ export type TourStep = {
   // the step's action has finished. It does its own job, and the press
   // then moves on as Next would.
   clickable?: string | (() => Element | undefined);
+  // Whether the control is also offered when the step is shown again
+  // without acting, such as on a Back visit.
+  clickableAgain?: boolean;
+  // Whether, while the control is offered, a press anywhere else does
+  // nothing, so that what the step shows, such as an open list, stays.
+  clickableOnly?: boolean;
+  // The wording when the step is shown again without acting, for how its
+  // action left things. HTML, as description.
+  againDescription?: string;
 };
 
 const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
@@ -58,6 +67,8 @@ export const tourSteps: readonly TourStep[] = [
     title: "Adding a project",
     description:
       "A project starts with a title, a few notes, who it is for, and a first task. Press Create, or Next, to create it.",
+    againDescription:
+      "The project started with a title, a few notes, who it is for, and a first task. Here they are, now that it is created.",
     action: fillInTourProject,
     clickable: findCreateButton,
   },
@@ -71,6 +82,7 @@ export const tourSteps: readonly TourStep[] = [
       "That's the project created, with just the basics. To add more, such as tasks, people and appointments, click its bar to open it again. Try it, or press Next.",
     action: createTourProject,
     clickable: findTourProjectBar,
+    clickableAgain: true,
   },
   {
     id: "assign-task",
@@ -81,8 +93,11 @@ export const tourSteps: readonly TourStep[] = [
     title: "Assigning a task",
     description:
       "Each task can go to a different person, chosen from its own list of people. Choose Priya for the first one, or press Next.",
+    againDescription:
+      "Each task can go to a different person, chosen from its own list of people. Priya was chosen for the first one.",
     action: openFirstTaskList,
     clickable: findFirstTaskPerson,
+    clickableOnly: true,
   },
   {
     id: "task-assigned",
