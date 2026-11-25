@@ -847,10 +847,16 @@ describe("Dashboard", () => {
     });
     afterEach(() => {
       Object.assign(tourPace, pace);
+      vi.useRealTimers();
     });
 
     const button = (name: string) =>
       screen.getByRole<HTMLButtonElement>("button", { name });
+    // A day in the window's calendar, by its name.
+    const dueDay = (name: string) =>
+      document.querySelector(
+        `.project-window button[name="dueDate"][aria-label="${name}"]`,
+      );
     // The bubble is a dialog too, so the window is found by its class.
     const projectWindow = () => document.querySelector(".project-window");
 
@@ -901,7 +907,10 @@ describe("Dashboard", () => {
           `${task.title}: ${task.assignee}`,
       );
 
-    it("fills in the tour's project, creates it on Next, then assigns its first task and adds and assigns two more", async () => {
+    it("fills in the tour's project, gives it a due date, creates it on Next, then assigns its first task and adds and assigns two more", async () => {
+      // Wednesday 28 October 2026: due on Friday 30 October.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 9, 28, 12));
       savePeople("Sam", "Priya");
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
@@ -909,6 +918,18 @@ describe("Dashboard", () => {
       await pressAndWait("Next", "Adding a project");
       expect(projectWindow()).toBeTruthy();
       expect(titleField()).toHaveProperty("value", "Bake for the street party");
+      expect(description()).not.toContain("Create");
+
+      await pressAndWait("Next", "Due date");
+      expect(description()).toContain("party is Saturday");
+      expect(
+        dueDay("Friday 30 October 2026")?.getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(
+        document
+          .querySelector('.project-window button[type="submit"]')
+          ?.classList.contains("tour-clickable"),
+      ).toBe(true);
       expect(savedProjects()).toHaveLength(0);
 
       await pressAndWait("Next", "Project created");
@@ -918,6 +939,7 @@ describe("Dashboard", () => {
         title: "Bake for the street party",
         notes: "Something sweet for Saturday.",
         assignee: "sam",
+        dueDate: "2026-10-30",
       });
       expect(bars()[0].classList.contains("driver-active-element")).toBe(true);
 
@@ -947,11 +969,14 @@ describe("Dashboard", () => {
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
 
       await pressAndWait("Back", "Project created");
       expect(projectWindow()).toBeNull();
+      await pressAndWait("Back", "Due date");
+      expect(projectWindow()).toBeTruthy();
       await pressAndWait("Back", "Adding a project");
       expect(projectWindow()).toBeTruthy();
       expect(savedProjects()).toHaveLength(1);
@@ -961,6 +986,7 @@ describe("Dashboard", () => {
 
       await pressAndWait("Next", "Adding a project");
       expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       expect(savedProjects()).toHaveLength(1);
     });
@@ -979,6 +1005,7 @@ describe("Dashboard", () => {
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
       expect(description()).toContain("Press Create");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
@@ -989,9 +1016,9 @@ describe("Dashboard", () => {
       expect(projectWindow()).toBeNull();
 
       await pressAndWait("Back", "More tasks");
-      expect(
-        projectWindow()?.classList.contains("driver-active-element"),
-      ).toBe(true);
+      expect(projectWindow()?.classList.contains("driver-active-element")).toBe(
+        true,
+      );
       await pressAndWait("Back", "Task assigned");
       await pressAndWait("Back", "Assigning a task");
       expect(description()).toContain("Priya was chosen");
@@ -1006,10 +1033,14 @@ describe("Dashboard", () => {
       expect(projectWindow()).toBeTruthy();
 
       await pressAndWait("Back", "Project created");
+      await pressAndWait("Back", "Due date");
+      expect(projectWindow()).toBeTruthy();
+      expect(description()).toContain("chosen from the project's calendar");
       await pressAndWait("Back", "Adding a project");
       expect(projectWindow()).toBeTruthy();
       expect(titleField()).toHaveProperty("value", "Bake for the street party");
-      expect(description()).toContain("now that it is created");
+      expect(description()).toContain("Here they are");
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       expect(savedProjects()).toHaveLength(1);
       expect(listTasks()).toEqual([
@@ -1019,11 +1050,29 @@ describe("Dashboard", () => {
       ]);
     }, 20_000);
 
+    it("goes on from the created project shown again on Adding a project, before the project has been opened", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Back", "Due date");
+      await pressAndWait("Back", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+      await pressAndWait("Next", "Assigning a task");
+      expect(peopleList()).toBeTruthy();
+    });
+
     it("keeps the list of people open on a press anywhere but Priya, and Next then chooses her", async () => {
       savePeople("Sam", "Priya");
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
       fireEvent.pointerDown(findPerson("Sam")!);
@@ -1039,6 +1088,7 @@ describe("Dashboard", () => {
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
       await pressAndWait("Back", "Project created");
@@ -1056,6 +1106,7 @@ describe("Dashboard", () => {
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
       await pressAndWait("Next", "Assigning a task");
       expect(peopleList()).toBeNull();
@@ -1064,10 +1115,23 @@ describe("Dashboard", () => {
     });
 
     it("goes on when the visitor presses Create, the new bar and Priya instead of Next, doing each once", async () => {
+      // Friday 27 November 2026: due on Friday 4 December, a month on, for
+      // the party next Saturday.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 10, 27, 12));
       savePeople("Sam", "Priya");
       await renderDashboard({ startTour: true });
       expect(await screen.findByText("Your projects")).toBeTruthy();
       await pressAndWait("Next", "Adding a project");
+      expect(notesField()).toHaveProperty(
+        "value",
+        "Something sweet for next Saturday.",
+      );
+      await pressAndWait("Next", "Due date");
+      expect(description()).toContain("party is next Saturday");
+      expect(
+        dueDay("Friday 4 December 2026")?.getAttribute("aria-pressed"),
+      ).toBe("true");
 
       await clickAndWait(
         document.querySelector('.project-window button[type="submit"]')!,
@@ -1075,6 +1139,7 @@ describe("Dashboard", () => {
       );
       expect(projectWindow()).toBeNull();
       expect(savedProjects()).toHaveLength(1);
+      expect(savedProjects()[0].dueDate).toBe("2026-12-04");
 
       await clickAndWait(bars()[0], "Assigning a task");
       expect(projectWindow()).toBeTruthy();

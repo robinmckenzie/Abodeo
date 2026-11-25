@@ -97,6 +97,13 @@ export function findWeekday(date: string) {
   return weekdayNames[(new Date(toUtc(year, month, day)).getUTCDay() + 6) % 7];
 }
 
+// The first Friday after the date, never the date itself: on a Friday, the
+// Friday a week later.
+export function findNextFriday(date: string) {
+  const days = (4 - weekdayNames.indexOf(findWeekday(date)) + 7) % 7 || 7;
+  return addDays(date, days);
+}
+
 // Such as "Friday 16 October 2026".
 export function describeDueDate(date: string) {
   const { year, month, day } = readCalendarDate(date);

@@ -5,7 +5,9 @@ import { describeBinPeriod } from "../projects/delete-project";
 import {
   addMoreTourTasks,
   chooseFirstTaskPerson,
+  chooseTourDueDate,
   createTourProject,
+  describeTourParty,
   fillInTourProject,
   findCreateButton,
   findFirstTaskPerson,
@@ -66,10 +68,26 @@ export const tourSteps: readonly TourStep[] = [
     isInWindow: true,
     title: "Adding a project",
     description:
-      "A project starts with a title, a few notes, who it is for, and a first task. Press Create, or Next, to create it.",
+      "A project starts with a title, a few notes, who it is for, and a first task.",
     againDescription:
-      "The project started with a title, a few notes, who it is for, and a first task. Here they are, now that it is created.",
+      "A project starts with a title, a few notes, who it is for, and a first task. Here they are.",
     action: fillInTourProject,
+  },
+  {
+    id: "due-date",
+    name: "Due date",
+    element: ".project-window",
+    side: "left",
+    isInWindow: true,
+    title: "Due date",
+    // "Saturday" or "next Saturday", from the day the tour is started.
+    get description() {
+      return `The street party is ${describeTourParty()}, so the baking is due the Friday before. A project's due date is chosen from its calendar. Press Create, or Next, to create the project.`;
+    },
+    get againDescription() {
+      return `The street party is ${describeTourParty()}, so the baking is due the Friday before, chosen from the project's calendar.`;
+    },
+    action: chooseTourDueDate,
     clickable: findCreateButton,
   },
   {

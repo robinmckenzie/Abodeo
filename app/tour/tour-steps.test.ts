@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  describeTourParty,
   findCreateButton,
   findFirstTaskPerson,
   findTourProjectBar,
@@ -14,6 +15,7 @@ describe("tourSteps", () => {
     expect(tourSteps.map((step) => step.name)).toEqual([
       "Projects",
       "Adding a project",
+      "Due date",
       "Project created",
       "Assigning a task",
       "Task assigned",
@@ -31,6 +33,7 @@ describe("tourSteps", () => {
     expect(tourSteps.map((step) => step.element)).toEqual([
       'ul[aria-label="Projects"]',
       ".project-window",
+      ".project-window",
       findTourProjectBar,
       ".project-window",
       ".project-window",
@@ -44,11 +47,18 @@ describe("tourSteps", () => {
   it("puts the steps that fill in, assign and add tasks in the window, and gives each project step an action", () => {
     expect(
       tourSteps.filter((step) => step.isInWindow).map((step) => step.id),
-    ).toEqual(["add-project", "assign-task", "task-assigned", "more-tasks"]);
+    ).toEqual([
+      "add-project",
+      "due-date",
+      "assign-task",
+      "task-assigned",
+      "more-tasks",
+    ]);
     expect(
       tourSteps.filter((step) => step.action).map((step) => step.id),
     ).toEqual([
       "add-project",
+      "due-date",
       "project-created",
       "assign-task",
       "task-assigned",
@@ -62,9 +72,26 @@ describe("tourSteps", () => {
         .filter((step) => step.clickable)
         .map((step) => [step.id, step.clickable]),
     ).toEqual([
-      ["add-project", findCreateButton],
+      ["due-date", findCreateButton],
       ["project-created", findTourProjectBar],
       ["assign-task", findFirstTaskPerson],
+    ]);
+  });
+
+  it("says the street party is next Saturday only on a Friday or a Saturday", () => {
+    // Monday 23 to Sunday 29 November 2026.
+    expect(
+      [23, 24, 25, 26, 27, 28, 29].map((day) =>
+        describeTourParty(`2026-11-${day}`),
+      ),
+    ).toEqual([
+      "Saturday",
+      "Saturday",
+      "Saturday",
+      "Saturday",
+      "next Saturday",
+      "next Saturday",
+      "Saturday",
     ]);
   });
 
@@ -85,6 +112,6 @@ describe("tourSteps", () => {
 
 describe("describeTourStep", () => {
   it("names a step by its place and name", () => {
-    expect(describeTourStep(6)).toBe("step 7 of 9 (People)");
+    expect(describeTourStep(7)).toBe("step 8 of 10 (People)");
   });
 });

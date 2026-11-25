@@ -4,6 +4,7 @@ import {
   addDays,
   addMonths,
   describeDueDate,
+  findNextFriday,
   findToday,
   findWeekday,
   isCalendarDate,
@@ -11,6 +12,24 @@ import {
 } from "./due-date";
 
 describe("due dates", () => {
+  it("finds the first Friday after a date, never the date itself", () => {
+    // Monday 23 to Sunday 29 November 2026.
+    expect(
+      [23, 24, 25, 26, 27, 28, 29].map((day) =>
+        findNextFriday(`2026-11-${day}`),
+      ),
+    ).toEqual([
+      "2026-11-27",
+      "2026-11-27",
+      "2026-11-27",
+      "2026-11-27",
+      "2026-12-04",
+      "2026-12-04",
+      "2026-12-04",
+    ]);
+    expect(findNextFriday("2026-12-26")).toBe("2027-01-01");
+  });
+
   it("accepts only real calendar dates, as YYYY-MM-DD", () => {
     expect(isCalendarDate("2026-10-16")).toBe(true);
     expect(isCalendarDate("2028-02-29")).toBe(true);

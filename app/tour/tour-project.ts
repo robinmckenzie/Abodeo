@@ -1,7 +1,14 @@
 // The demo tour's own project (AD #160 Tour Creates A Project), made as a
 // visitor would make it, one step at a time: the tour fills in Add project,
-// creates it, opens it and the first task's list of people, chooses Priya,
+// chooses its due date, creates it, opens it and the first task's list of people, chooses Priya,
 // then adds and assigns two more tasks.
+import {
+  describeDueDate,
+  findNextFriday,
+  findToday,
+  findWeekday,
+} from "../projects/due-date";
+
 import {
   pause,
   pressEnter,
@@ -13,7 +20,9 @@ import {
 
 export const tourProject = {
   title: "Bake for the street party",
-  notes: "Something sweet for Saturday.",
+  get notes() {
+    return `Something sweet for ${describeTourParty()}.`;
+  },
   firstTask: { title: "Buy flour and butter", person: "Priya" },
   moreTasks: [
     { title: "Bake two trays of scones", person: "Sam" },
@@ -85,14 +94,63 @@ export async function fillInTourProject({
   assignees[1]?.click();
 }
 
+// The project's due date: the Friday before the street party, the first
+// Friday after today.
+export function findTourDueDate(today = findToday()) {
+  return findNextFriday(today);
+}
+
+// When the street party is, the day after the due date: "next Saturday" on
+// a Friday or a Saturday, when it is more than a week away, and otherwise
+// "Saturday".
+export function describeTourParty(today = findToday()) {
+  const weekday = findWeekday(today);
+  return weekday === "Friday" || weekday === "Saturday"
+    ? "next Saturday"
+    : "Saturday";
+}
+
+// Chooses the due date in Add project's calendar, moving to the next month
+// if the day is not in the one shown. A day chosen already is left.
+export async function chooseTourDueDate({
+  show,
+  signal,
+  hurried,
+}: TourActionContext) {
+  const name = describeDueDate(findTourDueDate());
+  const findDay = () =>
+    findInWindow<HTMLButtonElement>(
+      `button[name="dueDate"][aria-label="${name}"]`,
+    ) ?? undefined;
+  await waitUntil(() => findInWindow(".due-date-picker"), signal);
+  show();
+  await pause(tourPace.settling, signal, hurried);
+  if (!findDay()) {
+    findInWindow<HTMLButtonElement>('button[name="dueDate-next"]')?.click();
+    await waitUntil(findDay, signal);
+    await pause(tourPace.settling, signal, hurried);
+  }
+  const day = findDay()!;
+  if (day.getAttribute("aria-pressed") !== "true") day.click();
+  await waitUntil(
+    () => findDay()?.getAttribute("aria-pressed") === "true",
+    signal,
+  );
+}
+
 // Presses Create, unless the visitor did, which closes the window once the
-// project is saved, and shows the step on the new project's bar.
+// project is saved, and shows the step on the new project's bar. Acting
+// again after Back, with the project created and open, it closes it.
 export async function createTourProject({
   show,
   signal,
   visitorActed,
 }: TourActionContext) {
-  if (!visitorActed) findCreateButton()?.click();
+  if (!visitorActed) {
+    const create = findCreateButton();
+    if (create) create.click();
+    else await closeProjectWindow(signal);
+  }
   await waitUntil(
     () => !document.querySelector(windowSelector) && findTourProjectBar(),
     signal,
