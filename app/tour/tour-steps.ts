@@ -56,7 +56,7 @@ export const tourSteps: readonly TourStep[] = [
     side: "bottom",
     title: "Your projects",
     description:
-      "Everything on the go around the home, one bar each. These two are already under way, with photos of how they are getting on.",
+      "Your projects around the home, one bar each. These two are already under way, with pictures of how they should look when finished.",
   },
   {
     id: "add-project",
