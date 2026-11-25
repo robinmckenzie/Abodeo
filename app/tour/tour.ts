@@ -11,6 +11,11 @@ import { TourEnded } from "./tour-page";
 import { closeProjectWindow, reopenTourProject } from "./tour-project";
 import { tourSteps, type TourStep } from "./tour-steps";
 
+// An arrow key as a small key cap. The arrow is drawn, as the text arrows
+// have heads too small to see at this size.
+const keyCap = (direction: "left" | "right") =>
+  `<kbd class="tour-key" aria-hidden="true"><svg viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${direction === "left" ? ' transform="scale(-1 1)"' : ""}><path d="M2 7h12M8.5 1.5 14 7l-5.5 5.5"/></svg></kbd>`;
+
 // Starts the tour from its first step. onEnd is called once it ends, by
 // finishing, skipping or Esc, but not by a call of the result's destroy.
 //
@@ -173,8 +178,11 @@ export function startTour(
     disableActiveInteraction: true,
     // No close (×) button (decision 31 on AD #139): "Skip tour" ends it.
     showButtons: ["next", "previous"],
-    prevBtnText: "Back",
-    doneBtnText: "Done",
+    // Each shows its arrow key as a small key cap, hidden from screen readers
+    // so that the buttons are still called Back, Next and Done.
+    prevBtnText: `${keyCap("left")} Back`,
+    nextBtnText: `Next ${keyCap("right")}`,
+    doneBtnText: `Done ${keyCap("right")}`,
     showProgress: true,
     popoverClass: "tour-popover",
     onPopoverRender: (popover) => {

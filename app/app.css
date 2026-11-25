@@ -2949,6 +2949,46 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   cursor: pointer;
 }
 
+/* The arrow keys on Back and Next, drawn like the keys in the keyboard
+   shortcuts panel. Each sits in the button's rounded end, as far from its
+   end as from its top and bottom; its radius follows the button's. */
+.tour-popover .driver-popover-prev-btn,
+.tour-popover .driver-popover-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tour-popover .driver-popover-prev-btn:has(.tour-key) {
+  padding-left: 0.25rem;
+  padding-right: 0.425rem;
+}
+
+.tour-popover .driver-popover-next-btn:has(.tour-key) {
+  padding-left: calc(0.425rem - 1px);
+  padding-right: 0.25rem;
+}
+
+/* The raised edge is a shadow below the key, so a margin of the same depth
+   centres the key and its edge together. */
+.tour-popover .tour-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.15rem;
+  margin-bottom: 1px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f7f5ef;
+  box-shadow: 0 1px 0 #ccc;
+}
+
+.tour-popover .tour-key svg {
+  width: 0.8rem;
+  height: 0.7rem;
+}
+
 .tour-popover .tour-skip {
   margin-right: auto;
   border-color: transparent;
