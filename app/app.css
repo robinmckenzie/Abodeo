@@ -3003,6 +3003,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   translate: 10px 0;
 }
 
+/* On People and the Bin, the bubble sits 15px further right. */
+.driver-popover:is(.tour-step-people, .tour-step-bin) {
+  translate: 15px 0;
+}
+
 /* On Task assigned, the bubble slides right as the tasks narrow once Priya
    is chosen. */
 .driver-popover.tour-step-task-assigned {
