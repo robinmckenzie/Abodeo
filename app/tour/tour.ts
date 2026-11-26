@@ -43,6 +43,9 @@ export function startTour(
   const ranActions = new Set<string>();
   const firstActing = steps.findIndex((step) => step.action);
   let isActing = false;
+  // While a step's action runs for the first time, as when More tasks adds
+  // its tasks; not when the step acts again after Back and Next.
+  let isActingFirst = false;
   // The bubble's buttons, and those driver.js itself made unavailable, such
   // as Back on the first step. driver.js builds a new bubble at every step.
   let buttons: HTMLButtonElement[] = [];
@@ -70,10 +73,11 @@ export function startTour(
       button.disabled = isUnavailable;
       button.classList.toggle("driver-popover-btn-disabled", isUnavailable);
     }
-    // So that app.css can place a step's bubble differently while it acts.
+    // So that app.css can place a step's bubble differently while it acts
+    // for the first time.
     buttons[0]
       ?.closest(".driver-popover")
-      ?.classList.toggle("tour-acting", isActing);
+      ?.classList.toggle("tour-acting", isActingFirst);
   };
 
   const setActing = (acting: boolean) => {
@@ -130,6 +134,7 @@ export function startTour(
     try {
       if (step.action && (!ranActions.has(step.id) || actsAgain)) {
         // The action closes or opens the window as it needs.
+        isActingFirst = !ranActions.has(step.id);
         ranActions.add(step.id);
         await step.action({
           show: () => tour.moveTo(to),
@@ -160,6 +165,7 @@ export function startTour(
     } catch (error) {
       if (!(error instanceof TourEnded)) throw error;
     } finally {
+      isActingFirst = false;
       if (!running.signal.aborted) {
         setActing(false);
         if (acted || (isShownAgain && step.clickableAgain)) {
