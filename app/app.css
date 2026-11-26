@@ -2961,6 +2961,20 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   cursor: pointer;
 }
 
+/* A part of the project's window that a step highlights, such as its
+   appointments (AD #161 Tour Appointment). The window is a modal dialog, so
+   it sits above driver.js's dimming; a shadow, clipped by the window, dims
+   the rest of it as driver.js dims the page, leaving a narrow margin in the
+   window's colour as driver.js does. */
+.project-window .driver-active-element {
+  position: relative;
+  z-index: 1;
+  border-radius: 1px;
+  box-shadow:
+    0 0 0 8px var(--card),
+    0 0 0 100vmax rgb(0 0 0 / 0.7);
+}
+
 /* The arrow keys on Back and Next, drawn like the keys in the keyboard
    shortcuts panel. Each sits in the button's rounded end, as far from its
    end as from its top and bottom; its radius follows the button's.
