@@ -2419,6 +2419,29 @@ describe("the tour's appointment (AD #161 Tour Appointment)", () => {
     expect(server.addedAppointments).toHaveLength(1);
   }, 20_000);
 
+  it("adds the two tasks once after Back from More tasks and Next, before the appointment", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    for (const title of [
+      "Adding a project",
+      "Due date",
+      "Project created",
+      "Assigning a task",
+      "Task assigned",
+      "More tasks",
+    ]) {
+      await pressAndWait("Next", title);
+    }
+    await pressAndWait("Back", "Task assigned");
+    await pressAndWait("Next", "More tasks");
+    const [project] = savedProjects(server);
+    expect(project.tasks.map((task) => task.title)).toEqual([
+      "Buy flour and butter",
+      "Bake two trays of scones",
+      "Pack them in the tin",
+    ]);
+  }, 20_000);
+
   it("fills in the open form again after Back to More tasks and Next, and adds one appointment", async () => {
     const server = signedIn();
     await renderTour({ startTour: true });

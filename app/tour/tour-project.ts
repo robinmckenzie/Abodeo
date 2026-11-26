@@ -317,6 +317,8 @@ export async function chooseFirstTaskPerson({
 }
 
 // Adds both tasks at once, as two lines and one Enter, then assigns each.
+// Acting again, after Back and Next before "Adding an appointment" has
+// acted, finds them added already and leaves them.
 export async function addMoreTourTasks(context: TourActionContext) {
   const { signal, hurried } = context;
   await openTourProject(context);
@@ -327,6 +329,7 @@ export async function addMoreTourTasks(context: TourActionContext) {
       ),
     signal,
   );
+  if (tourProject.moreTasks.every(({ title }) => findPicker(title))) return;
   taskBox.focus();
   setFieldValue(
     taskBox,
