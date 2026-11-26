@@ -58,6 +58,12 @@ export type TourStep = {
 
 const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
 
+// The Due date step's wording, the same whether shown first or again.
+function describeTourDueDate() {
+  const dance = describeTourDance();
+  return `The barn dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar.`;
+}
+
 export const tourSteps: readonly TourStep[] = [
   {
     id: "projects",
@@ -91,11 +97,10 @@ export const tourSteps: readonly TourStep[] = [
     // "on Saturday" or "next Saturday", and "tomorrow" or "on Friday", from
     // the day the tour is started.
     get description() {
-      const dance = describeTourDance();
-      return `The barn dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar. Press Create, or Next, to create the project.`;
+      return `${describeTourDueDate()} Press Create, or Next, to create the project.`;
     },
     get againDescription() {
-      return `The barn dance is ${describeTourDance()}, so the baking is due the Friday before, chosen from the project's calendar.`;
+      return describeTourDueDate();
     },
     action: chooseTourDueDate,
     clickable: findCreateButton,
