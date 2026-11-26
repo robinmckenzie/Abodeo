@@ -305,8 +305,11 @@ export async function openFirstTaskList(context: TourActionContext) {
 // Chooses the person in the first task's list, opening it again if the
 // press on Next closed it. If the visitor chose them, waits until the task
 // shows them.
+// The tasks are as wide as their widest row, so they narrow as "Unassigned"
+// becomes "Priya", and the bubble is placed again beside them.
 export async function chooseFirstTaskPerson({
   show,
+  refresh,
   signal,
   hurried,
   visitorActed,
@@ -316,13 +319,13 @@ export async function chooseFirstTaskPerson({
   const picker = await waitUntil(() => findPicker(title), signal);
   if (visitorActed) {
     await waitUntil(() => picker.textContent === person, signal);
-    return;
+  } else if (picker.textContent !== person) {
+    const wasOpen = isOpen(picker);
+    await openPeopleList(title, signal);
+    if (!wasOpen) await pause(tourPace.settling, signal, hurried);
+    await choosePerson(picker, person, signal, hurried);
   }
-  if (picker.textContent === person) return;
-  const wasOpen = isOpen(picker);
-  await openPeopleList(title, signal);
-  if (!wasOpen) await pause(tourPace.settling, signal, hurried);
-  await choosePerson(picker, person, signal, hurried);
+  refresh?.();
 }
 
 // Adds both tasks at once, as two lines and one Enter, then assigns each.
