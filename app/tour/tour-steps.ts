@@ -122,7 +122,7 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "assign-task",
     name: "Assigning a task",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "Assigning a task",
@@ -148,7 +148,7 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "more-tasks",
     name: "More tasks",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "More tasks",
