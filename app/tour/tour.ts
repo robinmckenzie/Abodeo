@@ -59,6 +59,25 @@ export function startTour(
   // Wording an action gave its step once it knew how things went, kept for
   // when driver.js draws the bubble again.
   let described: { at: number; html: string } | undefined;
+  // driver.js places the bubble only when a step shows. In a narrow window
+  // it puts the bubble above the highlighted part rather than beside it, and
+  // then the part moves when the project window grows, as when its
+  // appointments load. So the bubble is placed again whenever the
+  // highlighted part or the project window changes size.
+  const sizeWatcher =
+    typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(() => tour.refresh());
+  const followSize = (element: Element | undefined) => {
+    if (!sizeWatcher) return;
+    sizeWatcher.disconnect();
+    if (!element) return;
+    sizeWatcher.observe(element);
+    const projectWindow = element.closest(".project-window");
+    if (projectWindow && projectWindow !== element) {
+      sizeWatcher.observe(projectWindow);
+    }
+  };
 
   // driver.js's own onDestroyed is not called if the tour ends before its
   // first highlight has finished moving into place, so the tour ends here.
@@ -204,6 +223,7 @@ export function startTour(
         popoverClass: `tour-popover tour-step-${step.id}`,
       },
     })),
+    onHighlighted: followSize,
     overlayClickBehavior: "none",
     disableActiveInteraction: true,
     // No close (×) button (decision 31 on AD #139): "Skip tour" ends it.
@@ -254,6 +274,7 @@ export function startTour(
     running.abort();
     withdrawClickable();
     window.removeEventListener("keyup", hurryOnArrow, true);
+    sizeWatcher?.disconnect();
     destroy();
   };
   tour.drive();
