@@ -2951,12 +2951,15 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 /* The arrow keys on Back and Next, drawn like the keys in the keyboard
    shortcuts panel. Each sits in the button's rounded end, as far from its
-   end as from its top and bottom; its radius follows the button's. */
-.tour-popover .driver-popover-prev-btn,
-.tour-popover .driver-popover-next-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(0.4rem + 2px);
+   end as from its top and bottom; its radius follows the button's.
+   driver.js sets the buttons' display inline, so the space between key and
+   word is a margin on the key, not a gap. */
+.tour-popover .driver-popover-prev-btn .tour-key {
+  margin-right: 2px;
+}
+
+.tour-popover .driver-popover-next-btn .tour-key {
+  margin-left: 2px;
 }
 
 .tour-popover .driver-popover-prev-btn:has(.tour-key) {
