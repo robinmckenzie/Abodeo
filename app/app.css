@@ -2976,11 +2976,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* The due date's Clear button rises above its calendar, so the margin is
-   7px taller at the top there. */
+   10px taller at the top there. */
 .project-window .due-date-picker.driver-active-element {
   box-shadow:
     0 0 0 8px var(--card),
-    0 -7px 0 8px var(--card),
+    0 -10px 0 8px var(--card),
     0 0 0 100vmax rgb(0 0 0 / 0.7);
 }
 
