@@ -6,3 +6,4 @@
 - Check key and click handling in the browser, not only in tests. jsdom runs event listeners without the microtask checkpoint a real browser runs between them, so a test can pass where the browser fails.
 - Wait about 3 seconds after a page loads before pressing a button: before hydration a button may do nothing, or a link may navigate without its state. If Vite re-optimises its dependencies during a run, the page reloads; run the check again.
 - PowerShell cannot pass multi-line text to `gh` as an argument, and its `Set-Content` and `Out-File` add a byte-order mark. Write the text to a file and pass it with `--body-file`.
+- For the same reason, a commit message containing double quotes breaks apart in `git commit -m`, even in a here-string, and git reads the pieces as paths and commits nothing. Write the message to a file and use `git commit -F`.
