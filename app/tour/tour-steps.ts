@@ -14,8 +14,10 @@ import {
   fillInTourProject,
   findAppointmentsSection,
   findCreateButton,
+  findDueDateCalendar,
   findFirstTaskPerson,
   findSaveButton,
+  findTaskSection,
   findTourProjectBar,
   openFirstTaskList,
   tourAppointmentAddedText,
@@ -90,8 +92,8 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "due-date",
     name: "Due date",
-    element: ".project-window",
-    side: "left",
+    element: findDueDateCalendar,
+    side: "right",
     isInWindow: true,
     title: "Due date",
     // "on Saturday" or "next Saturday", and "tomorrow" or "on Friday", from
@@ -135,7 +137,7 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "task-assigned",
     name: "Task assigned",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "Task assigned",

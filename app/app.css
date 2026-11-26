@@ -2975,6 +2975,13 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
     0 0 0 100vmax rgb(0 0 0 / 0.7);
 }
 
+/* A control offered as Next outside that part, such as Create beside the
+   due date's calendar, stays above the dimming. */
+.project-window .tour-clickable {
+  position: relative;
+  z-index: 2;
+}
+
 /* The arrow keys on Back and Next, drawn like the keys in the keyboard
    shortcuts panel. Each sits in the button's rounded end, as far from its
    end as from its top and bottom; its radius follows the button's.

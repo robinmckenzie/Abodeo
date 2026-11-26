@@ -351,6 +351,16 @@ export async function closeProjectWindow(signal: AbortSignal) {
   await waitUntil(() => !document.querySelector(windowSelector), signal);
 }
 
+// The due date's calendar, in the window.
+export function findDueDateCalendar() {
+  return findInWindow(".due-date-picker") ?? undefined;
+}
+
+// The project's tasks, in the window.
+export function findTaskSection() {
+  return findInWindow(".task-section") ?? undefined;
+}
+
 // The opened project's appointments, in the window.
 export function findAppointmentsSection() {
   return findInWindow('section[aria-label="Appointments"]') ?? undefined;
