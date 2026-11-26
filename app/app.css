@@ -2984,9 +2984,14 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
     0 0 0 100vmax rgb(0 0 0 / 0.7);
 }
 
-/* On More tasks, the bubble sits 15px further left, clear of the tasks. */
+/* On More tasks, the bubble sits 15px further left, clear of the tasks, and
+   on Due date 10px further right of the calendar. */
 .driver-popover.tour-step-more-tasks {
   translate: -15px 0;
+}
+
+.driver-popover.tour-step-due-date {
+  translate: 10px 0;
 }
 
 /* A control offered as Next outside that part, such as Create beside the
