@@ -63,7 +63,7 @@ const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
 // The Due date step's wording, the same whether shown first or again.
 function describeTourDueDate() {
   const dance = describeTourDance();
-  return `The barn dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar.`;
+  return `The Barn Dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar.`;
 }
 
 export const tourSteps: readonly TourStep[] = [

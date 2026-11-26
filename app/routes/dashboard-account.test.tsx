@@ -45,6 +45,7 @@ import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
 import { tourPace } from "../tour/tour-page";
 import {
+  findTourDanceDay,
   tourAppointmentAddedText,
   tourAppointmentFailedText,
 } from "../tour/tour-project";
@@ -2332,7 +2333,7 @@ describe("the tour's appointment (AD #161 Tour Appointment)", () => {
       screen.getByRole<HTMLInputElement>("textbox", {
         name: "Appointment title",
       }).value,
-    ).toBe("Barn dance planning");
+    ).toBe("Set up the Village Hall");
     expect(saveButton().classList.contains("tour-clickable")).toBe(true);
     expect(description()).toContain("Press Save");
     expect(server.addedAppointments).toHaveLength(0);
@@ -2341,13 +2342,15 @@ describe("the tour's appointment (AD #161 Tour Appointment)", () => {
     expect(description()).toBe(tourAppointmentAddedText);
     expect(server.addedAppointments).toHaveLength(1);
     expect(server.addedAppointments[0]).toMatchObject({
-      title: "Barn dance planning",
+      title: "Set up the Village Hall",
       notes: "Agree who brings what.",
       allDay: false,
+      start: `${findTourDanceDay()}T14:00`,
+      end: `${findTourDanceDay()}T15:00`,
       projectId: savedProjects(server)[0].id,
     });
     expect(appointmentForm()).toBeNull();
-    expect(entries()).toEqual(["Barn dance planning"]);
+    expect(entries()).toEqual(["Set up the Village Hall"]);
 
     await pressAndWait("Next", "People");
     expect(projectWindow()).toBeNull();
@@ -2363,7 +2366,7 @@ describe("the tour's appointment (AD #161 Tour Appointment)", () => {
     await waitForStep("In Google Calendar");
     expect(description()).toBe(tourAppointmentAddedText);
     expect(server.addedAppointments).toHaveLength(1);
-    expect(entries()).toEqual(["Barn dance planning"]);
+    expect(entries()).toEqual(["Set up the Village Hall"]);
   }, 20_000);
 
   it.each([
@@ -2454,7 +2457,7 @@ describe("the tour's appointment (AD #161 Tour Appointment)", () => {
       screen.getByRole<HTMLInputElement>("textbox", {
         name: "Appointment title",
       }).value,
-    ).toBe("Barn dance planning");
+    ).toBe("Set up the Village Hall");
     await act(async () => {
       fireEvent.click(saveButton());
     });

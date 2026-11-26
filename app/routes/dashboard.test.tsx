@@ -917,7 +917,7 @@ describe("Dashboard", () => {
 
       await pressAndWait("Next", "Adding a project");
       expect(projectWindow()).toBeTruthy();
-      expect(titleField()).toHaveProperty("value", "Bake for the barn dance");
+      expect(titleField()).toHaveProperty("value", "Bake for the Barn Dance");
       expect(description()).not.toContain("Create");
 
       await pressAndWait("Next", "Due date");
@@ -936,7 +936,7 @@ describe("Dashboard", () => {
       expect(projectWindow()).toBeNull();
       expect(savedProjects()).toHaveLength(1);
       expect(savedProjects()[0]).toMatchObject({
-        title: "Bake for the barn dance",
+        title: "Bake for the Barn Dance",
         notes: "Something sweet for Saturday.",
         assignee: "sam",
         dueDate: "2026-10-30",
@@ -1054,7 +1054,7 @@ describe("Dashboard", () => {
       expect(description()).toContain("chosen from the project's calendar");
       await pressAndWait("Back", "Adding a project");
       expect(projectWindow()).toBeTruthy();
-      expect(titleField()).toHaveProperty("value", "Bake for the barn dance");
+      expect(titleField()).toHaveProperty("value", "Bake for the Barn Dance");
       expect(description()).toContain("Here they are");
       await pressAndWait("Next", "Due date");
       await pressAndWait("Next", "Project created");
@@ -1132,7 +1132,7 @@ describe("Dashboard", () => {
 
     it("goes on when the visitor presses Create, the new bar and Priya instead of Next, doing each once", async () => {
       // Friday 27 November 2026: due on Friday 4 December, a month on, for
-      // the barn dance next Saturday.
+      // the Barn Dance next Saturday.
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date(2026, 10, 27, 12));
       savePeople("Sam", "Priya");
@@ -1180,7 +1180,7 @@ describe("Dashboard", () => {
     it("Restart tour removes only the tour's projects and runs the tour again", async () => {
       savePeople("Sam", "Priya");
       await renderDashboard();
-      await addProject("Bake for the barn dance");
+      await addProject("Bake for the Barn Dance");
       await addProject("Kitchen");
       cleanup();
       await renderDashboard({ restartTour: true });

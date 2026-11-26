@@ -90,7 +90,7 @@ describe("tourSteps", () => {
     ]);
   });
 
-  it("says the barn dance is next Saturday only on a Friday or a Saturday", () => {
+  it("says the Barn Dance is next Saturday only on a Friday or a Saturday", () => {
     // Monday 23 to Sunday 29 November 2026.
     expect(
       [23, 24, 25, 26, 27, 28, 29].map((day) =>

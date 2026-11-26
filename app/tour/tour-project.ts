@@ -4,6 +4,7 @@
 // people, chooses Priya, adds and assigns two more tasks, then fills in and
 // saves an appointment in Google Calendar (AD #161 Tour Appointment).
 import {
+  addDays,
   describeDueDate,
   findNextFriday,
   findToday,
@@ -22,7 +23,7 @@ import {
 } from "./tour-page";
 
 export const tourProject = {
-  title: "Bake for the barn dance",
+  title: "Bake for the Barn Dance",
   get notes() {
     return `Something sweet for ${describeTourDance()}.`;
   },
@@ -33,11 +34,14 @@ export const tourProject = {
   ],
 };
 
-// The appointment the tour adds to the project. It starts at the form's own
-// next whole hour.
+// The appointment the tour adds to the project, on the day of the Barn
+// Dance, from 2 pm. The form ends it an hour later.
 export const tourAppointment = {
-  title: "Barn dance planning",
+  title: "Set up the Village Hall",
   notes: "Agree who brings what.",
+  get start() {
+    return `${findTourDanceDay()}T14:00`;
+  },
 };
 
 // What a step's action is given: show puts the step's bubble on the page
@@ -109,13 +113,18 @@ export async function fillInTourProject({
   assignees[1]?.click();
 }
 
-// The project's due date: the Friday before the barn dance, the first
+// The project's due date: the Friday before the Barn Dance, the first
 // Friday after today.
 export function findTourDueDate(today = findToday()) {
   return findNextFriday(today);
 }
 
-// When the barn dance is, the day after the due date: "next Saturday" on
+// The day of the Barn Dance, the Saturday after the due date.
+export function findTourDanceDay(today = findToday()) {
+  return addDays(findTourDueDate(today), 1);
+}
+
+// When the Barn Dance is, the day after the due date: "next Saturday" on
 // a Friday or a Saturday, when it is more than a week away, and otherwise
 // "Saturday".
 export function describeTourDance(today = findToday()) {
@@ -484,6 +493,10 @@ export async function fillInTourAppointment(context: TourActionContext) {
   setFieldValue(
     form.querySelector<HTMLInputElement>('input[type="text"]')!,
     tourAppointment.title,
+  );
+  setFieldValue(
+    form.querySelector<HTMLInputElement>('input[type="datetime-local"]')!,
+    tourAppointment.start,
   );
   setFieldValue(form.querySelector("textarea")!, tourAppointment.notes);
   context.refresh?.();
