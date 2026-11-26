@@ -139,6 +139,12 @@ export function startTour(
         await step.action({
           show: () => tour.moveTo(to),
           refresh: () => tour.refresh(),
+          settle: () => {
+            if (running.signal.aborted || tour.getActiveIndex() !== to) return;
+            isActingFirst = false;
+            showButtons();
+            tour.refresh();
+          },
           describe: (html) => {
             if (running.signal.aborted || tour.getActiveIndex() !== to) return;
             described = { at: to, html };

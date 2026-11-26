@@ -46,7 +46,8 @@ export const tourAppointment = {
 
 // What a step's action is given: show puts the step's bubble on the page
 // (again, if the area it highlights has been replaced), refresh fits the
-// highlight to an area that has changed size, describe changes the shown
+// highlight to an area that has changed size, settle does that and ends the
+// bubble's placing for acting (app.css) once the step's change is in view, describe changes the shown
 // bubble's wording (HTML) once the action knows how things went, signal ends
 // the action when the tour ends, and hurried ends its typing and pauses at
 // once.
@@ -56,6 +57,7 @@ export const tourAppointment = {
 export type TourActionContext = {
   show: () => void;
   refresh?: () => void;
+  settle?: () => void;
   describe?: (html: string) => void;
   signal: AbortSignal;
   hurried?: AbortSignal;
@@ -257,21 +259,24 @@ async function openPeopleList(taskTitle: string, signal: AbortSignal) {
 }
 
 // Chooses a person, by name, in the task's open list, and waits until the
-// task shows them. If no one has that name, the list is closed and the task
-// keeps its person.
+// task shows them, calling shown then. If no one has that name, the list is
+// closed and the task keeps its person.
 async function choosePerson(
   picker: HTMLButtonElement,
   person: string,
   signal: AbortSignal,
   hurried?: AbortSignal,
+  shown?: () => void,
 ) {
   const option = findPersonOption(person);
   if (!option) {
     picker.click();
+    shown?.();
     return;
   }
   option.click();
   await waitUntil(() => picker.textContent === person, signal);
+  shown?.();
   await pause(tourPace.settling, signal, hurried);
 }
 
@@ -281,10 +286,11 @@ async function assignTask(
   person: string,
   signal: AbortSignal,
   hurried?: AbortSignal,
+  shown?: () => void,
 ) {
   const picker = await openPeopleList(taskTitle, signal);
   await pause(tourPace.settling, signal, hurried);
-  await choosePerson(picker, person, signal, hurried);
+  await choosePerson(picker, person, signal, hurried, shown);
 }
 
 // Priya's entry in the first task's open list, which the visitor may choose
@@ -306,10 +312,10 @@ export async function openFirstTaskList(context: TourActionContext) {
 // press on Next closed it. If the visitor chose them, waits until the task
 // shows them.
 // The tasks are as wide as their widest row, so they narrow as "Unassigned"
-// becomes "Priya", and the bubble is placed again beside them.
+// becomes "Priya", and the bubble is placed again beside them at once.
 export async function chooseFirstTaskPerson({
   show,
-  refresh,
+  settle,
   signal,
   hurried,
   visitorActed,
@@ -319,13 +325,13 @@ export async function chooseFirstTaskPerson({
   const picker = await waitUntil(() => findPicker(title), signal);
   if (visitorActed) {
     await waitUntil(() => picker.textContent === person, signal);
+    settle?.();
   } else if (picker.textContent !== person) {
     const wasOpen = isOpen(picker);
     await openPeopleList(title, signal);
     if (!wasOpen) await pause(tourPace.settling, signal, hurried);
-    await choosePerson(picker, person, signal, hurried);
+    await choosePerson(picker, person, signal, hurried, settle);
   }
-  refresh?.();
 }
 
 // Adds both tasks at once, as two lines and one Enter, then assigns each.
@@ -351,11 +357,17 @@ export async function addMoreTourTasks(context: TourActionContext) {
   pressEnter(taskBox);
   // The box clears only once both tasks are saved.
   await waitUntil(() => taskBox.value === "", signal);
-  for (const { title, person } of tourProject.moreTasks) {
-    await assignTask(title, person, signal, hurried);
+  // The bubble moves beside the tasks as soon as the last is assigned.
+  const last = tourProject.moreTasks.length - 1;
+  for (const [index, { title, person }] of tourProject.moreTasks.entries()) {
+    await assignTask(
+      title,
+      person,
+      signal,
+      hurried,
+      index === last ? context.settle : undefined,
+    );
   }
-  // The bubble moves beside the finished tasks.
-  context.refresh?.();
 }
 
 // Closes the project's window with its Close button, if it is open, and
