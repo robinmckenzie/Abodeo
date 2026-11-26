@@ -180,8 +180,8 @@ export function startTour(
     showButtons: ["next", "previous"],
     // Each shows its arrow key as a small key cap, hidden from screen readers
     // so that the buttons are still called Back, Next and Done.
-    prevBtnText: `${keyCap("left")} Back`,
-    nextBtnText: `Next ${keyCap("right")}`,
+    prevBtnText: `${keyCap("left")} <span class="tour-word">Back</span>`,
+    nextBtnText: `<span class="tour-word">Next</span> ${keyCap("right")}`,
     doneBtnText: `Done ${keyCap("right")}`,
     showProgress: true,
     popoverClass: "tour-popover",

@@ -2962,6 +2962,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   margin-left: 2px;
 }
 
+/* Room either side of Back and Next (not Done). */
+.tour-popover .tour-word {
+  margin: 0 4px;
+}
+
 .tour-popover .driver-popover-prev-btn:has(.tour-key) {
   padding-left: 0.25rem;
   padding-right: 0.425rem;
