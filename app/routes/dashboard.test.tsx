@@ -921,7 +921,7 @@ describe("Dashboard", () => {
       expect(description()).not.toContain("Create");
 
       await pressAndWait("Next", "Due date");
-      expect(description()).toContain("dance is Saturday");
+      expect(description()).toContain("Dance is on Saturday");
       expect(
         dueDay("Friday 30 October 2026")?.getAttribute("aria-pressed"),
       ).toBe("true");
@@ -1032,9 +1032,12 @@ describe("Dashboard", () => {
       await pressAndWait("Back", "Adding an appointment");
       expect(description()).toContain("added from the project");
       await pressAndWait("Back", "More tasks");
-      expect(projectWindow()?.classList.contains("driver-active-element")).toBe(
-        true,
-      );
+      expect(projectWindow()).toBeTruthy();
+      expect(
+        document
+          .querySelector(".project-window .task-section")
+          ?.classList.contains("driver-active-element"),
+      ).toBe(true);
       await pressAndWait("Back", "Task assigned");
       await pressAndWait("Back", "Assigning a task");
       expect(description()).toContain("Priya was chosen");
@@ -1051,7 +1054,8 @@ describe("Dashboard", () => {
       await pressAndWait("Back", "Project created");
       await pressAndWait("Back", "Due date");
       expect(projectWindow()).toBeTruthy();
-      expect(description()).toContain("chosen from the project's calendar");
+      expect(description()).toContain("set using the displayed calendar.");
+      expect(description()).not.toContain("Press Create");
       await pressAndWait("Back", "Adding a project");
       expect(projectWindow()).toBeTruthy();
       expect(titleField()).toHaveProperty("value", "Bake for the Barn Dance");
@@ -1144,7 +1148,7 @@ describe("Dashboard", () => {
         "Something sweet for next Saturday.",
       );
       await pressAndWait("Next", "Due date");
-      expect(description()).toContain("dance is next Saturday");
+      expect(description()).toContain("Dance is next Saturday");
       expect(
         dueDay("Friday 4 December 2026")?.getAttribute("aria-pressed"),
       ).toBe("true");

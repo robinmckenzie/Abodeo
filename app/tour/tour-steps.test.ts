@@ -4,9 +4,11 @@ import {
   describeTourBakingDay,
   describeTourDance,
   findCreateButton,
+  findDueDateCalendar,
   findAppointmentsSection,
   findFirstTaskPerson,
   findSaveButton,
+  findTaskSection,
   findTourProjectBar,
 } from "./tour-project";
 import { describeTourStep, tourSteps } from "./tour-steps";
@@ -34,15 +36,15 @@ describe("tourSteps", () => {
     );
   });
 
-  it("highlights the projects list, the project's window, the new project's bar, its appointments and the People and Bin menu entries, and centres the closing step", () => {
+  it("highlights the projects list, the project's window, the due date's calendar, the new project's bar, its tasks and appointments and the People and Bin menu entries, and centres the closing step", () => {
     expect(tourSteps.map((step) => step.element)).toEqual([
       'ul[aria-label="Projects"]',
       ".project-window",
-      ".project-window",
+      findDueDateCalendar,
       findTourProjectBar,
-      ".project-window",
-      ".project-window",
-      ".project-window",
+      findTaskSection,
+      findTaskSection,
+      findTaskSection,
       findAppointmentsSection,
       findAppointmentsSection,
       '.app-menu a[href="/people"]',
