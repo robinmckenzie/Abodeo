@@ -125,6 +125,12 @@ export function describeTourDance(today = findToday()) {
     : "Saturday";
 }
 
+// When the baking is due, for the Due date step: "tomorrow" on a Thursday,
+// and otherwise "on Friday".
+export function describeTourBakingDay(today = findToday()) {
+  return findWeekday(today) === "Thursday" ? "tomorrow" : "on Friday";
+}
+
 // Chooses the due date in Add project's calendar, moving to the next month
 // if the day is not in the one shown. A day chosen already is left.
 export async function chooseTourDueDate({

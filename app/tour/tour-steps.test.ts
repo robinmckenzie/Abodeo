@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  describeTourBakingDay,
   describeTourDance,
   findCreateButton,
   findAppointmentsSection,
@@ -104,6 +105,12 @@ describe("tourSteps", () => {
       "next Saturday",
       "Saturday",
     ]);
+  });
+
+  it("says the baking is due tomorrow only on a Thursday", () => {
+    expect(
+      [25, 26, 27].map((day) => describeTourBakingDay(`2026-11-${day}`)),
+    ).toEqual(["on Friday", "tomorrow", "on Friday"]);
   });
 
   it("gives the Bin's grace period", () => {

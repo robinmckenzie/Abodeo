@@ -8,6 +8,7 @@ import {
   chooseFirstTaskPerson,
   chooseTourDueDate,
   createTourProject,
+  describeTourBakingDay,
   describeTourDance,
   fillInTourAppointment,
   fillInTourProject,
@@ -87,9 +88,11 @@ export const tourSteps: readonly TourStep[] = [
     side: "left",
     isInWindow: true,
     title: "Due date",
-    // "Saturday" or "next Saturday", from the day the tour is started.
+    // "on Saturday" or "next Saturday", and "tomorrow" or "on Friday", from
+    // the day the tour is started.
     get description() {
-      return `The barn dance is ${describeTourDance()}, so the baking is due the Friday before. A project's due date is chosen from its calendar. Press Create, or Next, to create the project.`;
+      const dance = describeTourDance();
+      return `The barn dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar. Press Create, or Next, to create the project.`;
     },
     get againDescription() {
       return `The barn dance is ${describeTourDance()}, so the baking is due the Friday before, chosen from the project's calendar.`;
