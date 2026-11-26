@@ -70,6 +70,10 @@ export function startTour(
       button.disabled = isUnavailable;
       button.classList.toggle("driver-popover-btn-disabled", isUnavailable);
     }
+    // So that app.css can place a step's bubble differently while it acts.
+    buttons[0]
+      ?.closest(".driver-popover")
+      ?.classList.toggle("tour-acting", isActing);
   };
 
   const setActing = (acting: boolean) => {

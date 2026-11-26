@@ -354,6 +354,8 @@ export async function addMoreTourTasks(context: TourActionContext) {
   for (const { title, person } of tourProject.moreTasks) {
     await assignTask(title, person, signal, hurried);
   }
+  // The bubble moves beside the finished tasks.
+  context.refresh?.();
 }
 
 // Closes the project's window with its Close button, if it is open, and
