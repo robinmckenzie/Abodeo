@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
@@ -25,6 +26,7 @@ import { projectKeyPrefix } from "../projects/project-storage";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
+import { tourPace } from "../tour/tour-page";
 
 // jsdom has no modal dialogs, so the floating window's are stood in for.
 beforeAll(() => {
@@ -836,6 +838,341 @@ describe("Dashboard", () => {
     cleanup();
     await renderDashboard();
     expect(screen.queryByText("Your projects")).toBeNull();
+  });
+
+  describe("the tour's project step", () => {
+    const pace = { ...tourPace };
+    beforeEach(() => {
+      Object.assign(tourPace, { typing: 0, settling: 0 });
+    });
+    afterEach(() => {
+      Object.assign(tourPace, pace);
+      vi.useRealTimers();
+    });
+
+    const button = (name: string) =>
+      screen.getByRole<HTMLButtonElement>("button", { name });
+    // A day in the window's calendar, by its name.
+    const dueDay = (name: string) =>
+      document.querySelector(
+        `.project-window button[name="dueDate"][aria-label="${name}"]`,
+      );
+    // The bubble is a dialog too, so the window is found by its class.
+    const projectWindow = () => document.querySelector(".project-window");
+
+    async function pressAndWait(name: string, title: string) {
+      fireEvent.click(button(name));
+      await waitFor(
+        () => {
+          // Not getByText or getByRole, which are slow to run each time
+          // the tour types a character.
+          expect(
+            document.querySelector(".driver-popover-title")?.textContent,
+          ).toBe(title);
+          expect(
+            document.querySelector<HTMLButtonElement>(
+              ".driver-popover-next-btn",
+            )?.disabled,
+          ).toBe(false);
+        },
+        { timeout: 3000 },
+      );
+    }
+
+    const peopleList = () => document.querySelector(".task-assignee-list");
+
+    // A press of a control the tour offers instead of Next, as the visitor
+    // would make it, waiting for the step it moves to.
+    async function clickAndWait(control: Element, title: string) {
+      expect(control.classList.contains("tour-clickable")).toBe(true);
+      fireEvent.click(control);
+      await waitFor(
+        () => {
+          expect(
+            document.querySelector(".driver-popover-title")?.textContent,
+          ).toBe(title);
+          expect(
+            document.querySelector<HTMLButtonElement>(
+              ".driver-popover-next-btn",
+            )?.disabled,
+          ).toBe(false);
+        },
+        { timeout: 3000 },
+      );
+    }
+
+    const listTasks = () =>
+      savedProjects()[0].tasks.map(
+        (task: { title: string; assignee: string }) =>
+          `${task.title}: ${task.assignee}`,
+      );
+
+    it("fills in the tour's project, gives it a due date, creates it on Next, then assigns its first task and adds and assigns two more", async () => {
+      // Wednesday 28 October 2026: due on Friday 30 October.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 9, 28, 12));
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+
+      await pressAndWait("Next", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      expect(titleField()).toHaveProperty("value", "Bake for the street party");
+      expect(description()).not.toContain("Create");
+
+      await pressAndWait("Next", "Due date");
+      expect(description()).toContain("party is Saturday");
+      expect(
+        dueDay("Friday 30 October 2026")?.getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(
+        document
+          .querySelector('.project-window button[type="submit"]')
+          ?.classList.contains("tour-clickable"),
+      ).toBe(true);
+      expect(savedProjects()).toHaveLength(0);
+
+      await pressAndWait("Next", "Project created");
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+      expect(savedProjects()[0]).toMatchObject({
+        title: "Bake for the street party",
+        notes: "Something sweet for Saturday.",
+        assignee: "sam",
+        dueDate: "2026-10-30",
+      });
+      expect(bars()[0].classList.contains("driver-active-element")).toBe(true);
+
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(peopleList()).toBeTruthy();
+      expect(listTasks()).toEqual(["Buy flour and butter: unassigned"]);
+
+      await pressAndWait("Next", "Task assigned");
+      expect(peopleList()).toBeNull();
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+
+      await pressAndWait("Next", "More tasks");
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
+      ]);
+
+      await pressAndWait("Next", "People");
+      expect(projectWindow()).toBeNull();
+      expect(bars()).toHaveLength(1);
+    });
+
+    it("removes the tour's project on Back to the start, and makes it again on Next", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Back", "Due date");
+      expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Back", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      expect(savedProjects()).toHaveLength(1);
+      await pressAndWait("Back", "Your projects");
+      expect(savedProjects()).toHaveLength(0);
+      expect(bars()).toHaveLength(0);
+
+      await pressAndWait("Next", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      expect(savedProjects()).toHaveLength(1);
+    });
+
+    const description = () =>
+      document.querySelector(".driver-popover-description")?.textContent;
+    const findPerson = (name: string) =>
+      [
+        ...document.querySelectorAll(
+          ".task-assignee-list [role=menuitemradio]",
+        ),
+      ].find((option) => option.textContent?.startsWith(name));
+
+    it("shows the project open as it was left on steps shown again, in their own wording", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      expect(description()).toContain("Press Create");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      expect(description()).toContain("Choose Priya");
+      await pressAndWait("Next", "Task assigned");
+      await pressAndWait("Next", "More tasks");
+      await pressAndWait("Next", "People");
+      expect(projectWindow()).toBeNull();
+
+      await pressAndWait("Back", "More tasks");
+      expect(projectWindow()?.classList.contains("driver-active-element")).toBe(
+        true,
+      );
+      await pressAndWait("Back", "Task assigned");
+      await pressAndWait("Back", "Assigning a task");
+      expect(description()).toContain("Priya was chosen");
+      expect(peopleList()).toBeNull();
+
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      await pressAndWait("Back", "Project created");
+      await clickAndWait(bars()[0], "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+
+      await pressAndWait("Back", "Project created");
+      await pressAndWait("Back", "Due date");
+      expect(projectWindow()).toBeTruthy();
+      expect(description()).toContain("chosen from the project's calendar");
+      await pressAndWait("Back", "Adding a project");
+      expect(projectWindow()).toBeTruthy();
+      expect(titleField()).toHaveProperty("value", "Bake for the street party");
+      expect(description()).toContain("Here they are");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      expect(savedProjects()).toHaveLength(1);
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
+      ]);
+    }, 20_000);
+
+    it("goes on from the created project shown again on Adding a project, before the project has been opened", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Back", "Due date");
+      await pressAndWait("Back", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+      await pressAndWait("Next", "Assigning a task");
+      expect(peopleList()).toBeTruthy();
+    });
+
+    it("keeps the list of people open on a press anywhere but Priya, and Next then chooses her", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      fireEvent.pointerDown(findPerson("Sam")!);
+      fireEvent.pointerDown(document.body);
+      fireEvent.pointerDown(button("Next"));
+      expect(peopleList()).toBeTruthy();
+      await pressAndWait("Next", "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+    });
+
+    it("acts again on a step whose list was not used, after going back before it", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      await pressAndWait("Back", "Project created");
+      expect(projectWindow()).toBeNull();
+      await pressAndWait("Next", "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(peopleList()).toBeTruthy();
+      expect(description()).toContain("Choose Priya");
+      await clickAndWait(findPerson("Priya")!, "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+    });
+
+    it("leaves a task unassigned when no one has the name, and goes on", async () => {
+      savePeople("Andy");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      await pressAndWait("Next", "Due date");
+      await pressAndWait("Next", "Project created");
+      await pressAndWait("Next", "Assigning a task");
+      expect(peopleList()).toBeNull();
+      await pressAndWait("Next", "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: unassigned"]);
+    });
+
+    it("goes on when the visitor presses Create, the new bar and Priya instead of Next, doing each once", async () => {
+      // Friday 27 November 2026: due on Friday 4 December, a month on, for
+      // the party next Saturday.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 10, 27, 12));
+      savePeople("Sam", "Priya");
+      await renderDashboard({ startTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      await pressAndWait("Next", "Adding a project");
+      expect(notesField()).toHaveProperty(
+        "value",
+        "Something sweet for next Saturday.",
+      );
+      await pressAndWait("Next", "Due date");
+      expect(description()).toContain("party is next Saturday");
+      expect(
+        dueDay("Friday 4 December 2026")?.getAttribute("aria-pressed"),
+      ).toBe("true");
+
+      await clickAndWait(
+        document.querySelector('.project-window button[type="submit"]')!,
+        "Project created",
+      );
+      expect(projectWindow()).toBeNull();
+      expect(savedProjects()).toHaveLength(1);
+      expect(savedProjects()[0].dueDate).toBe("2026-12-04");
+
+      await clickAndWait(bars()[0], "Assigning a task");
+      expect(projectWindow()).toBeTruthy();
+      expect(bars()).toHaveLength(1);
+
+      const priya = [
+        ...document.querySelectorAll(
+          ".task-assignee-list [role=menuitemradio]",
+        ),
+      ].find((option) => option.textContent?.startsWith("Priya"))!;
+      await clickAndWait(priya, "Task assigned");
+      expect(listTasks()).toEqual(["Buy flour and butter: priya"]);
+
+      await pressAndWait("Next", "More tasks");
+      expect(listTasks()).toEqual([
+        "Buy flour and butter: priya",
+        "Bake two trays of scones: sam",
+        "Pack them in the tin: priya",
+      ]);
+    });
+
+    it("Restart tour removes only the tour's projects and runs the tour again", async () => {
+      savePeople("Sam", "Priya");
+      await renderDashboard();
+      await addProject("Bake for the street party");
+      await addProject("Kitchen");
+      cleanup();
+      await renderDashboard({ restartTour: true });
+      expect(await screen.findByText("Your projects")).toBeTruthy();
+      expect(savedProjects().map((project) => project.title)).toEqual([
+        "Kitchen",
+      ]);
+    });
   });
 });
 

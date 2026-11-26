@@ -117,6 +117,15 @@ export function PeopleIcon() {
   );
 }
 
+// An arrow going round to its start, for Restart tour (AD #160).
+export function RestartIcon() {
+  return (
+    <ScreenIcon name="restart">
+      <path d="M5.6 10a4.4 4.4 0 1 0 1.3-3.1M6.6 4.6v2.6h2.6" />
+    </ScreenIcon>
+  );
+}
+
 // A bin with its lid ajar, to tell it from the bin of a delete button. One
 // short line inside for each project in it, up to three, filling from the
 // bottom. The three places are 1.9 units apart, the top one level with the top
