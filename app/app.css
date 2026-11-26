@@ -2953,10 +2953,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 /* A control the visitor may press instead of Next, such as Create, once the
-   step has finished acting (AD #160 Tour Creates A Project). */
-.driver-no-interaction.tour-clickable,
-.driver-no-interaction .tour-clickable,
-.driver-no-interaction .tour-clickable * {
+   step has finished acting (AD #160 Tour Creates A Project). driver.js makes
+   everything but the highlighted part unclickable, and Create sits outside
+   the due date's calendar. */
+.driver-active .tour-clickable,
+.driver-active .tour-clickable * {
   pointer-events: auto !important;
   cursor: pointer;
 }
