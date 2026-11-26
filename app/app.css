@@ -2986,7 +2986,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 
 /* On More tasks, while the tour adds and assigns the tasks, which change
    size as it does, the bubble sits 60px further left, clear of them. Then it
-   slides beside the finished tasks. On Due date it sits 10px further right
+   slides beside the finished tasks. On Due date it sits 15px further right
    of the calendar. */
 .driver-popover.tour-step-more-tasks {
   transition:
@@ -3000,7 +3000,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .driver-popover.tour-step-due-date {
-  translate: 10px 0;
+  translate: 15px 0;
 }
 
 /* On People and the Bin, the bubble sits 15px further right. */
