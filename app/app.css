@@ -2984,11 +2984,11 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
     0 0 0 100vmax rgb(0 0 0 / 0.7);
 }
 
-/* On More tasks, the bubble sits 45px further left, clear of the tasks,
+/* On More tasks, the bubble sits 60px further left, clear of the tasks,
    which change size as the tour adds them, and on Due date 10px further
    right of the calendar. */
 .driver-popover.tour-step-more-tasks {
-  translate: -45px 0;
+  translate: -60px 0;
 }
 
 .driver-popover.tour-step-due-date {
