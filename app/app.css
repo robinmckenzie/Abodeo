@@ -2995,6 +2995,12 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   translate: 10px 0;
 }
 
+/* On Task assigned, the bubble slides right as the tasks narrow once Priya
+   is chosen. */
+.driver-popover.tour-step-task-assigned {
+  transition: left 0.4s ease-in-out;
+}
+
 /* A control offered as Next outside that part, such as Create beside the
    due date's calendar, stays above the dimming. */
 .project-window .tour-clickable {
