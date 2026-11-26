@@ -4,15 +4,22 @@
 import { describeBinPeriod } from "../projects/delete-project";
 import {
   addMoreTourTasks,
+  addTourAppointment,
   chooseFirstTaskPerson,
   chooseTourDueDate,
   createTourProject,
-  describeTourParty,
+  describeTourDance,
+  fillInTourAppointment,
   fillInTourProject,
+  findAppointmentsSection,
   findCreateButton,
   findFirstTaskPerson,
+  findSaveButton,
   findTourProjectBar,
   openFirstTaskList,
+  tourAppointmentAddedText,
+  tourAppointmentFailedText,
+  wasTourAppointmentAdded,
   type TourActionContext,
 } from "./tour-project";
 
@@ -82,10 +89,10 @@ export const tourSteps: readonly TourStep[] = [
     title: "Due date",
     // "Saturday" or "next Saturday", from the day the tour is started.
     get description() {
-      return `The street party is ${describeTourParty()}, so the baking is due the Friday before. A project's due date is chosen from its calendar. Press Create, or Next, to create the project.`;
+      return `The barn dance is ${describeTourDance()}, so the baking is due the Friday before. A project's due date is chosen from its calendar. Press Create, or Next, to create the project.`;
     },
     get againDescription() {
-      return `The street party is ${describeTourParty()}, so the baking is due the Friday before, chosen from the project's calendar.`;
+      return `The barn dance is ${describeTourDance()}, so the baking is due the Friday before, chosen from the project's calendar.`;
     },
     action: chooseTourDueDate,
     clickable: findCreateButton,
@@ -138,6 +145,36 @@ export const tourSteps: readonly TourStep[] = [
     description:
       "Add tasks at any time, one per line, then choose who does each. Everything is saved as it goes.",
     action: addMoreTourTasks,
+  },
+  {
+    id: "add-appointment",
+    name: "Adding an appointment",
+    element: findAppointmentsSection,
+    side: "left",
+    isInWindow: true,
+    title: "Adding an appointment",
+    description:
+      "Appointments are kept in Google Calendar. The tour has filled one in for the project. Press Save, or Next, to add it.",
+    againDescription:
+      "Appointments are kept in Google Calendar, and added from the project.",
+    action: fillInTourAppointment,
+    clickable: findSaveButton,
+  },
+  {
+    id: "appointment-added",
+    name: "In Google Calendar",
+    element: findAppointmentsSection,
+    side: "left",
+    isInWindow: true,
+    title: "In Google Calendar",
+    // Until Google Calendar answers. The action then says how it went.
+    description: "Adding to Google Calendar…",
+    get againDescription() {
+      return wasTourAppointmentAdded()
+        ? tourAppointmentAddedText
+        : tourAppointmentFailedText;
+    },
+    action: addTourAppointment,
   },
   {
     id: "people",

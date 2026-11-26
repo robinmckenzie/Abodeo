@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
@@ -42,6 +43,11 @@ import { undoDuration } from "../projects/task-list";
 import { refreshPeople } from "../projects/use-people";
 import { refreshProjects } from "../projects/use-projects";
 import { withAppLayout } from "../test-routes";
+import { tourPace } from "../tour/tour-page";
+import {
+  tourAppointmentAddedText,
+  tourAppointmentFailedText,
+} from "../tour/tour-project";
 
 // The browser's own picture decoding is not available here.
 vi.mock("../projects/thumbnail", () => ({
@@ -87,6 +93,14 @@ type Server = {
   // What the appointments endpoints answer (AD #70).
   appointmentsAnswer: unknown;
   connectionReady: boolean;
+  // The connection check's status, when it is not 200.
+  connectionStatus: number;
+  // What adding an appointment answers. A 200 adds it to appointmentsAnswer.
+  addStatus: number;
+  // The appointments added, as sent.
+  addedAppointments: Record<string, unknown>[];
+  // Whether a request for the list is left unanswered.
+  holdAppointments: boolean;
   calls: string[];
   hang: boolean;
   // The account's projects, behind the real projects endpoints.
@@ -113,6 +127,10 @@ function fakeServer(overrides: Partial<Server> = {}) {
     calendarBodies: [],
     appointmentsAnswer: { status: "ok", appointments: [] },
     connectionReady: true,
+    connectionStatus: 200,
+    addStatus: 200,
+    addedAppointments: [],
+    holdAppointments: false,
     calls: [],
     hang: false,
     projects: createMemoryProjectStore(),
@@ -209,12 +227,41 @@ function fakeServer(overrides: Partial<Server> = {}) {
         case "/api/account/activity":
           return new Response(null, { status: server.session ? 204 : 401 });
         case "/api/calendar/connection":
+          if (server.connectionStatus !== 200) {
+            return Response.json(
+              { error: "unavailable" },
+              { status: server.connectionStatus },
+            );
+          }
           return Response.json({ ready: server.connectionReady });
         case "/api/calendar/test-appointment":
           server.calendarBodies.push(JSON.parse(String(init.body)));
           return new Response("{}", { status: server.calendarStatus });
       }
       if (path.startsWith("/api/calendar/appointments")) {
+        if (init.method === "POST") {
+          const fields = JSON.parse(String(init.body));
+          server.addedAppointments.push(fields);
+          if (server.addStatus !== 200) {
+            return Response.json(
+              { error: "unavailable" },
+              { status: server.addStatus },
+            );
+          }
+          const answer = server.appointmentsAnswer as {
+            appointments?: unknown[];
+          };
+          answer.appointments?.push({
+            id: `added-${server.addedAppointments.length}`,
+            title: fields.title,
+            notes: fields.notes,
+            allDay: fields.allDay,
+            start: fields.start,
+            end: fields.end,
+          });
+          return Response.json({ status: "ok" });
+        }
+        if (server.holdAppointments) return new Promise(() => {});
         return Response.json(server.appointmentsAnswer);
       }
       return new Response(null, { status: 404 });
@@ -2190,4 +2237,229 @@ describe("returning from Google to a project (AD #70)", () => {
     expect(screen.queryByRole("group", { name: "New appointment" })).toBeNull();
     expect(screen.getByText("Shed")).toBeTruthy();
   });
+});
+
+describe("the tour's appointment (AD #161 Tour Appointment)", () => {
+  const pace = { ...tourPace };
+  beforeEach(() => {
+    Object.assign(tourPace, { typing: 0, settling: 0 });
+  });
+  afterEach(() => {
+    Object.assign(tourPace, pace);
+  });
+
+  const signedIn = (overrides: Partial<Server> = {}) =>
+    fakeServer({
+      session: { name: "Ada Lovelace", email: "ada@example.com" },
+      ...overrides,
+    });
+
+  // The dashboard as the demo's Get Started or Restart tour opens it.
+  async function renderTour(state: unknown) {
+    const Stub = createRoutesStub(
+      withAppLayout([{ path: "/dashboard", Component: Dashboard }]),
+    );
+    render(<Stub initialEntries={[{ pathname: "/dashboard", state }]} />);
+    await act(async () => {});
+    await screen.findByText("Your projects");
+  }
+
+  const readTitle = () =>
+    document.querySelector(".driver-popover-title")?.textContent;
+  const description = () =>
+    document.querySelector(".driver-popover-description")?.textContent;
+  const isNextAvailable = () =>
+    document.querySelector<HTMLButtonElement>(".driver-popover-next-btn")
+      ?.disabled === false;
+  const projectWindow = () => document.querySelector(".project-window");
+  const appointmentForm = () =>
+    document.querySelector(
+      '.project-window [role="group"][aria-label="New appointment"]',
+    );
+  const saveButton = () =>
+    document.querySelector<HTMLButtonElement>(
+      ".appointment-form-buttons button:first-child",
+    )!;
+  const entries = () =>
+    [...document.querySelectorAll(".project-window .appointment-title")].map(
+      (title) => title.textContent,
+    );
+  const savedProjects = (server: Server) => [
+    ...(server.projects.accounts.get("ada")?.values() ?? []),
+  ];
+
+  async function waitForStep(title: string) {
+    await waitFor(
+      () => {
+        expect(readTitle()).toBe(title);
+        expect(isNextAvailable()).toBe(true);
+      },
+      { timeout: 3000 },
+    );
+  }
+
+  async function pressAndWait(name: "Next" | "Back", title: string) {
+    fireEvent.click(
+      document.querySelector(
+        name === "Next"
+          ? ".driver-popover-next-btn"
+          : ".driver-popover-prev-btn",
+      )!,
+    );
+    await waitForStep(title);
+  }
+
+  async function reachAppointment() {
+    for (const title of [
+      "Adding a project",
+      "Due date",
+      "Project created",
+      "Assigning a task",
+      "Task assigned",
+      "More tasks",
+      "Adding an appointment",
+    ]) {
+      await pressAndWait("Next", title);
+    }
+  }
+
+  it("fills in the appointment, adds it to Google Calendar on Next, shows it in the project, and closes the window for People", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    await reachAppointment();
+    expect(appointmentForm()).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLInputElement>("textbox", {
+        name: "Appointment title",
+      }).value,
+    ).toBe("Barn dance planning");
+    expect(saveButton().classList.contains("tour-clickable")).toBe(true);
+    expect(description()).toContain("Press Save");
+    expect(server.addedAppointments).toHaveLength(0);
+
+    await pressAndWait("Next", "In Google Calendar");
+    expect(description()).toBe(tourAppointmentAddedText);
+    expect(server.addedAppointments).toHaveLength(1);
+    expect(server.addedAppointments[0]).toMatchObject({
+      title: "Barn dance planning",
+      notes: "Agree who brings what.",
+      allDay: false,
+      projectId: savedProjects(server)[0].id,
+    });
+    expect(appointmentForm()).toBeNull();
+    expect(entries()).toEqual(["Barn dance planning"]);
+
+    await pressAndWait("Next", "People");
+    expect(projectWindow()).toBeNull();
+  }, 20_000);
+
+  it("goes on when the visitor presses Save, adding the appointment once", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    await reachAppointment();
+    await act(async () => {
+      fireEvent.click(saveButton());
+    });
+    await waitForStep("In Google Calendar");
+    expect(description()).toBe(tourAppointmentAddedText);
+    expect(server.addedAppointments).toHaveLength(1);
+    expect(entries()).toEqual(["Barn dance planning"]);
+  }, 20_000);
+
+  it.each([
+    [
+      "the appointments cannot be shown",
+      { appointmentsAnswer: { status: "unavailable" } },
+      "Adding an appointment",
+    ],
+    [
+      "the form cannot be opened",
+      { connectionStatus: 503 },
+      "Adding an appointment",
+    ],
+    ["Google Calendar refuses it", { addStatus: 503 }, "In Google Calendar"],
+  ] as const)(
+    "says the appointment was not added when %s, closes the form, and goes on",
+    async (_, overrides, failingStep) => {
+      const server = signedIn(overrides);
+      await renderTour({ startTour: true });
+      await reachAppointment();
+      if (failingStep === "Adding an appointment") {
+        expect(description()).toBe(tourAppointmentFailedText);
+        expect(appointmentForm()).toBeNull();
+      }
+      await pressAndWait("Next", "In Google Calendar");
+      expect(description()).toBe(tourAppointmentFailedText);
+      expect(appointmentForm()).toBeNull();
+      expect(entries()).toEqual([]);
+      expect(server.addedAppointments).toHaveLength(
+        failingStep === "In Google Calendar" ? 1 : 0,
+      );
+      await pressAndWait("Next", "People");
+      expect(projectWindow()).toBeNull();
+    },
+    20_000,
+  );
+
+  it("says the appointment was added on Back from People, while the reopened project's appointments load, and adds no second one", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    await reachAppointment();
+    await pressAndWait("Next", "In Google Calendar");
+    await pressAndWait("Next", "People");
+    server.holdAppointments = true;
+    await pressAndWait("Back", "In Google Calendar");
+    expect(projectWindow()).toBeTruthy();
+    expect(screen.getByText("Loading appointments…")).toBeTruthy();
+    expect(description()).toBe(tourAppointmentAddedText);
+    await pressAndWait("Back", "Adding an appointment");
+    expect(description()).toContain("added from the project");
+    await pressAndWait("Next", "In Google Calendar");
+    await pressAndWait("Next", "People");
+    expect(server.addedAppointments).toHaveLength(1);
+  }, 20_000);
+
+  it("fills in the open form again after Back to More tasks and Next, and adds one appointment", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    await reachAppointment();
+    await pressAndWait("Back", "More tasks");
+    expect(appointmentForm()).toBeTruthy();
+    await pressAndWait("Next", "Adding an appointment");
+    expect(description()).toContain("Press Save");
+    expect(
+      screen.getByRole<HTMLInputElement>("textbox", {
+        name: "Appointment title",
+      }).value,
+    ).toBe("Barn dance planning");
+    await act(async () => {
+      fireEvent.click(saveButton());
+    });
+    await waitForStep("In Google Calendar");
+    expect(description()).toBe(tourAppointmentAddedText);
+    expect(server.addedAppointments).toHaveLength(1);
+  }, 20_000);
+
+  it("Restart tour after the Calendar steps removes the project and adds a new appointment to the new one", async () => {
+    const server = signedIn();
+    await renderTour({ startTour: true });
+    await reachAppointment();
+    await pressAndWait("Next", "In Google Calendar");
+    await pressAndWait("Next", "People");
+    const [first] = savedProjects(server);
+    fireEvent.click(document.querySelector(".tour-skip")!);
+    cleanup();
+    refreshProjects();
+    await renderTour({ restartTour: true });
+    await waitFor(() => expect(savedProjects(server)).toHaveLength(0));
+    await reachAppointment();
+    await pressAndWait("Next", "In Google Calendar");
+    expect(description()).toBe(tourAppointmentAddedText);
+    const [second] = savedProjects(server);
+    expect(second.id).not.toBe(first.id);
+    expect(server.addedAppointments.map((added) => added.projectId)).toEqual([
+      first.id,
+      second.id,
+    ]);
+  }, 30_000);
 });

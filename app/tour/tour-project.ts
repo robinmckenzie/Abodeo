@@ -1,13 +1,16 @@
 // The demo tour's own project (AD #160 Tour Creates A Project), made as a
 // visitor would make it, one step at a time: the tour fills in Add project,
-// chooses its due date, creates it, opens it and the first task's list of people, chooses Priya,
-// then adds and assigns two more tasks.
+// chooses its due date, creates it, opens it and the first task's list of
+// people, chooses Priya, adds and assigns two more tasks, then fills in and
+// saves an appointment in Google Calendar (AD #161 Tour Appointment).
 import {
   describeDueDate,
   findNextFriday,
   findToday,
   findWeekday,
 } from "../projects/due-date";
+
+import { appointmentsUnavailableMessage } from "../projects/project-appointments";
 
 import {
   pause,
@@ -19,9 +22,9 @@ import {
 } from "./tour-page";
 
 export const tourProject = {
-  title: "Bake for the street party",
+  title: "Bake for the barn dance",
   get notes() {
-    return `Something sweet for ${describeTourParty()}.`;
+    return `Something sweet for ${describeTourDance()}.`;
   },
   firstTask: { title: "Buy flour and butter", person: "Priya" },
   moreTasks: [
@@ -30,14 +33,26 @@ export const tourProject = {
   ],
 };
 
+// The appointment the tour adds to the project. It starts at the form's own
+// next whole hour.
+export const tourAppointment = {
+  title: "Barn dance planning",
+  notes: "Agree who brings what.",
+};
+
 // What a step's action is given: show puts the step's bubble on the page
-// (again, if the area it highlights has been replaced), signal ends the
-// action when the tour ends, and hurried ends its typing and pauses at once.
+// (again, if the area it highlights has been replaced), refresh fits the
+// highlight to an area that has changed size, describe changes the shown
+// bubble's wording (HTML) once the action knows how things went, signal ends
+// the action when the tour ends, and hurried ends its typing and pauses at
+// once.
 // visitorActed is true when the visitor reached the step by pressing the
 // previous step's control (TourStep.clickable), so the action leaves out
 // what that press already did.
 export type TourActionContext = {
   show: () => void;
+  refresh?: () => void;
+  describe?: (html: string) => void;
   signal: AbortSignal;
   hurried?: AbortSignal;
   visitorActed?: boolean;
@@ -94,16 +109,16 @@ export async function fillInTourProject({
   assignees[1]?.click();
 }
 
-// The project's due date: the Friday before the street party, the first
+// The project's due date: the Friday before the barn dance, the first
 // Friday after today.
 export function findTourDueDate(today = findToday()) {
   return findNextFriday(today);
 }
 
-// When the street party is, the day after the due date: "next Saturday" on
+// When the barn dance is, the day after the due date: "next Saturday" on
 // a Friday or a Saturday, when it is more than a week away, and otherwise
 // "Saturday".
-export function describeTourParty(today = findToday()) {
+export function describeTourDance(today = findToday()) {
   const weekday = findWeekday(today);
   return weekday === "Friday" || weekday === "Saturday"
     ? "next Saturday"
@@ -328,4 +343,166 @@ export async function closeProjectWindow(signal: AbortSignal) {
   if (!close) return;
   close.click();
   await waitUntil(() => !document.querySelector(windowSelector), signal);
+}
+
+// The opened project's appointments, in the window.
+export function findAppointmentsSection() {
+  return findInWindow('section[aria-label="Appointments"]') ?? undefined;
+}
+
+function findAppointmentForm() {
+  return findInWindow('[role="group"][aria-label="New appointment"]');
+}
+
+// The new appointment form's Save button, which the visitor may press
+// instead of Next.
+export function findSaveButton() {
+  return (
+    findInWindow<HTMLButtonElement>(
+      ".appointment-form-buttons button:first-child",
+    ) ?? undefined
+  );
+}
+
+function findAddAppointmentButton() {
+  return findInWindow<HTMLButtonElement>(
+    'button[aria-label="Add appointment"]',
+  );
+}
+
+// The tour's appointment in the project's list, once it is there.
+export function findTourAppointment() {
+  return [
+    ...document.querySelectorAll(
+      `${windowSelector} .appointment-entry .appointment-title`,
+    ),
+  ].find((title) => title.textContent === tourAppointment.title);
+}
+
+// Whether the section says that something went wrong: the list could not be
+// shown, or the form could not be opened.
+function hasAppointmentsAlert() {
+  return [
+    ...(findAppointmentsSection()?.querySelectorAll('[role="alert"]') ?? []),
+  ].some((alert) => !alert.classList.contains("appointment-error"));
+}
+
+const isSettled = (section: Element) =>
+  !/Loading appointments…|Connecting to Google Calendar…/.test(
+    section.textContent ?? "",
+  );
+
+// Waits until the appointments have loaded, and gives whether an
+// appointment can be added: false when they cannot be shown, Google
+// Calendar has to be connected first, or no one is signed in.
+export async function waitForAppointments(signal: AbortSignal) {
+  const section = await waitUntil(
+    () => {
+      const found = findAppointmentsSection();
+      return found && isSettled(found) && found;
+    },
+    signal,
+  );
+  return Boolean(
+    section.querySelector('[role="group"][aria-label="New appointment"]') ??
+      findAddAppointmentButton(),
+  );
+}
+
+// Whether the tour's last try added its appointment, for the wording of
+// "In Google Calendar" shown again, when the list may still be loading.
+let isTourAppointmentAdded = false;
+
+export function wasTourAppointmentAdded() {
+  return isTourAppointmentAdded;
+}
+
+export const tourAppointmentAddedText =
+  "The appointment is now in the demo account's Google Calendar, and shows in the project.";
+export const tourAppointmentFailedText =
+  "Google Calendar could not be reached just now, so the appointment was not added. You can add one yourself after the tour.";
+
+// Closes the new appointment form with its Cancel button, if it is open.
+export function cancelAppointmentForm() {
+  findInWindow<HTMLButtonElement>(
+    ".appointment-form-buttons button:last-child",
+  )?.click();
+}
+
+function failToAddAppointment(context: TourActionContext) {
+  isTourAppointmentAdded = false;
+  cancelAppointmentForm();
+  context.describe?.(tourAppointmentFailedText);
+}
+
+// Opens the project and its new appointment form, unless the form is open
+// from an earlier visit, and fills it in at once, leaving Save to the next
+// step. If Google Calendar cannot be reached, says so instead.
+export async function fillInTourAppointment(context: TourActionContext) {
+  const { signal, hurried } = context;
+  await openTourProject(context);
+  if (!findAppointmentForm()) {
+    if (!(await waitForAppointments(signal))) {
+      failToAddAppointment(context);
+      return;
+    }
+    findAddAppointmentButton()?.click();
+    const opened = await waitUntil(() => {
+      const section = findAppointmentsSection();
+      if (findAppointmentForm()) return "form";
+      if (hasAppointmentsAlert()) return "failed";
+      if (section && isSettled(section) && !findAddAppointmentButton()) {
+        return "failed";
+      }
+      return false;
+    }, signal);
+    if (opened === "failed") {
+      failToAddAppointment(context);
+      return;
+    }
+  }
+  const form = findAppointmentForm()!;
+  setFieldValue(
+    form.querySelector<HTMLInputElement>('input[type="text"]')!,
+    tourAppointment.title,
+  );
+  setFieldValue(form.querySelector("textarea")!, tourAppointment.notes);
+  context.refresh?.();
+  await pause(tourPace.settling, signal, hurried);
+}
+
+// Presses Save, unless the visitor did, and waits for Google Calendar's
+// answer: the appointment in the project's list, or a failure, when the form
+// is closed and the bubble says so.
+export async function addTourAppointment(context: TourActionContext) {
+  const { show, signal, visitorActed } = context;
+  show();
+  if (!visitorActed) {
+    const save = findSaveButton();
+    if (!save) {
+      failToAddAppointment(context);
+      return;
+    }
+    save.click();
+  }
+  const outcome = await waitUntil(() => {
+    if (findInWindow(".appointment-error")) return "failed";
+    if (findAppointmentForm()) return false;
+    if (findTourAppointment()) return "added";
+    const section = findAppointmentsSection();
+    if (
+      !section ||
+      section.textContent?.includes(appointmentsUnavailableMessage)
+    ) {
+      return "failed";
+    }
+    return false;
+  }, signal);
+  if (outcome === "failed") {
+    failToAddAppointment(context);
+    return;
+  }
+  isTourAppointmentAdded = true;
+  context.refresh?.();
+  context.describe?.(tourAppointmentAddedText);
 }

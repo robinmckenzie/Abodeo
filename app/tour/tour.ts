@@ -53,6 +53,9 @@ export function startTour(
   let withdrawClickable = () => {};
   // The step being shown again without acting, for its own wording.
   let shownAgain: number | undefined;
+  // Wording an action gave its step once it knew how things went, kept for
+  // when driver.js draws the bubble again.
+  let described: { at: number; html: string } | undefined;
 
   // driver.js's own onDestroyed is not called if the tour ends before its
   // first highlight has finished moving into place, so the tour ends here.
@@ -115,6 +118,7 @@ export function startTour(
     hurry = new AbortController();
     setActing(true);
     shownAgain = undefined;
+    described = undefined;
     let acted = false;
     let isShownAgain = false;
     const next = steps[to + 1];
@@ -125,6 +129,14 @@ export function startTour(
         ranActions.add(step.id);
         await step.action({
           show: () => tour.moveTo(to),
+          refresh: () => tour.refresh(),
+          describe: (html) => {
+            if (running.signal.aborted || tour.getActiveIndex() !== to) return;
+            described = { at: to, html };
+            const shown = document.querySelector(".driver-popover-description");
+            if (shown) shown.innerHTML = html;
+            tour.refresh();
+          },
           signal: running.signal,
           hurried: hurry.signal,
           visitorActed,
@@ -196,6 +208,9 @@ export function startTour(
       const again = shownAgain === undefined ? undefined : steps[shownAgain];
       if (again?.againDescription && tour.getActiveIndex() === shownAgain) {
         popover.description.innerHTML = again.againDescription;
+      }
+      if (described && tour.getActiveIndex() === described.at) {
+        popover.description.innerHTML = described.html;
       }
       unavailable = new Set(buttons.filter((button) => button.disabled));
       showButtons();

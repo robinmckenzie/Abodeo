@@ -103,6 +103,38 @@ describe("startTour", () => {
     expect(document.querySelector(".driver-popover")).toBeNull();
   });
 
+  it("lets an action change its shown bubble's wording, until the tour moves on", async () => {
+    let finishAction: () => void = () => {};
+    const describing: TourStep[] = [
+      steps[0],
+      {
+        id: "d",
+        name: "D",
+        element: "#area-b",
+        title: "Saving",
+        description: "Saving…",
+        action: async ({ show, describe }: TourActionContext) => {
+          show();
+          await new Promise<void>((resolve) => (finishAction = resolve));
+          describe?.("<strong>Saved.</strong>");
+        },
+      },
+      steps[2],
+    ];
+    const readDescription = () =>
+      document.querySelector(".driver-popover-description")?.innerHTML;
+    tour = startTour(onEnd, describing);
+    await pressAndSee("Next", "Saving");
+    expect(readDescription()).toBe("Saving…");
+    finishAction();
+    await waitFor(() =>
+      expect(readDescription()).toBe("<strong>Saved.</strong>"),
+    );
+    await pressAndSee("Next", "Closing");
+    await pressAndSee("Back", "Saving");
+    expect(readDescription()).toBe("Saving…");
+  });
+
   describe("a step that acts in the project's window", () => {
     let finishAction: () => void;
     const action = vi.fn(async ({ show }: TourActionContext) => {
