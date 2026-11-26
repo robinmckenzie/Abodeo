@@ -184,6 +184,8 @@ export function startTour(
         title: step.title,
         description: step.description,
         side: step.side,
+        // Named after the step, so that app.css can nudge one step's bubble.
+        popoverClass: `tour-popover tour-step-${step.id}`,
       },
     })),
     overlayClickBehavior: "none",
