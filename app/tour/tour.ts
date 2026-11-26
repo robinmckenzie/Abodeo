@@ -182,7 +182,7 @@ export function startTour(
     // so that the buttons are still called Back, Next and Done.
     prevBtnText: `${keyCap("left")} <span class="tour-word">Back</span>`,
     nextBtnText: `<span class="tour-word">Next</span> ${keyCap("right")}`,
-    doneBtnText: `Done ${keyCap("right")}`,
+    doneBtnText: `<span class="tour-word">Done</span> ${keyCap("right")}`,
     showProgress: true,
     popoverClass: "tour-popover",
     onPopoverRender: (popover) => {

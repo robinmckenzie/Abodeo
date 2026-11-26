@@ -2921,8 +2921,20 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   font-size: 0.85em;
 }
 
+/* The footer's items never wrap: the bubble widens past its max-width
+   instead, when the footer needs it, as on the last step with "10 of 10"
+   and Done. */
+.driver-popover.tour-popover {
+  min-width: min-content;
+}
+
 .tour-popover .driver-popover-footer {
   gap: 0.75rem;
+}
+
+.tour-popover .driver-popover-footer > *,
+.tour-popover .driver-popover-footer-btn {
+  white-space: nowrap;
 }
 
 .tour-popover .driver-popover-footer-btn {
@@ -2962,7 +2974,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
   margin-left: 2px;
 }
 
-/* Room either side of Back and Next (not Done). */
+/* Room either side of Back, Next and Done. */
 .tour-popover .tour-word {
   margin: 0 4px;
 }
