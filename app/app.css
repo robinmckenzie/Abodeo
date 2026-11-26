@@ -2997,7 +2997,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 }
 
 .driver-popover.tour-step-more-tasks.tour-acting:has(
-    > .driver-popover-arrow-side-left
+    .driver-popover-arrow-side-left
   ) {
   translate: -60px 0;
   transition: left 0.4s ease-in-out;
