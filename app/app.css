@@ -2956,7 +2956,7 @@ html[data-has-projects] .welcome .keyboard-shortcuts {
 .tour-popover .driver-popover-next-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: calc(0.4rem + 2px);
 }
 
 .tour-popover .driver-popover-prev-btn:has(.tour-key) {
