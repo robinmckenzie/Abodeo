@@ -1,2 +1,2 @@
 @AGENTS.md
-@C:/dev/project-starters/claude-home/managed-project.md
+@docs/agents/managed-project.md
