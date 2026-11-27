@@ -43,6 +43,9 @@ export function startTour(
   const ranActions = new Set<string>();
   const firstActing = steps.findIndex((step) => step.action);
   let isActing = false;
+  // While a step's action runs for the first time, as when More tasks adds
+  // its tasks; not when the step acts again after Back and Next.
+  let isActingFirst = false;
   // The bubble's buttons, and those driver.js itself made unavailable, such
   // as Back on the first step. driver.js builds a new bubble at every step.
   let buttons: HTMLButtonElement[] = [];
@@ -53,6 +56,28 @@ export function startTour(
   let withdrawClickable = () => {};
   // The step being shown again without acting, for its own wording.
   let shownAgain: number | undefined;
+  // Wording an action gave its step once it knew how things went, kept for
+  // when driver.js draws the bubble again.
+  let described: { at: number; html: string } | undefined;
+  // driver.js places the bubble only when a step shows. In a narrow window
+  // it puts the bubble above the highlighted part rather than beside it, and
+  // then the part moves when the project window grows, as when its
+  // appointments load. So the bubble is placed again whenever the
+  // highlighted part or the project window changes size.
+  const sizeWatcher =
+    typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(() => tour.refresh());
+  const followSize = (element: Element | undefined) => {
+    if (!sizeWatcher) return;
+    sizeWatcher.disconnect();
+    if (!element) return;
+    sizeWatcher.observe(element);
+    const projectWindow = element.closest(".project-window");
+    if (projectWindow && projectWindow !== element) {
+      sizeWatcher.observe(projectWindow);
+    }
+  };
 
   // driver.js's own onDestroyed is not called if the tour ends before its
   // first highlight has finished moving into place, so the tour ends here.
@@ -67,6 +92,11 @@ export function startTour(
       button.disabled = isUnavailable;
       button.classList.toggle("driver-popover-btn-disabled", isUnavailable);
     }
+    // So that app.css can place a step's bubble differently while it acts
+    // for the first time.
+    buttons[0]
+      ?.closest(".driver-popover")
+      ?.classList.toggle("tour-acting", isActingFirst);
   };
 
   const setActing = (acting: boolean) => {
@@ -115,6 +145,7 @@ export function startTour(
     hurry = new AbortController();
     setActing(true);
     shownAgain = undefined;
+    described = undefined;
     let acted = false;
     let isShownAgain = false;
     const next = steps[to + 1];
@@ -122,9 +153,24 @@ export function startTour(
     try {
       if (step.action && (!ranActions.has(step.id) || actsAgain)) {
         // The action closes or opens the window as it needs.
+        isActingFirst = !ranActions.has(step.id);
         ranActions.add(step.id);
         await step.action({
           show: () => tour.moveTo(to),
+          refresh: () => tour.refresh(),
+          settle: () => {
+            if (running.signal.aborted || tour.getActiveIndex() !== to) return;
+            isActingFirst = false;
+            showButtons();
+            tour.refresh();
+          },
+          describe: (html) => {
+            if (running.signal.aborted || tour.getActiveIndex() !== to) return;
+            described = { at: to, html };
+            const shown = document.querySelector(".driver-popover-description");
+            if (shown) shown.innerHTML = html;
+            tour.refresh();
+          },
           signal: running.signal,
           hurried: hurry.signal,
           visitorActed,
@@ -144,6 +190,7 @@ export function startTour(
     } catch (error) {
       if (!(error instanceof TourEnded)) throw error;
     } finally {
+      isActingFirst = false;
       if (!running.signal.aborted) {
         setActing(false);
         if (acted || (isShownAgain && step.clickableAgain)) {
@@ -172,8 +219,11 @@ export function startTour(
         title: step.title,
         description: step.description,
         side: step.side,
+        // Named after the step, so that app.css can nudge one step's bubble.
+        popoverClass: `tour-popover tour-step-${step.id}`,
       },
     })),
+    onHighlighted: followSize,
     overlayClickBehavior: "none",
     disableActiveInteraction: true,
     // No close (×) button (decision 31 on AD #139): "Skip tour" ends it.
@@ -196,6 +246,9 @@ export function startTour(
       const again = shownAgain === undefined ? undefined : steps[shownAgain];
       if (again?.againDescription && tour.getActiveIndex() === shownAgain) {
         popover.description.innerHTML = again.againDescription;
+      }
+      if (described && tour.getActiveIndex() === described.at) {
+        popover.description.innerHTML = described.html;
       }
       unavailable = new Set(buttons.filter((button) => button.disabled));
       showButtons();
@@ -221,6 +274,7 @@ export function startTour(
     running.abort();
     withdrawClickable();
     window.removeEventListener("keyup", hurryOnArrow, true);
+    sizeWatcher?.disconnect();
     destroy();
   };
   tour.drive();

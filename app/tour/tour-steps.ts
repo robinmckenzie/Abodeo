@@ -4,15 +4,25 @@
 import { describeBinPeriod } from "../projects/delete-project";
 import {
   addMoreTourTasks,
+  addTourAppointment,
   chooseFirstTaskPerson,
   chooseTourDueDate,
   createTourProject,
-  describeTourParty,
+  describeTourBakingDay,
+  describeTourDance,
+  fillInTourAppointment,
   fillInTourProject,
+  findAppointmentsSection,
   findCreateButton,
+  findDueDateCalendar,
   findFirstTaskPerson,
+  findSaveButton,
+  findTaskSection,
   findTourProjectBar,
   openFirstTaskList,
+  tourAppointmentAddedText,
+  tourAppointmentFailedText,
+  wasTourAppointmentAdded,
   type TourActionContext,
 } from "./tour-project";
 
@@ -50,6 +60,12 @@ export type TourStep = {
 
 const repositoryUrl = "https://github.com/robinmckenzie/Abodeo";
 
+// The Due date step's wording, the same whether shown first or again.
+function describeTourDueDate() {
+  const dance = describeTourDance();
+  return `The Barn Dance is ${dance === "Saturday" ? "on Saturday" : dance}, so the baking needs to be done ${describeTourBakingDay()}. A project's due date is set using the displayed calendar.`;
+}
+
 export const tourSteps: readonly TourStep[] = [
   {
     id: "projects",
@@ -76,16 +92,17 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "due-date",
     name: "Due date",
-    element: ".project-window",
-    side: "left",
+    element: findDueDateCalendar,
+    side: "right",
     isInWindow: true,
     title: "Due date",
-    // "Saturday" or "next Saturday", from the day the tour is started.
+    // "on Saturday" or "next Saturday", and "tomorrow" or "on Friday", from
+    // the day the tour is started.
     get description() {
-      return `The street party is ${describeTourParty()}, so the baking is due the Friday before. A project's due date is chosen from its calendar. Press Create, or Next, to create the project.`;
+      return `${describeTourDueDate()} Press Create, or Next, to create the project.`;
     },
     get againDescription() {
-      return `The street party is ${describeTourParty()}, so the baking is due the Friday before, chosen from the project's calendar.`;
+      return describeTourDueDate();
     },
     action: chooseTourDueDate,
     clickable: findCreateButton,
@@ -105,7 +122,7 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "assign-task",
     name: "Assigning a task",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "Assigning a task",
@@ -120,7 +137,7 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "task-assigned",
     name: "Task assigned",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "Task assigned",
@@ -131,13 +148,43 @@ export const tourSteps: readonly TourStep[] = [
   {
     id: "more-tasks",
     name: "More tasks",
-    element: ".project-window",
+    element: findTaskSection,
     side: "left",
     isInWindow: true,
     title: "More tasks",
     description:
       "Add tasks at any time, one per line, then choose who does each. Everything is saved as it goes.",
     action: addMoreTourTasks,
+  },
+  {
+    id: "add-appointment",
+    name: "Adding an appointment",
+    element: findAppointmentsSection,
+    side: "left",
+    isInWindow: true,
+    title: "Adding an appointment",
+    description:
+      "Appointments are kept in Google Calendar. The tour has filled one in for the project. Press Save, or Next, to add it.",
+    againDescription:
+      "Appointments are kept in Google Calendar, and added from the project.",
+    action: fillInTourAppointment,
+    clickable: findSaveButton,
+  },
+  {
+    id: "appointment-added",
+    name: "In Google Calendar",
+    element: findAppointmentsSection,
+    side: "left",
+    isInWindow: true,
+    title: "In Google Calendar",
+    // Until Google Calendar answers. The action then says how it went.
+    description: "Adding to Google Calendar…",
+    get againDescription() {
+      return wasTourAppointmentAdded()
+        ? tourAppointmentAddedText
+        : tourAppointmentFailedText;
+    },
+    action: addTourAppointment,
   },
   {
     id: "people",
